@@ -1,4 +1,8 @@
+import { resolveCredential } from '../lib/credentials.js';
+
 export default {
   baseUrl: 'https://api.clockify.me/api/v1',
-  apiKey: process.env.CLOCKIFY_API_KEY,
+  get apiKey() {
+    return resolveCredential('CLOCKIFY_API_KEY');
+  },
 };

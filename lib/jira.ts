@@ -1,17 +1,18 @@
 import axios from 'axios';
-
-const JIRA_API_URL = process.env.ATLASSIAN_URL;
-const JIRA_API_TOKEN = process.env.ATLASSIAN_API_TOKEN;
-const JIRA_USER_EMAIL = process.env.ATLASSIAN_EMAIL;
+import { resolveCredential } from './credentials.js';
 
 async function jiraApiRequest(url: string, method: 'POST' | 'GET', body?: unknown) {
-  if (!JIRA_API_URL || !JIRA_API_TOKEN || !JIRA_USER_EMAIL) {
+  const jiraApiUrl = resolveCredential('ATLASSIAN_URL');
+  const jiraApiToken = resolveCredential('ATLASSIAN_API_TOKEN');
+  const jiraUserEmail = resolveCredential('ATLASSIAN_EMAIL');
+
+  if (!jiraApiUrl || !jiraApiToken || !jiraUserEmail) {
     console.error('Jira environment variables are not set. Please check your .env file.');
     return null;
   }
 
   const headers = {
-    Authorization: `Basic ${Buffer.from(`${JIRA_USER_EMAIL}:${JIRA_API_TOKEN}`).toString('base64')}`,
+    Authorization: `Basic ${Buffer.from(`${jiraUserEmail}:${jiraApiToken}`).toString('base64')}`,
     Accept: 'application/json',
     'Content-Type': 'application/json',
   };
@@ -34,7 +35,8 @@ async function jiraApiRequest(url: string, method: 'POST' | 'GET', body?: unknow
 }
 
 export async function stopJiraTimer(ticketId: string, timeSpentSeconds: number) {
-  const url = `${JIRA_API_URL}/issue/${ticketId}/worklog`;
+  const jiraApiUrl = resolveCredential('ATLASSIAN_URL');
+  const url = `${jiraApiUrl}/issue/${ticketId}/worklog`;
   const body = {
     timeSpentSeconds,
     comment: {
@@ -58,6 +60,7 @@ export async function stopJiraTimer(ticketId: string, timeSpentSeconds: number) 
 }
 
 export async function getJiraTicket(ticketId: string) {
-  const url = `${JIRA_API_URL}/issue/${ticketId}`;
+  const jiraApiUrl = resolveCredential('ATLASSIAN_URL');
+  const url = `${jiraApiUrl}/issue/${ticketId}`;
   return await jiraApiRequest(url, 'GET');
 }

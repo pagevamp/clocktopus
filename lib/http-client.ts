@@ -10,8 +10,12 @@ export class HttpClient {
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
-        'X-Api-Key': clockifyConfig.apiKey,
       },
+    });
+
+    this.client.interceptors.request.use((config) => {
+      config.headers['X-Api-Key'] = clockifyConfig.apiKey;
+      return config;
     });
   }
 

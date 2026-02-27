@@ -10,6 +10,7 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { completeLatestSession, getLatestSession } from './lib/db.js';
 import { stopJiraTimer } from './lib/jira.js';
+import { startDashboard } from './dashboard/server.js';
 
 interface Project {
   id: string;
@@ -310,6 +311,13 @@ program
     });
 
     process.on('SIGTERM', () => cleanupAndExit(0));
+  });
+
+program
+  .command('dash')
+  .description('Start the Clocktopus web dashboard on localhost:4001.')
+  .action(() => {
+    startDashboard();
   });
 
 program.parse(process.argv);

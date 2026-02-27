@@ -50,6 +50,13 @@ function getDb(): Database.Database {
         projectId TEXT
       )
     `);
+    dbInstance.exec(`
+      CREATE TABLE IF NOT EXISTS credentials (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      )
+    `);
   }
 
   return dbInstance;
@@ -125,4 +132,23 @@ export function deleteOldSessions(days: number) {
   date.setDate(date.getDate() - days);
   const stmt = db.prepare('DELETE FROM sessions WHERE startedAt < ?');
   stmt.run(date.toISOString());
+}
+
+export function getCredential(key: string): string | null {
+  const db = getDb();
+  const stmt = db.prepare('SELECT value FROM credentials WHERE key = ?');
+  const row = stmt.get(key) as { value: string } | undefined;
+  return row ? row.value : null;
+}
+
+export function setCredential(key: string, value: string) {
+  const db = getDb();
+  const stmt = db.prepare('INSERT OR REPLACE INTO credentials (key, value, updatedAt) VALUES (?, ?, ?)');
+  stmt.run(key, value, new Date().toISOString());
+}
+
+export function deleteCredential(key: string) {
+  const db = getDb();
+  const stmt = db.prepare('DELETE FROM credentials WHERE key = ?');
+  stmt.run(key);
 }

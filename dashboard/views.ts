@@ -134,6 +134,11 @@ export function indexPage() {
               <tr><td colspan="5" class="empty-state">Loading...</td></tr>
             </tbody>
           </table>
+          <div id="pagination" style="display:none; margin-top:1rem; display:flex; align-items:center; justify-content:space-between;">
+            <button id="prev-btn" onclick="changePage(-1)" style="background:#30363d;" disabled>Previous</button>
+            <span id="page-info" style="font-size:0.85rem; color:#8b949e;"></span>
+            <button id="next-btn" onclick="changePage(1)" style="background:#30363d;">Next</button>
+          </div>
         </div>
       </div>
     </div>
@@ -208,6 +213,8 @@ export function indexPage() {
 
   <script>
     let elapsedInterval = null;
+    let currentPage = 1;
+    let totalPages = 1;
 
     // --- Tab switching ---
     function switchTab(tab) {
@@ -352,12 +359,16 @@ export function indexPage() {
     // --- Sessions ---
     async function loadSessions() {
       try {
-        const res = await fetch('/api/sessions');
-        const sessions = await res.json();
+        const res = await fetch('/api/sessions?page=' + currentPage + '&limit=10');
+        const result = await res.json();
+        const sessions = result.data;
+        totalPages = result.totalPages;
         const tbody = document.getElementById('sessions-body');
+        const pagination = document.getElementById('pagination');
 
-        if (sessions.length === 0) {
+        if (sessions.length === 0 && currentPage === 1) {
           tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No sessions yet. Start a timer to get going!</td></tr>';
+          pagination.style.display = 'none';
           return;
         }
 
@@ -379,9 +390,22 @@ export function indexPage() {
             '<td>' + escapeHtml(jira) + '</td>' +
             '</tr>';
         }).join('');
+
+        // Update pagination controls
+        pagination.style.display = totalPages > 1 ? 'flex' : 'none';
+        document.getElementById('prev-btn').disabled = currentPage <= 1;
+        document.getElementById('next-btn').disabled = currentPage >= totalPages;
+        document.getElementById('page-info').textContent = 'Page ' + currentPage + ' of ' + totalPages + ' (' + result.total + ' sessions)';
       } catch {
         document.getElementById('sessions-body').innerHTML = '<tr><td colspan="5" class="empty-state">Failed to load sessions.</td></tr>';
       }
+    }
+
+    function changePage(delta) {
+      const newPage = currentPage + delta;
+      if (newPage < 1 || newPage > totalPages) return;
+      currentPage = newPage;
+      loadSessions();
     }
 
     function escapeHtml(str) {

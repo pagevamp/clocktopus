@@ -28,6 +28,11 @@ export function indexPage() {
     .msg { font-size: 0.85rem; margin-top: 0.5rem; }
     .msg.ok { color: #3fb950; }
     .msg.err { color: #f85149; }
+    .guide { font-size: 0.8rem; color: #8b949e; margin-bottom: 0.25rem; }
+    .guide a { color: #58a6ff; text-decoration: none; }
+    .guide a:hover { text-decoration: underline; }
+    .guide ol { margin: 0.25rem 0 0 1.25rem; }
+    .guide li { margin-bottom: 0.15rem; }
   </style>
 </head>
 <body>
@@ -39,6 +44,13 @@ export function indexPage() {
       <div class="card-header">
         <div class="dot gray" id="clockify-dot"></div>
         <h2>Clockify</h2>
+      </div>
+      <div class="guide">
+        <ol>
+          <li>Go to <a href="https://app.clockify.me/manage-api-keys" target="_blank">Manage API Keys</a></li>
+          <li>Click <strong>Generate</strong>, enter a name, and confirm</li>
+          <li>Copy the key and paste it below</li>
+        </ol>
       </div>
       <label for="clockify-key">API Key</label>
       <input type="password" id="clockify-key" placeholder="Enter your Clockify API key" />
@@ -62,6 +74,13 @@ export function indexPage() {
       <div class="card-header">
         <div class="dot gray" id="jira-dot"></div>
         <h2>Jira</h2>
+      </div>
+      <div class="guide">
+        <ol>
+          <li>Go to <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank">Atlassian API Tokens</a></li>
+          <li>Click <strong>Create API token</strong> and copy it</li>
+          <li>Your URL is <code>https://&lt;your-org&gt;.atlassian.net/rest/api/3</code></li>
+        </ol>
       </div>
       <label for="jira-url">Atlassian URL</label>
       <input type="text" id="jira-url" placeholder="https://your-org.atlassian.net/rest/api/3" />

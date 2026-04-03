@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import Database from 'better-sqlite3';
+import { Database } from 'bun:sqlite';
 import { z } from 'zod';
 
 const DB_DIR = path.join(process.cwd(), 'data/db');
@@ -20,12 +20,12 @@ const SessionSchema = z.object({
   jiraTicket: z.string().nullable(),
 });
 
-let dbInstance: Database.Database | null = null;
+let dbInstance: Database | null = null;
 
-function getDb(): Database.Database {
+function getDb(): Database {
   if (!dbInstance) {
     dbInstance = new Database(DB_PATH);
-    dbInstance.pragma('journal_mode = WAL');
+    dbInstance.exec('PRAGMA journal_mode = WAL');
     dbInstance.exec(`
       CREATE TABLE IF NOT EXISTS sessions (
         id TEXT PRIMARY KEY,
@@ -101,7 +101,7 @@ export function logSessionStart(
     'INSERT INTO sessions (id, projectId, description, startedAt, isAutoCompleted, jiraTicket) VALUES (?, ?, ?, ?, ?, ?)',
   );
 
-  stmt.run(id, projectId, description, startedAt, 0, jiraTicket);
+  stmt.run(id, projectId, description, startedAt, 0, jiraTicket ?? null);
 }
 
 export function completeLatestSession(completedAt: string, isAutoCompleted = false) {

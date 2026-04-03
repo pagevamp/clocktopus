@@ -116,6 +116,21 @@ export function indexPage() {
         <div class="msg" id="timer-msg"></div>
       </div>
 
+      <!-- Monitor Control -->
+      <div class="card">
+        <div class="card-header">
+          <div class="dot gray" id="monitor-dot"></div>
+          <h2>Idle Monitor</h2>
+        </div>
+        <p id="monitor-desc" style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Auto-stops timers when idle, resumes when active.</p>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+          <button id="monitor-start-btn" onclick="monitorAction('start')" style="margin-top:0;">Start</button>
+          <button id="monitor-stop-btn" onclick="monitorAction('stop')" class="stop-btn" style="margin-top:0;" disabled>Stop</button>
+          <button id="monitor-restart-btn" onclick="monitorAction('restart')" style="margin-top:0;background:#30363d;" disabled>Restart</button>
+        </div>
+        <div class="msg" id="monitor-msg"></div>
+      </div>
+
       <!-- Session History -->
       <div class="card card-full">
         <h2>Recent Sessions</h2>
@@ -338,6 +353,54 @@ export function indexPage() {
       }
     }
 
+    // --- Monitor ---
+    async function checkMonitorStatus() {
+      try {
+        const res = await fetch('/api/monitor/status');
+        const data = await res.json();
+        const dot = document.getElementById('monitor-dot');
+        const desc = document.getElementById('monitor-desc');
+        const startBtn = document.getElementById('monitor-start-btn');
+        const stopBtn = document.getElementById('monitor-stop-btn');
+        const restartBtn = document.getElementById('monitor-restart-btn');
+
+        if (data.running) {
+          dot.className = 'dot green';
+          const uptime = data.uptime ? formatDuration(Date.now() - data.uptime) : '';
+          desc.textContent = 'Running' + (uptime ? ' for ' + uptime : '') + (data.restarts > 0 ? ' (' + data.restarts + ' restarts)' : '');
+          desc.style.color = '#3fb950';
+          startBtn.disabled = true;
+          stopBtn.disabled = false;
+          restartBtn.disabled = false;
+        } else {
+          dot.className = 'dot red';
+          desc.textContent = data.status === 'stopped' ? 'Stopped' : 'Not running';
+          desc.style.color = '#8b949e';
+          startBtn.disabled = false;
+          stopBtn.disabled = true;
+          restartBtn.disabled = true;
+        }
+      } catch {
+        document.getElementById('monitor-dot').className = 'dot gray';
+      }
+    }
+
+    async function monitorAction(action) {
+      setMsg('monitor-msg', '', true);
+      try {
+        const res = await fetch('/api/monitor/' + action, { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) {
+          setMsg('monitor-msg', 'Monitor ' + action + (action === 'stop' ? 'ped' : 'ed') + '.', true);
+        } else {
+          setMsg('monitor-msg', data.output || 'Failed.', false);
+        }
+        setTimeout(checkMonitorStatus, 1000);
+      } catch {
+        setMsg('monitor-msg', 'Request failed.', false);
+      }
+    }
+
     // --- Projects ---
     async function loadProjects() {
       try {
@@ -553,6 +616,7 @@ export function indexPage() {
     loadProjects();
     loadSessions();
     checkActiveTimer();
+    checkMonitorStatus();
   </script>
 </body>
 </html>`;

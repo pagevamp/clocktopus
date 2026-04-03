@@ -8,18 +8,42 @@ export function indexPage() {
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1117; color: #e1e4e8; padding: 2rem; }
-    h1 { font-size: 1.8rem; margin-bottom: 1.5rem; color: #fff; }
+    h1 { font-size: 1.8rem; margin-bottom: 0; color: #fff; }
+    h2 { font-size: 1.1rem; color: #fff; margin-bottom: 1rem; }
+
+    /* Nav */
+    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+    .nav { display: flex; gap: 0.25rem; background: #1c1f26; border-radius: 8px; padding: 0.25rem; }
+    .nav-btn { padding: 0.5rem 1.25rem; border: none; border-radius: 6px; background: transparent; color: #8b949e; font-size: 0.9rem; cursor: pointer; }
+    .nav-btn:hover { color: #e1e4e8; }
+    .nav-btn.active { background: #30363d; color: #fff; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Cards */
     .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 1.5rem; }
     .card { background: #1c1f26; border: 1px solid #2d3139; border-radius: 12px; padding: 1.5rem; }
     .card-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
-    .card-header h2 { font-size: 1.1rem; color: #fff; }
+    .card-header h2 { margin-bottom: 0; }
+    .card-full { grid-column: 1 / -1; }
+
+    /* Active timer */
+    .active-timer { border-left: 3px solid #3fb950; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+    .active-timer .timer-info { flex: 1; }
+    .active-timer .timer-desc { font-size: 1rem; color: #fff; font-weight: 500; }
+    .active-timer .timer-elapsed { font-size: 0.9rem; color: #3fb950; margin-top: 0.25rem; }
+    .stop-btn { background: #da3633; margin-top: 0; }
+    .stop-btn:hover { background: #f85149; }
+
+    /* Form elements */
     .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
     .dot.green { background: #3fb950; }
     .dot.red { background: #f85149; }
     .dot.gray { background: #484f58; }
     label { display: block; font-size: 0.85rem; color: #8b949e; margin-bottom: 0.25rem; margin-top: 0.75rem; }
-    input { width: 100%; padding: 0.5rem 0.75rem; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #e1e4e8; font-size: 0.9rem; }
-    input:focus { outline: none; border-color: #58a6ff; }
+    input, select { width: 100%; padding: 0.5rem 0.75rem; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #e1e4e8; font-size: 0.9rem; }
+    input:focus, select:focus { outline: none; border-color: #58a6ff; }
+    select { appearance: none; -webkit-appearance: none; cursor: pointer; }
     button { margin-top: 1rem; padding: 0.5rem 1.25rem; background: #238636; border: none; border-radius: 6px; color: #fff; font-size: 0.9rem; cursor: pointer; }
     button:hover { background: #2ea043; }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -33,75 +57,167 @@ export function indexPage() {
     .guide a:hover { text-decoration: underline; }
     .guide ol { margin: 0.25rem 0 0 1.25rem; }
     .guide li { margin-bottom: 0.15rem; }
+
+    /* Sessions table */
+    .sessions-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .sessions-table th { text-align: left; color: #8b949e; padding: 0.5rem 0.75rem; border-bottom: 1px solid #30363d; font-weight: 500; }
+    .sessions-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid #21262d; }
+    .sessions-table tr:hover { background: #161b22; }
+    .sessions-table .in-progress { color: #3fb950; font-style: italic; }
+    .empty-state { color: #8b949e; font-size: 0.9rem; padding: 2rem; text-align: center; }
+
+    /* Inline form row */
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 600px) { .form-row { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
-  <h1>Clocktopus Dashboard</h1>
-  <div class="cards">
+  <div class="header">
+    <h1>Clocktopus</h1>
+    <div class="nav">
+      <button class="nav-btn active" onclick="switchTab('home')" id="nav-home">Home</button>
+      <button class="nav-btn" onclick="switchTab('settings')" id="nav-settings">Settings</button>
+    </div>
+  </div>
 
-    <!-- Clockify -->
-    <div class="card">
-      <div class="card-header">
-        <div class="dot gray" id="clockify-dot"></div>
-        <h2>Clockify</h2>
+  <!-- HOME TAB -->
+  <div id="tab-home" class="tab-content active">
+
+    <!-- Active Timer Banner -->
+    <div id="active-timer" class="card active-timer" style="display:none; margin-bottom:1.5rem;">
+      <div class="timer-info">
+        <div class="timer-desc" id="active-timer-desc"></div>
+        <div class="timer-elapsed" id="active-timer-elapsed"></div>
       </div>
-      <div class="guide">
-        <ol>
-          <li>Go to <a href="https://app.clockify.me/manage-api-keys" target="_blank">Manage API Keys</a></li>
-          <li>Click <strong>Generate</strong>, enter a name, and confirm</li>
-          <li>Copy the key and paste it below</li>
-        </ol>
-      </div>
-      <label for="clockify-key">API Key</label>
-      <input type="password" id="clockify-key" placeholder="Enter your Clockify API key" />
-      <button onclick="saveClockify()">Save &amp; Validate</button>
-      <div class="msg" id="clockify-msg"></div>
+      <button class="stop-btn" onclick="stopTimer()">Stop Timer</button>
     </div>
 
-    <!-- Google Calendar -->
-    <div class="card">
-      <div class="card-header">
-        <div class="dot gray" id="google-dot"></div>
-        <h2>Google Calendar</h2>
-      </div>
-      <p id="google-desc" style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Authorize access to your Google Calendar.</p>
-      <button class="connect" id="google-connect-btn" onclick="connectGoogle()">Connect Google Account</button>
-      <div class="msg" id="google-msg"></div>
-    </div>
-
-    <!-- Jira -->
-    <div class="card">
-      <div class="card-header">
-        <div class="dot gray" id="jira-dot"></div>
-        <h2>Jira</h2>
-      </div>
-      <p id="jira-desc" style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Connect your Atlassian account to log time on Jira tickets.</p>
-      <button class="connect" id="jira-connect-btn" onclick="connectJira()">Connect Atlassian</button>
-      <div class="msg" id="jira-msg"></div>
-      <div style="margin-top:1rem;">
-        <a href="#" id="jira-toggle" onclick="toggleJiraForm(event)" style="font-size:0.8rem;color:#8b949e;text-decoration:none;">or use API token &darr;</a>
-        <div id="jira-form" style="display:none;margin-top:0.5rem;">
-          <div class="guide">
-            <ol>
-              <li>Go to <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank">Atlassian API Tokens</a></li>
-              <li>Click <strong>Create API token</strong> and copy it</li>
-              <li>Your URL is <code>https://&lt;your-org&gt;.atlassian.net/rest/api/3</code></li>
-            </ol>
+    <div class="cards">
+      <!-- Start Timer -->
+      <div class="card">
+        <h2>Start Timer</h2>
+        <div id="start-timer-form">
+          <label for="project-select">Project</label>
+          <select id="project-select">
+            <option value="">Loading projects...</option>
+          </select>
+          <div class="form-row">
+            <div>
+              <label for="timer-description">Description</label>
+              <input type="text" id="timer-description" placeholder="What are you working on?" />
+            </div>
+            <div>
+              <label for="timer-jira">Jira Ticket (optional)</label>
+              <input type="text" id="timer-jira" placeholder="e.g. PROJ-123" />
+            </div>
           </div>
-          <label for="jira-url">Atlassian URL</label>
-          <input type="text" id="jira-url" placeholder="https://your-org.atlassian.net/rest/api/3" />
-          <label for="jira-email">Email</label>
-          <input type="email" id="jira-email" placeholder="you@example.com" />
-          <label for="jira-token">API Token</label>
-          <input type="password" id="jira-token" placeholder="Atlassian API token" />
-          <button onclick="saveJira()">Save &amp; Validate</button>
+          <button id="start-btn" onclick="startTimer()">Start Timer</button>
+        </div>
+        <div class="msg" id="timer-msg"></div>
+      </div>
+
+      <!-- Session History -->
+      <div class="card card-full">
+        <h2>Recent Sessions</h2>
+        <div id="sessions-container">
+          <table class="sessions-table">
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th>Project</th>
+                <th>Started</th>
+                <th>Duration</th>
+                <th>Jira</th>
+              </tr>
+            </thead>
+            <tbody id="sessions-body">
+              <tr><td colspan="5" class="empty-state">Loading...</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
+  </div>
 
+  <!-- SETTINGS TAB -->
+  <div id="tab-settings" class="tab-content">
+    <div class="cards">
+
+      <!-- Clockify -->
+      <div class="card">
+        <div class="card-header">
+          <div class="dot gray" id="clockify-dot"></div>
+          <h2>Clockify</h2>
+        </div>
+        <div class="guide">
+          <ol>
+            <li>Go to <a href="https://app.clockify.me/manage-api-keys" target="_blank">Manage API Keys</a></li>
+            <li>Click <strong>Generate</strong>, enter a name, and confirm</li>
+            <li>Copy the key and paste it below</li>
+          </ol>
+        </div>
+        <label for="clockify-key">API Key</label>
+        <input type="password" id="clockify-key" placeholder="Enter your Clockify API key" />
+        <button onclick="saveClockify()">Save &amp; Validate</button>
+        <div class="msg" id="clockify-msg"></div>
+      </div>
+
+      <!-- Google Calendar -->
+      <div class="card">
+        <div class="card-header">
+          <div class="dot gray" id="google-dot"></div>
+          <h2>Google Calendar</h2>
+        </div>
+        <p id="google-desc" style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Authorize access to your Google Calendar.</p>
+        <button class="connect" id="google-connect-btn" onclick="connectGoogle()">Connect Google Account</button>
+        <div class="msg" id="google-msg"></div>
+      </div>
+
+      <!-- Jira -->
+      <div class="card">
+        <div class="card-header">
+          <div class="dot gray" id="jira-dot"></div>
+          <h2>Jira</h2>
+        </div>
+        <p id="jira-desc" style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Connect your Atlassian account to log time on Jira tickets.</p>
+        <button class="connect" id="jira-connect-btn" onclick="connectJira()">Connect Atlassian</button>
+        <div class="msg" id="jira-msg"></div>
+        <div style="margin-top:1rem;">
+          <a href="#" id="jira-toggle" onclick="toggleJiraForm(event)" style="font-size:0.8rem;color:#8b949e;text-decoration:none;">or use API token &darr;</a>
+          <div id="jira-form" style="display:none;margin-top:0.5rem;">
+            <div class="guide">
+              <ol>
+                <li>Go to <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank">Atlassian API Tokens</a></li>
+                <li>Click <strong>Create API token</strong> and copy it</li>
+                <li>Your URL is <code>https://&lt;your-org&gt;.atlassian.net/rest/api/3</code></li>
+              </ol>
+            </div>
+            <label for="jira-url">Atlassian URL</label>
+            <input type="text" id="jira-url" placeholder="https://your-org.atlassian.net/rest/api/3" />
+            <label for="jira-email">Email</label>
+            <input type="email" id="jira-email" placeholder="you@example.com" />
+            <label for="jira-token">API Token</label>
+            <input type="password" id="jira-token" placeholder="Atlassian API token" />
+            <button onclick="saveJira()">Save &amp; Validate</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
   </div>
 
   <script>
+    let elapsedInterval = null;
+
+    // --- Tab switching ---
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+      document.getElementById('tab-' + tab).classList.add('active');
+      document.getElementById('nav-' + tab).classList.add('active');
+    }
+
+    // --- Utilities ---
     function setMsg(id, text, ok) {
       const el = document.getElementById(id);
       el.textContent = text;
@@ -112,27 +228,211 @@ export function indexPage() {
       document.getElementById(id).className = 'dot ' + color;
     }
 
+    function formatDuration(ms) {
+      const totalSec = Math.floor(ms / 1000);
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+      if (h > 0) return h + 'h ' + m + 'm ' + s + 's';
+      if (m > 0) return m + 'm ' + s + 's';
+      return s + 's';
+    }
+
+    function formatDate(iso) {
+      if (!iso) return '-';
+      const d = new Date(iso);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' +
+             d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // --- Timer ---
+    async function checkActiveTimer() {
+      try {
+        const res = await fetch('/api/timer/active');
+        const data = await res.json();
+        const banner = document.getElementById('active-timer');
+        const startBtn = document.getElementById('start-btn');
+
+        if (data.active) {
+          document.getElementById('active-timer-desc').textContent = data.description || 'Timer running';
+          banner.style.display = 'flex';
+          startBtn.disabled = true;
+          startBtn.textContent = 'Timer Running...';
+
+          if (elapsedInterval) clearInterval(elapsedInterval);
+          const startTime = new Date(data.start).getTime();
+          function updateElapsed() {
+            const elapsed = Date.now() - startTime;
+            document.getElementById('active-timer-elapsed').textContent = formatDuration(elapsed);
+          }
+          updateElapsed();
+          elapsedInterval = setInterval(updateElapsed, 1000);
+        } else {
+          banner.style.display = 'none';
+          startBtn.disabled = false;
+          startBtn.textContent = 'Start Timer';
+          if (elapsedInterval) { clearInterval(elapsedInterval); elapsedInterval = null; }
+        }
+      } catch {}
+    }
+
+    async function startTimer() {
+      const projectId = document.getElementById('project-select').value;
+      const description = document.getElementById('timer-description').value.trim();
+      const jiraTicket = document.getElementById('timer-jira').value.trim();
+
+      if (!projectId) return setMsg('timer-msg', 'Please select a project.', false);
+      if (!description && !jiraTicket) return setMsg('timer-msg', 'Please enter a description or Jira ticket.', false);
+
+      const btn = document.getElementById('start-btn');
+      btn.disabled = true;
+      btn.textContent = 'Starting...';
+
+      try {
+        const res = await fetch('/api/timer/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId, description: description || 'Working on a task...', jiraTicket: jiraTicket || undefined }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          setMsg('timer-msg', 'Timer started!', true);
+          document.getElementById('timer-description').value = '';
+          document.getElementById('timer-jira').value = '';
+          checkActiveTimer();
+          loadSessions();
+        } else {
+          setMsg('timer-msg', data.error || 'Failed to start timer.', false);
+          btn.disabled = false;
+          btn.textContent = 'Start Timer';
+        }
+      } catch {
+        setMsg('timer-msg', 'Request failed.', false);
+        btn.disabled = false;
+        btn.textContent = 'Start Timer';
+      }
+    }
+
+    async function stopTimer() {
+      try {
+        const res = await fetch('/api/timer/stop', {
+          method: 'POST',
+        });
+        const data = await res.json();
+        if (data.ok) {
+          setMsg('timer-msg', 'Timer stopped.', true);
+          checkActiveTimer();
+          loadSessions();
+        } else {
+          setMsg('timer-msg', data.error || 'Failed to stop timer.', false);
+        }
+      } catch {
+        setMsg('timer-msg', 'Request failed.', false);
+      }
+    }
+
+    // --- Projects ---
+    async function loadProjects() {
+      try {
+        const res = await fetch('/api/projects');
+        const projects = await res.json();
+        const select = document.getElementById('project-select');
+        select.innerHTML = '<option value="">Select a project</option>';
+        projects.forEach(function(p) {
+          const opt = document.createElement('option');
+          opt.value = p.id;
+          opt.textContent = p.name;
+          select.appendChild(opt);
+        });
+      } catch {
+        document.getElementById('project-select').innerHTML = '<option value="">Failed to load projects</option>';
+      }
+    }
+
+    // --- Sessions ---
+    async function loadSessions() {
+      try {
+        const res = await fetch('/api/sessions');
+        const sessions = await res.json();
+        const tbody = document.getElementById('sessions-body');
+
+        if (sessions.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No sessions yet. Start a timer to get going!</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = sessions.map(function(s) {
+          const started = formatDate(s.startedAt);
+          let duration;
+          if (s.completedAt) {
+            const ms = new Date(s.completedAt).getTime() - new Date(s.startedAt).getTime();
+            duration = formatDuration(ms);
+          } else {
+            duration = '<span class="in-progress">In progress</span>';
+          }
+          const jira = s.jiraTicket || '-';
+          return '<tr>' +
+            '<td>' + escapeHtml(s.description) + '</td>' +
+            '<td>' + escapeHtml(s.projectName) + '</td>' +
+            '<td>' + started + '</td>' +
+            '<td>' + duration + '</td>' +
+            '<td>' + escapeHtml(jira) + '</td>' +
+            '</tr>';
+        }).join('');
+      } catch {
+        document.getElementById('sessions-body').innerHTML = '<tr><td colspan="5" class="empty-state">Failed to load sessions.</td></tr>';
+      }
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // --- Settings: Clockify ---
+    async function saveClockify() {
+      const apiKey = document.getElementById('clockify-key').value.trim();
+      if (!apiKey) return setMsg('clockify-msg', 'API key is required.', false);
+      try {
+        const res = await fetch('/api/clockify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ apiKey }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          setMsg('clockify-msg', 'Saved and validated successfully.', true);
+          setDot('clockify-dot', 'green');
+        } else {
+          setMsg('clockify-msg', data.error || 'Validation failed.', false);
+          setDot('clockify-dot', 'red');
+        }
+      } catch {
+        setMsg('clockify-msg', 'Request failed.', false);
+      }
+    }
+
+    // --- Settings: Google ---
     function setGoogleConnected(connected, email) {
       const btn = document.getElementById('google-connect-btn');
       const desc = document.getElementById('google-desc');
       if (connected) {
         btn.textContent = 'Reconnect';
-        btn.disabled = false;
-        if (email) {
-          desc.textContent = 'Connected as ' + email;
-          desc.style.color = '#3fb950';
-        } else {
-          desc.textContent = 'Connected';
-          desc.style.color = '#3fb950';
-        }
+        desc.textContent = 'Connected' + (email ? ' as ' + email : '');
+        desc.style.color = '#3fb950';
       } else {
         btn.textContent = 'Connect Google Account';
-        btn.disabled = false;
         desc.textContent = 'Authorize access to your Google Calendar.';
         desc.style.color = '#8b949e';
       }
     }
 
+    function connectGoogle() {
+      window.location.href = '/api/google/connect';
+    }
+
+    // --- Settings: Jira ---
     function setJiraConnected(connected, isOAuth, siteUrl) {
       const btn = document.getElementById('jira-connect-btn');
       const desc = document.getElementById('jira-desc');
@@ -168,58 +468,6 @@ export function indexPage() {
       }
     }
 
-    async function fetchStatus() {
-      try {
-        const res = await fetch('/api/status');
-        const data = await res.json();
-        setDot('clockify-dot', data.clockify ? 'green' : 'red');
-        setDot('google-dot', data.google ? 'green' : 'red');
-        setDot('jira-dot', data.jira ? 'green' : 'red');
-        setGoogleConnected(data.google, data.googleEmail);
-        setJiraConnected(data.jira, data.jiraOAuth, data.jiraSiteUrl);
-      } catch {}
-    }
-
-    // Handle OAuth callback params
-    (function checkUrlParams() {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('jira') === 'connected') {
-        const site = params.get('site') || '';
-        setMsg('jira-msg', 'Connected to ' + (site || 'Atlassian') + ' successfully!', true);
-        setDot('jira-dot', 'green');
-        window.history.replaceState({}, '', '/');
-      } else if (params.get('jira') === 'error') {
-        setMsg('jira-msg', 'Connection failed: ' + (params.get('reason') || 'unknown error'), false);
-        window.history.replaceState({}, '', '/');
-      }
-    })();
-
-    async function saveClockify() {
-      const apiKey = document.getElementById('clockify-key').value.trim();
-      if (!apiKey) return setMsg('clockify-msg', 'API key is required.', false);
-      try {
-        const res = await fetch('/api/clockify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ apiKey }),
-        });
-        const data = await res.json();
-        if (data.ok) {
-          setMsg('clockify-msg', 'Saved and validated successfully.', true);
-          setDot('clockify-dot', 'green');
-        } else {
-          setMsg('clockify-msg', data.error || 'Validation failed.', false);
-          setDot('clockify-dot', 'red');
-        }
-      } catch (e) {
-        setMsg('clockify-msg', 'Request failed.', false);
-      }
-    }
-
-    function connectGoogle() {
-      window.location.href = '/api/google/connect';
-    }
-
     async function saveJira() {
       const url = document.getElementById('jira-url').value.trim();
       const email = document.getElementById('jira-email').value.trim();
@@ -239,12 +487,48 @@ export function indexPage() {
           setMsg('jira-msg', data.error || 'Validation failed.', false);
           setDot('jira-dot', 'red');
         }
-      } catch (e) {
+      } catch {
         setMsg('jira-msg', 'Request failed.', false);
       }
     }
 
+    // --- Status ---
+    async function fetchStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        setDot('clockify-dot', data.clockify ? 'green' : 'red');
+        setDot('google-dot', data.google ? 'green' : 'red');
+        setDot('jira-dot', data.jira ? 'green' : 'red');
+        setGoogleConnected(data.google, data.googleEmail);
+        setJiraConnected(data.jira, data.jiraOAuth, data.jiraSiteUrl);
+      } catch {}
+    }
+
+    // --- OAuth callback params ---
+    (function checkUrlParams() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('jira') === 'connected') {
+        switchTab('settings');
+        setTimeout(function() {
+          setMsg('jira-msg', 'Connected to ' + (params.get('site') || 'Atlassian') + ' successfully!', true);
+          setDot('jira-dot', 'green');
+        }, 100);
+        window.history.replaceState({}, '', '/');
+      } else if (params.get('jira') === 'error') {
+        switchTab('settings');
+        setTimeout(function() {
+          setMsg('jira-msg', 'Connection failed: ' + (params.get('reason') || 'unknown error'), false);
+        }, 100);
+        window.history.replaceState({}, '', '/');
+      }
+    })();
+
+    // --- Init ---
     fetchStatus();
+    loadProjects();
+    loadSessions();
+    checkActiveTimer();
   </script>
 </body>
 </html>`;

@@ -128,6 +128,12 @@ export function completeLatestSession(completedAt: string, isAutoCompleted = fal
   stmt.run(completedAt, isAutoCompleted ? 1 : 0);
 }
 
+export function getRecentSessions(limit = 20) {
+  const db = getDb();
+  const stmt = db.prepare('SELECT * FROM sessions ORDER BY startedAt DESC LIMIT ?');
+  return stmt.all(limit);
+}
+
 export function getLatestSession() {
   const db = getDb();
   const stmt = db.prepare(`

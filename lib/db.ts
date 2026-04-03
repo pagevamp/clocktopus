@@ -57,6 +57,17 @@ function getDb(): Database {
         updatedAt TEXT NOT NULL
       )
     `);
+    dbInstance.exec(`
+      CREATE TABLE IF NOT EXISTS atlassian_tokens (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        access_token TEXT NOT NULL,
+        refresh_token TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        cloud_id TEXT NOT NULL,
+        site_url TEXT,
+        createdAt TEXT NOT NULL
+      )
+    `);
   }
 
   return dbInstance;
@@ -151,4 +162,48 @@ export function deleteCredential(key: string) {
   const db = getDb();
   const stmt = db.prepare('DELETE FROM credentials WHERE key = ?');
   stmt.run(key);
+}
+
+export interface AtlassianToken {
+  access_token: string;
+  refresh_token: string;
+  expires_at: string;
+  cloud_id: string;
+  site_url: string | null;
+}
+
+export function storeAtlassianToken(token: {
+  access_token: string;
+  refresh_token: string;
+  expires_at: string;
+  cloud_id: string;
+  site_url?: string;
+}) {
+  const db = getDb();
+  const stmt = db.prepare(
+    'INSERT OR REPLACE INTO atlassian_tokens (id, access_token, refresh_token, expires_at, cloud_id, site_url, createdAt) VALUES (1, ?, ?, ?, ?, ?, ?)',
+  );
+  stmt.run(
+    token.access_token,
+    token.refresh_token,
+    token.expires_at,
+    token.cloud_id,
+    token.site_url ?? null,
+    new Date().toISOString(),
+  );
+}
+
+export function getAtlassianToken(): AtlassianToken | null {
+  const db = getDb();
+  const stmt = db.prepare(
+    'SELECT access_token, refresh_token, expires_at, cloud_id, site_url FROM atlassian_tokens WHERE id = 1',
+  );
+  const row = stmt.get() as AtlassianToken | undefined;
+  return row ?? null;
+}
+
+export function updateAtlassianAccessToken(access_token: string, expires_at: string) {
+  const db = getDb();
+  const stmt = db.prepare('UPDATE atlassian_tokens SET access_token = ?, expires_at = ? WHERE id = 1');
+  stmt.run(access_token, expires_at);
 }

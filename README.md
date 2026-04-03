@@ -30,27 +30,50 @@ To get started with the Clocktopus CLI, follow these steps:
 
 2.  **Install dependencies:**
     ```bash
-    yarn install
+    bun install
     ```
 
 ## Configuration
 
-### Clockify API Key
+### Environment Variables
 
-To connect to your Clockify account, you need to provide your API key. Create a `.env` file in the root directory of the project and add your Clockify API key:
+Create a `.env` file in the `data/` directory with the following variables:
 
 ```
 CLOCKIFY_API_KEY="your_clockify_api_key_here"
-ATLASSIAN_URL="https://your_org.atlassian.net/rest/api/3"
-ATLASSIAN_API_TOKEN="your_atlassian_api_token_here"
-ATLASSIAN_EMAIL="username@example.com"
+ATLASSIAN_CLIENT_ID="your_atlassian_oauth_client_id"
+ATLASSIAN_CLIENT_SECRET="your_atlassian_oauth_client_secret"
 GOOGLE_CLIENT_ID="google_client_id"
 GOOGLE_CLIENT_SECRET="google_client_secret"
 ```
 
-> Note: If you do not want to use Jira Integration, you can remove the ATLASSIAN variables.
+You can get your Clockify API key from [Manage API Keys](https://app.clockify.me/manage-api-keys).
 
-Replace `"your_actual_clockify_api_key"` with your personal API key from your Clockify profile settings.
+### Jira Integration (Atlassian OAuth)
+
+Clocktopus uses Atlassian OAuth 2.0 so users can connect their Jira account with a single click from the dashboard instead of manually copying API tokens.
+
+#### Setting up the Atlassian OAuth App
+
+1. Go to [Atlassian Developer Console](https://developer.atlassian.com/console/myapps/) and create a new **OAuth 2.0 (3LO)** app
+2. Under **Authorization**, set the callback URL to:
+   ```
+   http://localhost:4001/api/jira/callback
+   ```
+3. Under **Permissions**, add the following scopes:
+   - **Jira API**: `read:jira-work`, `write:jira-work`
+   - **User identity API**: `read:me`
+4. Copy the **Client ID** and **Client Secret** from the app's **Settings** page
+5. Add them to your `.env` file as `ATLASSIAN_CLIENT_ID` and `ATLASSIAN_CLIENT_SECRET`
+6. Start the dashboard (`bun run dashboard`) and click **Connect Atlassian**
+
+> **Fallback:** If you prefer using an API token instead of OAuth, you can expand the "or use API token" section on the dashboard and enter your credentials manually. For this, set the following in `.env`:
+>
+> ```
+> ATLASSIAN_URL="https://your_org.atlassian.net/rest/api/3"
+> ATLASSIAN_API_TOKEN="your_atlassian_api_token_here"
+> ATLASSIAN_EMAIL="username@example.com"
+> ```
 
 ### Local Projects Filtering
 
@@ -80,7 +103,7 @@ Remove any project objects (both `id` and `name`) that you don't want to appear 
 Before running, you need to compile the TypeScript code:
 
 ```bash
-yarn build
+bun run build
 ```
 
 ### Run the application
@@ -90,7 +113,7 @@ Once built, you can run the CLI commands using the following commands:
 - **Monitor idle state and auto-manage timers:**
 
   ```bash
-  yarn monitor
+  bun run monitor
   ```
 
   This command will monitor your system's idle time and automatically manage your Clockify timer:
@@ -106,7 +129,7 @@ Once built, you can run the CLI commands using the following commands:
 - **Start a new time entry:**
 
   ```bash
-  yarn clock start "Task description"
+  bun run clock start "Task description"
   ```
 
   This will prompt you to select a project from your curated list.
@@ -114,7 +137,7 @@ Once built, you can run the CLI commands using the following commands:
 - **Start a new time entry with a Jira ticket:**
 
   ```bash
-  yarn clock start -j TICKET-123
+  bun run clock start -j TICKET-123
   ```
 
   When you provide a Jira ticket number with the `-j` flag, the tool will automatically fetch the ticket's title from Jira and prepend it to your time entry description. For example, if the title of `TICKET-123` is "Fix the login button", the description will be saved as `TICKET-123 Fix the login button`. If you also provide a description, it will be appended after the Jira title.
@@ -122,12 +145,12 @@ Once built, you can run the CLI commands using the following commands:
 - **Stop the currently running time entry:**
 
   ```bash
-  yarn clock stop
+  bun run clock stop
   ```
 
 - **Check the status of the current timer:**
   ```bash
-  yarn clock status
+  bun run clock status
   ```
 
 ### Manage Monitor
@@ -135,7 +158,7 @@ Once built, you can run the CLI commands using the following commands:
 - **Restart the monitor process (after code changes):**
 
   ```bash
-  yarn monitor:restart
+  bun run monitor:restart
   ```
 
   Use this command to restart the monitor process, for example after making code changes or updating dependencies. This ensures the monitor is running the latest version of your code.
@@ -143,7 +166,7 @@ Once built, you can run the CLI commands using the following commands:
 - **Stop the monitor process:**
 
   ```bash
-  yarn monitor:stop
+  bun run monitor:stop
   ```
 
   This command will stop the monitor process if it is running in the background. Use this when you want to fully halt all automatic idle monitoring and timer management.
@@ -151,7 +174,7 @@ Once built, you can run the CLI commands using the following commands:
 - **Show monitor logs:**
 
   ```bash
-  yarn monitor:logs
+  bun run monitor:logs
   ```
 
   This command will display logs related to the monitor process. Use it to review idle/active transitions, timer events, and session details that have been recorded while the monitor was running. This is useful for troubleshooting, auditing, or reviewing your time tracking history.
@@ -161,7 +184,7 @@ Once built, you can run the CLI commands using the following commands:
 To delete old session logs from the local SQLite database, use the `db:cleanup` command:
 
 ```bash
-yarn db:cleanup <older-than-number-in-days>
+bun run db:cleanup <older-than-number-in-days>
 ```
 
 - `<older-than-number-in-days>` (Optional): Specifies the number of days. Session logs older than this number of days will be deleted. If not provided, logs older than 5 days will be deleted by default.
@@ -171,12 +194,12 @@ Examples:
 - Delete logs older than 5 days (default):
 
   ```bash
-  yarn db:cleanup
+  bun run db:cleanup
   ```
 
 - Delete logs older than 5 days:
   ```bash
-  yarn db:cleanup 5
+  bun run db:cleanup 5
   ```
 
 ### Google Calendar Integration
@@ -188,7 +211,7 @@ This tool can log your Google Calendar events as time entries in Clockify. This 
 Before you can log calendar events, you need to authenticate with your Google account. This will grant the tool read-only access to your Google Calendar.
 
 ```bash
-yarn google-auth
+bun run google-auth
 ```
 
 Follow the prompts in your browser to complete the authentication process. A token will be stored locally to maintain your session.
@@ -198,7 +221,7 @@ Follow the prompts in your browser to complete the authentication process. A tok
 Once authenticated, you can log events for a specific date range:
 
 ```bash
-yarn log-calendar -s <start-date> -e <end-date>
+bun run log-calendar -s <start-date> -e <end-date>
 ```
 
 - `<start-date>`: The start date for fetching calendar events (e.g., `2025-07-21`).
@@ -207,7 +230,7 @@ yarn log-calendar -s <start-date> -e <end-date>
 You can also log events for today using the `-t` or `--today` flag:
 
 ```bash
-yarn log-calendar -t
+bun run log-calendar -t
 ```
 
 For each calendar event, the tool will prompt you to select a Clockify project. Your selection will be cached based on the event's summary (name), so if you have recurring events with the same name, you will only be asked once for the project. If you provide a `project-id` using the `-p` flag, all events will be logged to that project without prompting.
@@ -215,13 +238,13 @@ For each calendar event, the tool will prompt you to select a Clockify project. 
 Example:
 
 ```bash
-yarn log-calendar -s 2025-07-21 -e 2025-07-22
+bun run log-calendar -s 2025-07-21 -e 2025-07-22
 ```
 
 Or, to log all events to a specific project:
 
 ```bash
-yarn log-calendar -s 2025-07-21 -e 2025-07-22 -p your_clockify_project_id
+bun run log-calendar -s 2025-07-21 -e 2025-07-22 -p your_clockify_project_id
 ```
 
 ## Troubleshooting
@@ -256,7 +279,7 @@ CLOCKTOPUS_PATH="$HOME/Projects/Personal/clocktopus"
 
 clocktopus() {
   cd "$CLOCKTOPUS_PATH" || return
-  yarn "$@"
+  bun run "$@"
 }
 
 alias cbuild="clocktopus build"

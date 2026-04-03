@@ -1,9 +1,55 @@
 import { Hono } from 'hono';
 import axios from 'axios';
 import { saveCredential } from '../../lib/credentials.js';
+import { storeAtlassianToken } from '../../lib/db.js';
+import { getAtlassianAuthUrl, exchangeCodeForTokens, getAccessibleResources } from '../../lib/atlassian.js';
 
 const jiraRoutes = new Hono();
 
+// OAuth: redirect to Atlassian authorization
+jiraRoutes.get('/jira/connect', (c) => {
+  try {
+    const authUrl = getAtlassianAuthUrl();
+    return c.redirect(authUrl);
+  } catch (error) {
+    return c.json({ ok: false, error: error instanceof Error ? error.message : 'Failed to generate auth URL.' }, 500);
+  }
+});
+
+// OAuth: handle callback from Atlassian
+jiraRoutes.get('/jira/callback', async (c) => {
+  const code = c.req.query('code');
+  if (!code) {
+    return c.redirect('/?jira=error&reason=no_code');
+  }
+
+  try {
+    const tokens = await exchangeCodeForTokens(code);
+    const resources = await getAccessibleResources(tokens.access_token);
+
+    if (resources.length === 0) {
+      return c.redirect('/?jira=error&reason=no_sites');
+    }
+
+    const site = resources[0];
+    const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
+
+    storeAtlassianToken({
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      expires_at: expiresAt,
+      cloud_id: site.id,
+      site_url: site.url,
+    });
+
+    return c.redirect(`/?jira=connected&site=${encodeURIComponent(site.name)}`);
+  } catch (error) {
+    console.error('Atlassian OAuth callback error:', error instanceof Error ? error.message : error);
+    return c.redirect('/?jira=error&reason=token_exchange_failed');
+  }
+});
+
+// Basic Auth: manual API token setup (kept as fallback)
 jiraRoutes.post('/jira', async (c) => {
   const { url, email, token } = await c.req.json<{ url: string; email: string; token: string }>();
 

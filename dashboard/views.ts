@@ -75,21 +75,28 @@ export function indexPage() {
         <div class="dot gray" id="jira-dot"></div>
         <h2>Jira</h2>
       </div>
-      <div class="guide">
-        <ol>
-          <li>Go to <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank">Atlassian API Tokens</a></li>
-          <li>Click <strong>Create API token</strong> and copy it</li>
-          <li>Your URL is <code>https://&lt;your-org&gt;.atlassian.net/rest/api/3</code></li>
-        </ol>
-      </div>
-      <label for="jira-url">Atlassian URL</label>
-      <input type="text" id="jira-url" placeholder="https://your-org.atlassian.net/rest/api/3" />
-      <label for="jira-email">Email</label>
-      <input type="email" id="jira-email" placeholder="you@example.com" />
-      <label for="jira-token">API Token</label>
-      <input type="password" id="jira-token" placeholder="Atlassian API token" />
-      <button onclick="saveJira()">Save &amp; Validate</button>
+      <p id="jira-desc" style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Connect your Atlassian account to log time on Jira tickets.</p>
+      <button class="connect" id="jira-connect-btn" onclick="connectJira()">Connect Atlassian</button>
       <div class="msg" id="jira-msg"></div>
+      <div style="margin-top:1rem;">
+        <a href="#" id="jira-toggle" onclick="toggleJiraForm(event)" style="font-size:0.8rem;color:#8b949e;text-decoration:none;">or use API token &darr;</a>
+        <div id="jira-form" style="display:none;margin-top:0.5rem;">
+          <div class="guide">
+            <ol>
+              <li>Go to <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank">Atlassian API Tokens</a></li>
+              <li>Click <strong>Create API token</strong> and copy it</li>
+              <li>Your URL is <code>https://&lt;your-org&gt;.atlassian.net/rest/api/3</code></li>
+            </ol>
+          </div>
+          <label for="jira-url">Atlassian URL</label>
+          <input type="text" id="jira-url" placeholder="https://your-org.atlassian.net/rest/api/3" />
+          <label for="jira-email">Email</label>
+          <input type="email" id="jira-email" placeholder="you@example.com" />
+          <label for="jira-token">API Token</label>
+          <input type="password" id="jira-token" placeholder="Atlassian API token" />
+          <button onclick="saveJira()">Save &amp; Validate</button>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -126,6 +133,41 @@ export function indexPage() {
       }
     }
 
+    function setJiraConnected(connected, isOAuth, siteUrl) {
+      const btn = document.getElementById('jira-connect-btn');
+      const desc = document.getElementById('jira-desc');
+      if (connected && isOAuth) {
+        btn.textContent = 'Reconnect';
+        desc.textContent = 'Connected via OAuth' + (siteUrl ? ' (' + siteUrl.replace('https://', '') + ')' : '');
+        desc.style.color = '#3fb950';
+      } else if (connected) {
+        btn.textContent = 'Reconnect';
+        desc.textContent = 'Connected via API token';
+        desc.style.color = '#3fb950';
+      } else {
+        btn.textContent = 'Connect Atlassian';
+        desc.textContent = 'Connect your Atlassian account to log time on Jira tickets.';
+        desc.style.color = '#8b949e';
+      }
+    }
+
+    function connectJira() {
+      window.location.href = '/api/jira/connect';
+    }
+
+    function toggleJiraForm(e) {
+      e.preventDefault();
+      const form = document.getElementById('jira-form');
+      const toggle = document.getElementById('jira-toggle');
+      if (form.style.display === 'none') {
+        form.style.display = 'block';
+        toggle.innerHTML = 'hide API token form &uarr;';
+      } else {
+        form.style.display = 'none';
+        toggle.innerHTML = 'or use API token &darr;';
+      }
+    }
+
     async function fetchStatus() {
       try {
         const res = await fetch('/api/status');
@@ -134,8 +176,23 @@ export function indexPage() {
         setDot('google-dot', data.google ? 'green' : 'red');
         setDot('jira-dot', data.jira ? 'green' : 'red');
         setGoogleConnected(data.google, data.googleEmail);
+        setJiraConnected(data.jira, data.jiraOAuth, data.jiraSiteUrl);
       } catch {}
     }
+
+    // Handle OAuth callback params
+    (function checkUrlParams() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('jira') === 'connected') {
+        const site = params.get('site') || '';
+        setMsg('jira-msg', 'Connected to ' + (site || 'Atlassian') + ' successfully!', true);
+        setDot('jira-dot', 'green');
+        window.history.replaceState({}, '', '/');
+      } else if (params.get('jira') === 'error') {
+        setMsg('jira-msg', 'Connection failed: ' + (params.get('reason') || 'unknown error'), false);
+        window.history.replaceState({}, '', '/');
+      }
+    })();
 
     async function saveClockify() {
       const apiKey = document.getElementById('clockify-key').value.trim();

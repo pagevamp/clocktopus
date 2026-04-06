@@ -1,0 +1,11 @@
+name = "clocktopus-auth"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+[vars]
+ATLASSIAN_CLIENT_ID = "KKmA0TMrj9AtY9H64C3TesiBxynasV1q"
+GOOGLE_CLIENT_ID = "49421886044-i3dknjm4ncmv50a59nh35rlksanj8vug.apps.googleusercontent.com"
+
+# Secrets — set via wrangler CLI:
+#   npx wrangler secret put ATLASSIAN_CLIENT_SECRET
+#   npx wrangler secret put GOOGLE_CLIENT_SECRET

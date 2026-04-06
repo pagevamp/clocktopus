@@ -2,40 +2,54 @@ import axios from 'axios';
 import { resolveCredential } from './credentials.js';
 import { getAtlassianToken, updateAtlassianAccessToken } from './db.js';
 
-const ATLASSIAN_AUTH_URL = 'https://auth.atlassian.com/authorize';
+// Cloudflare Worker proxy that holds the client secret
+const AUTH_PROXY_URL = 'https://clocktopus-auth.clocktopus.workers.dev/';
+
+// Fallback: direct Atlassian API (when user provides their own credentials)
 const ATLASSIAN_TOKEN_URL = 'https://auth.atlassian.com/oauth/token';
 const ATLASSIAN_RESOURCES_URL = 'https://api.atlassian.com/oauth/token/accessible-resources';
-const SCOPES = ['read:jira-work', 'write:jira-work', 'read:jira-user', 'read:me', 'offline_access'];
 const REDIRECT_URI = 'http://localhost:4001/api/jira/callback';
 
-function getClientCredentials() {
-  const clientId = resolveCredential('ATLASSIAN_CLIENT_ID');
-  const clientSecret = resolveCredential('ATLASSIAN_CLIENT_SECRET');
-  if (!clientId || !clientSecret) {
-    throw new Error('ATLASSIAN_CLIENT_ID and ATLASSIAN_CLIENT_SECRET must be set.');
-  }
-  return { clientId, clientSecret };
+function hasLocalCredentials(): boolean {
+  return !!(resolveCredential('ATLASSIAN_CLIENT_ID') && resolveCredential('ATLASSIAN_CLIENT_SECRET'));
 }
 
-export function getAtlassianAuthUrl(): string {
-  const { clientId } = getClientCredentials();
-  const params = new URLSearchParams({
-    audience: 'api.atlassian.com',
-    client_id: clientId,
-    scope: SCOPES.join(' '),
-    redirect_uri: REDIRECT_URI,
-    response_type: 'code',
-    prompt: 'consent',
+export async function getAtlassianAuthUrl(): Promise<string> {
+  if (hasLocalCredentials()) {
+    const clientId = resolveCredential('ATLASSIAN_CLIENT_ID')!;
+    const params = new URLSearchParams({
+      audience: 'api.atlassian.com',
+      client_id: clientId,
+      scope: 'read:jira-work write:jira-work read:jira-user read:me offline_access',
+      redirect_uri: REDIRECT_URI,
+      response_type: 'code',
+      prompt: 'consent',
+    });
+    return `https://auth.atlassian.com/authorize?${params.toString()}`;
+  }
+
+  // Use proxy to get auth URL
+  const res = await axios.get(`${AUTH_PROXY_URL}/atlassian/auth-url`, {
+    params: { redirect_uri: REDIRECT_URI },
   });
-  return `${ATLASSIAN_AUTH_URL}?${params.toString()}`;
+  return res.data.url;
 }
 
 export async function exchangeCodeForTokens(code: string) {
-  const { clientId, clientSecret } = getClientCredentials();
-  const res = await axios.post(ATLASSIAN_TOKEN_URL, {
+  if (hasLocalCredentials()) {
+    const res = await axios.post(ATLASSIAN_TOKEN_URL, {
+      grant_type: 'authorization_code',
+      client_id: resolveCredential('ATLASSIAN_CLIENT_ID'),
+      client_secret: resolveCredential('ATLASSIAN_CLIENT_SECRET'),
+      code,
+      redirect_uri: REDIRECT_URI,
+    });
+    return res.data as { access_token: string; refresh_token: string; expires_in: number };
+  }
+
+  // Use proxy
+  const res = await axios.post(`${AUTH_PROXY_URL}/atlassian/token`, {
     grant_type: 'authorization_code',
-    client_id: clientId,
-    client_secret: clientSecret,
     code,
     redirect_uri: REDIRECT_URI,
   });
@@ -43,11 +57,19 @@ export async function exchangeCodeForTokens(code: string) {
 }
 
 export async function refreshAccessToken(refreshToken: string) {
-  const { clientId, clientSecret } = getClientCredentials();
-  const res = await axios.post(ATLASSIAN_TOKEN_URL, {
+  if (hasLocalCredentials()) {
+    const res = await axios.post(ATLASSIAN_TOKEN_URL, {
+      grant_type: 'refresh_token',
+      client_id: resolveCredential('ATLASSIAN_CLIENT_ID'),
+      client_secret: resolveCredential('ATLASSIAN_CLIENT_SECRET'),
+      refresh_token: refreshToken,
+    });
+    return res.data as { access_token: string; expires_in: number };
+  }
+
+  // Use proxy
+  const res = await axios.post(`${AUTH_PROXY_URL}/atlassian/token`, {
     grant_type: 'refresh_token',
-    client_id: clientId,
-    client_secret: clientSecret,
     refresh_token: refreshToken,
   });
   return res.data as { access_token: string; expires_in: number };

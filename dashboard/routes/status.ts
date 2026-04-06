@@ -14,6 +14,7 @@ statusRoutes.get('/status', async (c) => {
     jira: boolean;
     jiraOAuth: boolean;
     jiraSiteUrl?: string;
+    clockifyKeyHint?: string;
   } = {
     clockify: false,
     google: false,
@@ -24,6 +25,7 @@ statusRoutes.get('/status', async (c) => {
   // Check Clockify
   const clockifyKey = resolveCredential('CLOCKIFY_API_KEY');
   if (clockifyKey) {
+    results.clockifyKeyHint = '***' + clockifyKey.slice(-4);
     try {
       const res = await axios.get('https://api.clockify.me/api/v1/user', {
         headers: { 'X-Api-Key': clockifyKey },

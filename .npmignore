@@ -1,0 +1,11 @@
+desktop/
+.github/
+.claude/
+.husky/
+docs/
+*.ts
+!dist/**
+tsconfig.json
+eslint.config.js
+.prettierrc
+CLAUDE.md

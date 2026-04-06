@@ -801,6 +801,9 @@ export function indexPage() {
         setDot('clockify-dot', data.clockify ? 'green' : 'red');
         setDot('google-dot', data.google ? 'green' : 'red');
         setDot('jira-dot', data.jira ? 'green' : 'red');
+        if (data.clockifyKeyHint) {
+          document.getElementById('clockify-key').placeholder = data.clockifyKeyHint;
+        }
         setGoogleConnected(data.google, data.googleEmail);
         setJiraConnected(data.jira, data.jiraOAuth, data.jiraSiteUrl);
       } catch {}

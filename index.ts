@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import 'dotenv/config';
 import { Command } from 'commander';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
@@ -60,7 +59,7 @@ async function getWorkspaceAndUser() {
   };
 }
 
-program.name('tracker').description('A CLI to track your time in Clockify').version('1.0.0');
+program.name('clocktopus').description('CLI time-tracking automation for Clockify').version('1.0.0');
 
 program
   .command('start')

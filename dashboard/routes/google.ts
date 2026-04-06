@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { google } from 'googleapis';
-import { getAuthenticatedClient } from '../../lib/google.js';
+import { getAuthenticatedClient, getAuthUrl, exchangeGoogleCode } from '../../lib/google.js';
 import { storeToken } from '../../lib/db.js';
 import { saveCredential } from '../../lib/credentials.js';
 
@@ -9,35 +9,21 @@ const SCOPES = ['https://www.googleapis.com/auth/calendar.readonly', 'https://ww
 
 const googleRoutes = new Hono();
 
-googleRoutes.get('/google/connect', (c) => {
+googleRoutes.get('/google/connect', async (c) => {
   try {
-    const oAuth2Client = getAuthenticatedClient(DASHBOARD_REDIRECT_URI);
-    const authorizeUrl = oAuth2Client.generateAuthUrl({
-      access_type: 'offline',
-      scope: SCOPES,
-    });
-    return c.redirect(authorizeUrl);
+    const url = await getAuthUrl(DASHBOARD_REDIRECT_URI, SCOPES);
+    return c.redirect(url);
   } catch {
-    return c.json(
-      { ok: false, error: 'GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set in your .env file.' },
-      500,
-    );
+    return c.json({ ok: false, error: 'Failed to generate Google auth URL.' }, 500);
   }
 });
 
-googleRoutes.get('/google/auth-url', (c) => {
+googleRoutes.get('/google/auth-url', async (c) => {
   try {
-    const oAuth2Client = getAuthenticatedClient(DASHBOARD_REDIRECT_URI);
-    const url = oAuth2Client.generateAuthUrl({
-      access_type: 'offline',
-      scope: SCOPES,
-    });
+    const url = await getAuthUrl(DASHBOARD_REDIRECT_URI, SCOPES);
     return c.json({ url });
   } catch {
-    return c.json(
-      { ok: false, error: 'GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set in your .env file.' },
-      500,
-    );
+    return c.json({ ok: false, error: 'Failed to generate Google auth URL.' }, 500);
   }
 });
 
@@ -48,11 +34,11 @@ googleRoutes.get('/google/callback', async (c) => {
   }
 
   try {
-    const oAuth2Client = getAuthenticatedClient(DASHBOARD_REDIRECT_URI);
-    const { tokens } = await oAuth2Client.getToken(code);
+    const tokens = await exchangeGoogleCode(code, DASHBOARD_REDIRECT_URI);
     storeToken(tokens);
 
     // Fetch and store the user's email
+    const oAuth2Client = getAuthenticatedClient(DASHBOARD_REDIRECT_URI);
     oAuth2Client.setCredentials(tokens);
     const oauth2 = google.oauth2({ version: 'v2', auth: oAuth2Client });
     const { data } = await oauth2.userinfo.get();

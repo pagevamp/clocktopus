@@ -3,9 +3,18 @@
   "version": "1.0.0",
   "type": "module",
   "main": "dist/index.js",
+  "bin": {
+    "clocktopus": "dist/index.js"
+  },
   "license": "MIT",
+  "files": [
+    "dist",
+    "data/.gitkeep",
+    "!dist/desktop"
+  ],
   "scripts": {
     "build": "bunx tsc",
+    "prepublishOnly": "bunx tsc",
     "lint": "eslint . --ext .ts",
     "clock": "bun dist/index.js",
     "clockd": "bunx pm2 start dist/index.js --name clocktopus --",

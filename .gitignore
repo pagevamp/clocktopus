@@ -3,3 +3,8 @@
 /.env
 /dist/
 /data/
+
+# Desktop (Tauri)
+/desktop/src-tauri/target/
+/desktop/src-tauri/gen/
+/desktop/node_modules/

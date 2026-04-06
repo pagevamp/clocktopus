@@ -25,6 +25,22 @@ googleRoutes.get('/google/connect', (c) => {
   }
 });
 
+googleRoutes.get('/google/auth-url', (c) => {
+  try {
+    const oAuth2Client = getAuthenticatedClient(DASHBOARD_REDIRECT_URI);
+    const url = oAuth2Client.generateAuthUrl({
+      access_type: 'offline',
+      scope: SCOPES,
+    });
+    return c.json({ url });
+  } catch {
+    return c.json(
+      { ok: false, error: 'GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set in your .env file.' },
+      500,
+    );
+  }
+});
+
 googleRoutes.get('/google/callback', async (c) => {
   const code = c.req.query('code');
   if (!code) {

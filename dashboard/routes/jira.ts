@@ -6,11 +6,21 @@ import { getAtlassianAuthUrl, exchangeCodeForTokens, getAccessibleResources } fr
 
 const jiraRoutes = new Hono();
 
-// OAuth: redirect to Atlassian authorization
+// OAuth: redirect to Atlassian authorization (browser fallback)
 jiraRoutes.get('/jira/connect', (c) => {
   try {
     const authUrl = getAtlassianAuthUrl();
     return c.redirect(authUrl);
+  } catch (error) {
+    return c.json({ ok: false, error: error instanceof Error ? error.message : 'Failed to generate auth URL.' }, 500);
+  }
+});
+
+// OAuth: return auth URL as JSON (for desktop app)
+jiraRoutes.get('/jira/auth-url', (c) => {
+  try {
+    const url = getAtlassianAuthUrl();
+    return c.json({ url });
   } catch (error) {
     return c.json({ ok: false, error: error instanceof Error ? error.message : 'Failed to generate auth URL.' }, 500);
   }

@@ -647,8 +647,18 @@ export function indexPage() {
       }
     }
 
-    function connectGoogle() {
-      window.location.href = '/api/google/connect';
+    async function connectGoogle() {
+      try {
+        const res = await fetch('/api/google/auth-url');
+        const data = await res.json();
+        if (data.url) {
+          if (window.__TAURI__) {
+            window.__TAURI__.opener.openUrl(data.url);
+          } else {
+            window.location.href = '/api/google/connect';
+          }
+        }
+      } catch (e) { console.error('Connect Google error:', e); }
     }
 
     // --- Settings: Jira ---
@@ -670,8 +680,18 @@ export function indexPage() {
       }
     }
 
-    function connectJira() {
-      window.location.href = '/api/jira/connect';
+    async function connectJira() {
+      try {
+        const res = await fetch('/api/jira/auth-url');
+        const data = await res.json();
+        if (data.url) {
+          if (window.__TAURI__) {
+            window.__TAURI__.opener.openUrl(data.url);
+          } else {
+            window.location.href = '/api/jira/connect';
+          }
+        }
+      } catch (e) { console.error('Connect Jira error:', e); }
     }
 
     function toggleJiraForm(e) {

@@ -59,8 +59,9 @@ export function indexPage() {
     .guide li { margin-bottom: 0.15rem; }
 
     /* Sessions table */
-    .sessions-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-    .sessions-table th { text-align: left; color: #8b949e; padding: 0.5rem 0.75rem; border-bottom: 1px solid #30363d; font-weight: 500; }
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .sessions-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; min-width: 540px; }
+    .sessions-table th { text-align: left; color: #8b949e; padding: 0.5rem 0.75rem; border-bottom: 1px solid #30363d; font-weight: 500; white-space: nowrap; }
     .sessions-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid #21262d; }
     .sessions-table tr:hover { background: #161b22; }
     .sessions-table .in-progress { color: #3fb950; font-style: italic; }
@@ -69,6 +70,16 @@ export function indexPage() {
     /* Inline form row */
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
     @media (max-width: 600px) { .form-row { grid-template-columns: 1fr; } }
+    /* Project toggles */
+    .project-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.4rem 0; border-bottom: 1px solid #21262d; }
+    .project-item:last-child { border-bottom: none; }
+    .project-item label { margin: 0; color: #e1e4e8; font-size: 0.9rem; cursor: pointer; flex: 1; }
+    .toggle { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+    .toggle input { opacity: 0; width: 100%; height: 100%; position: absolute; inset: 0; z-index: 1; cursor: pointer; margin: 0; }
+    .toggle .slider { position: absolute; inset: 0; background: #30363d; border-radius: 10px; cursor: pointer; transition: background 0.2s; pointer-events: none; }
+    .toggle .slider::before { content: ''; position: absolute; width: 16px; height: 16px; left: 2px; top: 2px; background: #8b949e; border-radius: 50%; transition: transform 0.2s, background 0.2s; }
+    .toggle input:checked + .slider { background: #238636; }
+    .toggle input:checked + .slider::before { transform: translateX(16px); background: #fff; }
   </style>
 </head>
 <body>
@@ -76,6 +87,7 @@ export function indexPage() {
     <h1>Clocktopus</h1>
     <div class="nav">
       <button class="nav-btn active" onclick="switchTab('home')" id="nav-home">Home</button>
+      <button class="nav-btn" onclick="switchTab('projects')" id="nav-projects">Projects</button>
       <button class="nav-btn" onclick="switchTab('settings')" id="nav-settings">Settings</button>
     </div>
   </div>
@@ -134,7 +146,7 @@ export function indexPage() {
       <!-- Session History -->
       <div class="card card-full">
         <h2>Recent Sessions</h2>
-        <div id="sessions-container">
+        <div id="sessions-container" class="table-wrap">
           <table class="sessions-table">
             <thead>
               <tr>
@@ -223,6 +235,22 @@ export function indexPage() {
         </div>
       </div>
 
+    </div>
+  </div>
+
+  <!-- PROJECTS TAB -->
+  <div id="tab-projects" class="tab-content">
+    <div class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
+        <h2 style="margin-bottom:0;">Projects</h2>
+        <button id="fetch-projects-btn" onclick="fetchProjects()" style="margin-top:0; background:#1f6feb;">Pull from Clockify</button>
+      </div>
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem;">
+        <p style="font-size:0.8rem; color:#8b949e; margin:0;">Toggle projects on/off to control which appear in the timer dropdown.</p>
+        <a href="#" id="toggle-all-link" onclick="toggleAllProjects(event)" style="font-size:0.8rem; color:#58a6ff; text-decoration:none; white-space:nowrap; margin-left:1rem;">Deselect all</a>
+      </div>
+      <div class="msg" id="projects-msg"></div>
+      <div id="projects-list" style="margin-top:0.5rem;"></div>
     </div>
   </div>
 
@@ -408,6 +436,10 @@ export function indexPage() {
         const projects = await res.json();
         const select = document.getElementById('project-select');
         select.innerHTML = '<option value="">Select a project</option>';
+        if (projects.length === 0) {
+          select.innerHTML = '<option value="">No active projects \u2014 pull from Clockify in Settings</option>';
+          return;
+        }
         projects.forEach(function(p) {
           const opt = document.createElement('option');
           opt.value = p.id;
@@ -417,6 +449,99 @@ export function indexPage() {
       } catch {
         document.getElementById('project-select').innerHTML = '<option value="">Failed to load projects</option>';
       }
+    }
+
+    async function fetchProjects() {
+      const btn = document.getElementById('fetch-projects-btn');
+      btn.disabled = true;
+      btn.textContent = 'Fetching...';
+      try {
+        const res = await fetch('/api/projects/fetch', { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) {
+          setMsg('projects-msg', 'Pulled ' + data.count + ' projects from Clockify.', true);
+          loadAllProjects();
+          loadProjects();
+        } else {
+          setMsg('projects-msg', data.error || 'Failed.', false);
+        }
+      } catch {
+        setMsg('projects-msg', 'Request failed.', false);
+      }
+      btn.disabled = false;
+      btn.textContent = 'Pull from Clockify';
+    }
+
+    async function loadAllProjects() {
+      try {
+        const res = await fetch('/api/projects/all');
+        const projects = await res.json();
+        const container = document.getElementById('projects-list');
+
+        if (projects.length === 0) {
+          container.innerHTML = '<p style="color:#8b949e;font-size:0.85rem;">No projects yet. Click "Pull from Clockify" to import them.</p>';
+          return;
+        }
+
+        container.innerHTML = projects.map(function(p) {
+          return '<div class="project-item">' +
+            '<div class="toggle">' +
+              '<input type="checkbox" data-project-id="' + p.id + '" id="proj-' + p.id + '" ' + (p.active ? 'checked' : '') + ' />' +
+              '<span class="slider"></span>' +
+            '</div>' +
+            '<label for="proj-' + p.id + '">' + escapeHtml(p.name) + '</label>' +
+          '</div>';
+        }).join('');
+        container.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+          cb.addEventListener('change', function() {
+            toggleProject(cb.dataset.projectId, cb.checked);
+          });
+        });
+      } catch {
+        document.getElementById('projects-list').innerHTML = '<p style="color:#f85149;font-size:0.85rem;">Failed to load projects.</p>';
+      }
+    }
+
+    async function toggleProject(id, active) {
+      try {
+        const res = await fetch('/api/projects/toggle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, active }),
+        });
+        if (!res.ok) console.error('Toggle failed:', await res.text());
+        loadProjects();
+        loadAllProjects();
+        updateToggleAllLink();
+      } catch (e) { console.error('Toggle error:', e); }
+    }
+
+    async function toggleAllProjects(e) {
+      e.preventDefault();
+      const checkboxes = document.querySelectorAll('#projects-list input[type="checkbox"]');
+      if (checkboxes.length === 0) return;
+      const allChecked = Array.from(checkboxes).every(function(cb) { return cb.checked; });
+      const newState = !allChecked;
+      const promises = Array.from(checkboxes).map(function(cb) {
+        cb.checked = newState;
+        const id = cb.id.replace('proj-', '');
+        return fetch('/api/projects/toggle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, active: newState }),
+        });
+      });
+      await Promise.all(promises);
+      loadProjects();
+      updateToggleAllLink();
+    }
+
+    function updateToggleAllLink() {
+      const checkboxes = document.querySelectorAll('#projects-list input[type="checkbox"]');
+      const link = document.getElementById('toggle-all-link');
+      if (!link || checkboxes.length === 0) return;
+      const allChecked = Array.from(checkboxes).every(function(cb) { return cb.checked; });
+      link.textContent = allChecked ? 'Deselect all' : 'Select all';
     }
 
     // --- Sessions ---
@@ -617,6 +742,7 @@ export function indexPage() {
     loadSessions();
     checkActiveTimer();
     checkMonitorStatus();
+    loadAllProjects();
   </script>
 </body>
 </html>`;

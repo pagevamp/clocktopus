@@ -58,6 +58,13 @@ function getDb(): Database {
       )
     `);
     dbInstance.exec(`
+      CREATE TABLE IF NOT EXISTS projects (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        active INTEGER DEFAULT 1
+      )
+    `);
+    dbInstance.exec(`
       CREATE TABLE IF NOT EXISTS atlassian_tokens (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         access_token TEXT NOT NULL,
@@ -219,4 +226,37 @@ export function updateAtlassianAccessToken(access_token: string, expires_at: str
   const db = getDb();
   const stmt = db.prepare('UPDATE atlassian_tokens SET access_token = ?, expires_at = ? WHERE id = 1');
   stmt.run(access_token, expires_at);
+}
+
+// --- Projects ---
+
+export interface Project {
+  id: string;
+  name: string;
+  active: number;
+}
+
+export function upsertProjects(projects: Array<{ id: string; name: string }>) {
+  const db = getDb();
+  const stmt = db.prepare(
+    'INSERT INTO projects (id, name, active) VALUES (?, ?, 1) ON CONFLICT(id) DO UPDATE SET name = ?',
+  );
+  for (const p of projects) {
+    stmt.run(p.id, p.name, p.name);
+  }
+}
+
+export function getAllProjects(): Project[] {
+  const db = getDb();
+  return db.prepare('SELECT * FROM projects ORDER BY name').all() as Project[];
+}
+
+export function getActiveProjects(): Project[] {
+  const db = getDb();
+  return db.prepare('SELECT * FROM projects WHERE active = 1 ORDER BY name').all() as Project[];
+}
+
+export function toggleProjectActive(id: string, active: boolean) {
+  const db = getDb();
+  db.prepare('UPDATE projects SET active = ? WHERE id = ?').run(active ? 1 : 0, id);
 }

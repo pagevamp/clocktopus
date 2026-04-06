@@ -132,6 +132,7 @@ export function indexPage() {
           </div>
           <button id="start-btn" onclick="startTimer()">Start Timer</button>
         </div>
+        <div id="last-tasks" style="display:none; margin-top:0.75rem;"></div>
         <div class="msg" id="timer-msg"></div>
       </div>
 
@@ -169,9 +170,9 @@ export function indexPage() {
             </tbody>
           </table>
           <div id="pagination" style="display:none; margin-top:1rem; align-items:center; justify-content:center; gap:0.75rem; flex-wrap:wrap;">
-            <button id="prev-btn" onclick="changePage(-1)" style="background:#30363d; margin-top:0;" disabled>Previous</button>
+            <button id="prev-btn" onclick="changePage(-1)" style="background:#30363d; margin-top:0; padding:0.3rem 0.75rem;" disabled>&lt;</button>
             <span id="page-info" style="font-size:0.85rem; color:#8b949e;"></span>
-            <button id="next-btn" onclick="changePage(1)" style="background:#30363d; margin-top:0;">Next</button>
+            <button id="next-btn" onclick="changePage(1)" style="background:#30363d; margin-top:0; padding:0.3rem 0.75rem;">&gt;</button>
           </div>
         </div>
       </div>
@@ -315,6 +316,7 @@ export function indexPage() {
           banner.style.display = 'flex';
           startBtn.disabled = true;
           startBtn.textContent = 'Timer Running...';
+          document.getElementById('last-tasks').style.display = 'none';
 
           if (elapsedInterval) clearInterval(elapsedInterval);
           const startTime = new Date(data.start).getTime();
@@ -329,6 +331,7 @@ export function indexPage() {
           startBtn.disabled = false;
           startBtn.textContent = 'Start Timer';
           if (elapsedInterval) { clearInterval(elapsedInterval); elapsedInterval = null; }
+          loadLastTask();
         }
       } catch {}
     }
@@ -386,6 +389,65 @@ export function indexPage() {
       } catch {
         setMsg('timer-msg', 'Request failed.', false);
       }
+    }
+
+    // --- Last Tasks ---
+    var lastTasks = [];
+
+    async function loadLastTask() {
+      try {
+        var res = await fetch('/api/sessions?page=1&limit=2');
+        var result = await res.json();
+        var container = document.getElementById('last-tasks');
+        if (result.data && result.data.length > 0) {
+          lastTasks = result.data;
+          container.innerHTML = lastTasks.map(function(t, i) {
+            var label = t.description || 'Untitled';
+            if (t.projectName) label = t.projectName + ' — ' + label;
+            return '<div style="display:flex; align-items:center; padding:0.5rem 0.75rem; background:#161b22; border:1px solid #30363d; font-size:0.85rem;' +
+              (i === 0 ? ' border-radius:8px 8px 0 0; border-bottom:none;' : ' border-radius:0 0 8px 8px;') + '">' +
+              '<span style="color:#e1e4e8; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + escapeHtml(label) + '</span>' +
+              '<button onclick="restartTask(' + i + ')" style="margin-top:0; margin-left:0.5rem; padding:0.2rem 0.6rem; font-size:0.8rem; background:#30363d; flex-shrink:0;">Restart</button>' +
+            '</div>';
+          }).join('');
+          container.style.display = 'block';
+        } else {
+          container.style.display = 'none';
+        }
+      } catch {
+        document.getElementById('last-tasks').style.display = 'none';
+      }
+    }
+
+    async function restartTask(index) {
+      var task = lastTasks[index];
+      if (!task) return;
+      var btns = document.getElementById('last-tasks').querySelectorAll('button');
+      btns[index].disabled = true;
+      btns[index].textContent = 'Starting...';
+      try {
+        var res = await fetch('/api/timer/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId: task.projectId,
+            description: task.description || 'Working on a task...',
+            jiraTicket: task.jiraTicket || undefined,
+          }),
+        });
+        var data = await res.json();
+        if (data.ok) {
+          setMsg('timer-msg', 'Restarted task!', true);
+          checkActiveTimer();
+          loadSessions();
+        } else {
+          setMsg('timer-msg', data.error || 'Failed.', false);
+        }
+      } catch {
+        setMsg('timer-msg', 'Request failed.', false);
+      }
+      btns[index].disabled = false;
+      btns[index].textContent = 'Restart';
     }
 
     // --- Monitor ---
@@ -767,9 +829,11 @@ export function indexPage() {
     fetchStatus();
     loadProjects();
     loadSessions();
+    loadLastTask();
     checkActiveTimer();
     checkMonitorStatus();
     loadAllProjects();
+
   </script>
 </body>
 </html>`;

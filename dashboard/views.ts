@@ -13,8 +13,8 @@ export function indexPage() {
 
     /* Nav */
     .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
-    .nav { display: flex; gap: 0.25rem; background: #1c1f26; border-radius: 8px; padding: 0.25rem; }
-    .nav-btn { padding: 0.5rem 1.25rem; border: none; border-radius: 6px; background: transparent; color: #8b949e; font-size: 0.9rem; cursor: pointer; }
+    .nav { display: flex; gap: 0.25rem; background: #1c1f26; border-radius: 10px; padding: 0.3rem; }
+    .nav-btn { margin-top: 0; padding: 0.5rem 1.25rem; border: none; border-radius: 6px; background: transparent; color: #8b949e; font-size: 0.9rem; cursor: pointer; }
     .nav-btn:hover { color: #e1e4e8; }
     .nav-btn.active { background: #30363d; color: #fff; }
     .tab-content { display: none; }
@@ -69,7 +69,14 @@ export function indexPage() {
 
     /* Inline form row */
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-    @media (max-width: 600px) { .form-row { grid-template-columns: 1fr; } }
+    @media (max-width: 600px) {
+      body { padding: 0.75rem; }
+      .form-row { grid-template-columns: 1fr; }
+      .header { flex-direction: column; gap: 0; align-items: stretch; margin-bottom: 1rem; }
+      .header h1 { display: none; }
+      .nav { justify-content: center; flex-wrap: wrap; }
+      .nav-btn { padding: 0.5rem 1rem; font-size: 0.8rem; }
+    }
     /* Project toggles */
     .project-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.4rem 0; border-bottom: 1px solid #21262d; }
     .project-item:last-child { border-bottom: none; }
@@ -161,10 +168,10 @@ export function indexPage() {
               <tr><td colspan="5" class="empty-state">Loading...</td></tr>
             </tbody>
           </table>
-          <div id="pagination" style="display:none; margin-top:1rem; display:flex; align-items:center; justify-content:space-between;">
-            <button id="prev-btn" onclick="changePage(-1)" style="background:#30363d;" disabled>Previous</button>
+          <div id="pagination" style="display:none; margin-top:1rem; align-items:center; justify-content:center; gap:0.75rem; flex-wrap:wrap;">
+            <button id="prev-btn" onclick="changePage(-1)" style="background:#30363d; margin-top:0;" disabled>Previous</button>
             <span id="page-info" style="font-size:0.85rem; color:#8b949e;"></span>
-            <button id="next-btn" onclick="changePage(1)" style="background:#30363d;">Next</button>
+            <button id="next-btn" onclick="changePage(1)" style="background:#30363d; margin-top:0;">Next</button>
           </div>
         </div>
       </div>

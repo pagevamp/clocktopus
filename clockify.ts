@@ -34,7 +34,10 @@ export class Clockify {
         wait: true,
         actions,
       },
-      callback,
+      callback ??
+        ((err: unknown) => {
+          if (err) console.error('Notification error:', err);
+        }),
     );
   }
 

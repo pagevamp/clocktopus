@@ -1,5 +1,11 @@
 import { Hono } from 'hono';
 import { execSync } from 'child_process';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const SCRIPT_PATH = path.resolve(__dirname, '../../index.js');
 
 const monitorRoutes = new Hono();
 
@@ -36,7 +42,7 @@ monitorRoutes.get('/monitor/status', (c) => {
 
 monitorRoutes.post('/monitor/start', (c) => {
   const bunPath = execSync('which bun', { encoding: 'utf-8' }).trim();
-  const result = pm2Exec(`bunx pm2 start dist/index.js --name clocktopus --interpreter ${bunPath} -- monitor`);
+  const result = pm2Exec(`bunx pm2 start ${SCRIPT_PATH} --name clocktopus --interpreter ${bunPath} -- monitor`);
   return c.json(result);
 });
 

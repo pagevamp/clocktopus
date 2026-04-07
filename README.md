@@ -52,9 +52,17 @@ That's it. Start/stop timers from the Home tab.
 | `clocktopus serve:stop` | Stop the dashboard daemon            |
 | `clocktopus serve:logs` | View dashboard daemon logs           |
 
-### Desktop App
+### Desktop App (macOS)
 
-A macOS menu bar app is available — see [desktop/README.md](desktop/README.md) for setup. It wraps the dashboard with a system tray icon that shows timer status.
+A menu bar app is available — download the `.dmg` from [GitHub Releases](https://github.com/sajxraj/clocktopus/releases).
+
+After installing, remove the quarantine flag (app is not code-signed):
+
+```bash
+xattr -cr /Applications/Clocktopus.app
+```
+
+The dashboard server must be running (`clocktopus serve`). See [desktop/README.md](desktop/README.md) for details.
 
 ---
 

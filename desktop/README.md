@@ -2,6 +2,23 @@
 
 A macOS menu bar app built with [Tauri v2](https://v2.tauri.app/) that wraps the Clocktopus dashboard. It provides quick access to start/stop timers from the system tray with a live status indicator.
 
+## Download
+
+1. Download the latest `.dmg` from [GitHub Releases](https://github.com/sajxraj/clocktopus/releases)
+2. Open the DMG and drag **Clocktopus.app** to `/Applications`
+3. **Important**: The app is not code-signed. macOS will block it on first launch with "app is damaged". Run this in Terminal to fix:
+
+   ```bash
+   xattr -cr /Applications/Clocktopus.app
+   ```
+
+4. Open Clocktopus from Applications
+5. The dashboard server must be running for the app to work:
+
+   ```bash
+   clocktopus serve
+   ```
+
 ## Architecture
 
 ```

@@ -35,7 +35,8 @@ monitorRoutes.get('/monitor/status', (c) => {
 });
 
 monitorRoutes.post('/monitor/start', (c) => {
-  const result = pm2Exec('bunx pm2 start dist/index.js --name clocktopus -- monitor');
+  const bunPath = execSync('which bun', { encoding: 'utf-8' }).trim();
+  const result = pm2Exec(`bunx pm2 start dist/index.js --name clocktopus --interpreter ${bunPath} -- monitor`);
   return c.json(result);
 });
 

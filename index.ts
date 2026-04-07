@@ -59,7 +59,8 @@ async function getWorkspaceAndUser() {
   };
 }
 
-program.name('clocktopus').description('CLI time-tracking automation for Clockify').version('1.0.0');
+const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf-8'));
+program.name('clocktopus').description('CLI time-tracking automation for Clockify').version(pkg.version);
 
 program
   .command('start')

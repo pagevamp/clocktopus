@@ -216,18 +216,18 @@ For quick access, add to `~/.zshrc`:
 ```bash
 CLOCKTOPUS_PATH="$HOME/Projects/Personal/clocktopus"
 
-clocktopus() {
+clockto() {
   cd "$CLOCKTOPUS_PATH" || return
   bun run "$@"
 }
 
-alias cbuild="clocktopus build"
-alias cstart="clocktopus clock start"
-alias cstop="clocktopus clock stop"
-alias mstart="clocktopus monitor"
-alias mstop="clocktopus monitor:stop"
-alias mrestart="clocktopus monitor:restart"
-alias mlogs="clocktopus monitor:logs"
+alias cbuild="clockto build"
+alias cstart="clockto clock start"
+alias cstop="clockto clock stop"
+alias mstart="clockto monitor"
+alias mstop="clockto monitor:stop"
+alias mrestart="clockto monitor:restart"
+alias mlogs="clockto monitor:logs"
 ```
 
 ---

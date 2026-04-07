@@ -3,7 +3,7 @@ import { resolveCredential } from './credentials.js';
 import { getAtlassianToken, updateAtlassianAccessToken } from './db.js';
 
 // Cloudflare Worker proxy that holds the client secret
-const AUTH_PROXY_URL = 'https://clocktopus-auth.clocktopus.workers.dev/';
+const AUTH_PROXY_URL = 'https://clocktopus-auth.clocktopus.workers.dev';
 
 // Fallback: direct Atlassian API (when user provides their own credentials)
 const ATLASSIAN_TOKEN_URL = 'https://auth.atlassian.com/oauth/token';

@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
 import { Command } from 'commander';
 import inquirer from 'inquirer';
@@ -317,6 +317,55 @@ program
   .description('Start the Clocktopus web dashboard on localhost:4001.')
   .action(() => {
     startDashboard();
+  });
+
+program
+  .command('serve')
+  .description('Start dashboard as a background daemon (PM2).')
+  .action(async () => {
+    const { execSync } = await import('child_process');
+    const bunPath = execSync('which bun', { encoding: 'utf-8' }).trim();
+    const scriptPath = path.join(__dirname, 'index.js');
+
+    try {
+      // Stop existing if running
+      try {
+        execSync('bunx pm2 delete clocktopus-dash', { stdio: 'ignore' });
+      } catch {}
+
+      execSync(`bunx pm2 start ${scriptPath} --name clocktopus-dash --interpreter ${bunPath} -- dash`, {
+        stdio: 'inherit',
+      });
+      console.log(chalk.green('Dashboard running at http://localhost:4001'));
+      console.log(chalk.gray('  Stop:   clocktopus serve:stop'));
+      console.log(chalk.gray('  Logs:   clocktopus serve:logs'));
+    } catch {
+      console.error(chalk.red('Failed to start dashboard daemon.'));
+    }
+  });
+
+program
+  .command('serve:stop')
+  .description('Stop the dashboard daemon.')
+  .action(async () => {
+    const { execSync } = await import('child_process');
+    try {
+      execSync('bunx pm2 stop clocktopus-dash', { stdio: 'inherit' });
+    } catch {
+      console.log(chalk.yellow('Dashboard is not running.'));
+    }
+  });
+
+program
+  .command('serve:logs')
+  .description('Show dashboard daemon logs.')
+  .action(async () => {
+    const { execSync } = await import('child_process');
+    try {
+      execSync('bunx pm2 logs clocktopus-dash --lines 50', { stdio: 'inherit' });
+    } catch {
+      console.log(chalk.yellow('Dashboard is not running.'));
+    }
   });
 
 program.parse(process.argv);

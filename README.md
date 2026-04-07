@@ -4,277 +4,216 @@
   <img src="assets/logo.png" alt="Clocktopus Logo" width="300px" />
 </p>
 
-## About
+CLI-based time-tracking automation for Clockify with idle monitoring, Jira integration, Google Calendar sync, and a web dashboard.
 
-Clocktopus is a powerful command-line interface tool designed to streamline your time tracking with platforms like Clockify and Jira. It offers a suite of features to automate and simplify the process of logging your work, ensuring accuracy and efficiency.
+## Quick Start (Dashboard User)
 
-### Key Features
+Most users only need the dashboard — a web UI to manage timers, connect integrations, and monitor idle time.
 
-- **Automated Idle Monitoring:** Automatically stops and restarts timers based on your system's idle activity.
-- **Jira Integration:** Seamlessly link your time entries to Jira tickets, fetching and prepending ticket titles to descriptions.
-- **Google Calendar Integration:** Log your Google Calendar events directly as Clockify time entries, with intelligent project caching for recurring events.
-- **Local Project Filtering:** Curate a personalized list of projects for quick selection, reducing clutter.
-- **Session Management:** Start, stop, and check the status of your time entries directly from the terminal.
-- **Database Cleanup:** Easily manage and clean up old session logs from the local SQLite database.
-
-## Installation
-
-To get started with the Clocktopus CLI, follow these steps:
-
-1.  **Clone the repository:**
-
-    ```bash
-    git clone <repository_url>
-    cd clocktopus
-    ```
-
-2.  **Install dependencies:**
-    ```bash
-    bun install
-    ```
-
-## Configuration
-
-### Environment Variables
-
-Create a `.env` file in the `data/` directory with the following variables:
-
-```
-CLOCKIFY_API_KEY="your_clockify_api_key_here"
-ATLASSIAN_CLIENT_ID="your_atlassian_oauth_client_id"
-ATLASSIAN_CLIENT_SECRET="your_atlassian_oauth_client_secret"
-GOOGLE_CLIENT_ID="google_client_id"
-GOOGLE_CLIENT_SECRET="google_client_secret"
-```
-
-You can get your Clockify API key from [Manage API Keys](https://app.clockify.me/manage-api-keys).
-
-### Jira Integration (Atlassian OAuth)
-
-Clocktopus uses Atlassian OAuth 2.0 so users can connect their Jira account with a single click from the dashboard instead of manually copying API tokens.
-
-#### Setting up the Atlassian OAuth App
-
-1. Go to [Atlassian Developer Console](https://developer.atlassian.com/console/myapps/) and create a new **OAuth 2.0 (3LO)** app
-2. Under **Authorization**, set the callback URL to:
-   ```
-   http://localhost:4001/api/jira/callback
-   ```
-3. Under **Permissions**, add the following scopes:
-   - **Jira API**: `read:jira-work`, `write:jira-work`
-   - **User identity API**: `read:me`
-4. Copy the **Client ID** and **Client Secret** from the app's **Settings** page
-5. Add them to your `.env` file as `ATLASSIAN_CLIENT_ID` and `ATLASSIAN_CLIENT_SECRET`
-6. Start the dashboard (`bun run dashboard`) and click **Connect Atlassian**
-
-> **Fallback:** If you prefer using an API token instead of OAuth, you can expand the "or use API token" section on the dashboard and enter your credentials manually. For this, set the following in `.env`:
->
-> ```
-> ATLASSIAN_URL="https://your_org.atlassian.net/rest/api/3"
-> ATLASSIAN_API_TOKEN="your_atlassian_api_token_here"
-> ATLASSIAN_EMAIL="username@example.com"
-> ```
-
-### Local Projects Filtering
-
-The CLI allows you to filter the projects displayed when starting a new time entry. On the first run of the `clock start` command, the application will fetch all your Clockify projects and populate `data/local-projects.json` with their IDs and names. You can then edit this file to keep only the projects you frequently work on.
-
-Example `data/local-projects.json`:
-
-```json
-[
-  {
-    "id": "671b783fbd91bc5e5ddcb944",
-    "name": "2024 Project Management Traineeship"
-  },
-  {
-    "id": "another_project_id",
-    "name": "Another Project Name"
-  }
-]
-```
-
-Remove any project objects (both `id` and `name`) that you don't want to appear in the project selection list.
-
-## Usage
-
-### Build the application
-
-Before running, you need to compile the TypeScript code:
+### Install
 
 ```bash
+npm i -g clocktopus
+```
+
+Requires [Bun](https://bun.sh) runtime:
+
+```bash
+curl -fsSL https://bun.sh/install | bash
+```
+
+### Run
+
+```bash
+# Start dashboard in foreground
+clocktopus dash
+
+# Or as a background daemon
+clocktopus serve
+```
+
+Open [http://localhost:4001](http://localhost:4001) in your browser.
+
+### Setup
+
+1. Go to **Settings** tab
+2. Enter your **Clockify API key** ([get one here](https://app.clockify.me/manage-api-keys))
+3. Click **Pull from Clockify** in the Projects tab
+4. Optionally connect **Jira** and **Google Calendar** with one click
+
+That's it. Start/stop timers from the Home tab.
+
+### Dashboard Commands
+
+| Command                 | Description                          |
+| ----------------------- | ------------------------------------ |
+| `clocktopus dash`       | Start dashboard (foreground)         |
+| `clocktopus serve`      | Start dashboard as background daemon |
+| `clocktopus serve:stop` | Stop the dashboard daemon            |
+| `clocktopus serve:logs` | View dashboard daemon logs           |
+
+### Desktop App
+
+A macOS menu bar app is available — see [desktop/README.md](desktop/README.md) for setup. It wraps the dashboard with a system tray icon that shows timer status.
+
+---
+
+## Power User Guide
+
+For CLI-based workflows, scripting, and advanced features.
+
+### Install from Source
+
+```bash
+git clone https://github.com/pagevamp/clocktopus.git
+cd clocktopus
+bun install
 bun run build
 ```
 
-### Run the application
+### Local Development
 
-Once built, you can run the CLI commands using the following commands:
-
-- **Monitor idle state and auto-manage timers:**
-
-  ```bash
-  bun run monitor
-  ```
-
-  This command will monitor your system's idle time and automatically manage your Clockify timer:
-  - If you are idle for more than 5 minutes, the currently running timer will be stopped.
-  - When you become active again (move the mouse, press a key, etc.), if your last session was auto-completed due to idleness, a new timer will automatically be created for the last used project.
-  - All session events (start, stop, auto-complete, resume) are logged locally in the SQLite database, including project and description.
-
-  This ensures your time tracking is accurate even if you step away from your computer or forget to manually stop and restart your timer.
-
-  > Note: This ensures your time tracking is accurate even if you step away from your computer or forget to manually stop and restart your timer.
-  > If you do not want the background process to check your idle state, you can skip this.
-
-- **Start a new time entry:**
-
-  ```bash
-  bun run clock start "Task description"
-  ```
-
-  This will prompt you to select a project from your curated list.
-
-- **Start a new time entry with a Jira ticket:**
-
-  ```bash
-  bun run clock start -j TICKET-123
-  ```
-
-  When you provide a Jira ticket number with the `-j` flag, the tool will automatically fetch the ticket's title from Jira and prepend it to your time entry description. For example, if the title of `TICKET-123` is "Fix the login button", the description will be saved as `TICKET-123 Fix the login button`. If you also provide a description, it will be appended after the Jira title.
-
-- **Stop the currently running time entry:**
-
-  ```bash
-  bun run clock stop
-  ```
-
-- **Check the status of the current timer:**
-  ```bash
-  bun run clock status
-  ```
-
-### Manage Monitor
-
-- **Restart the monitor process (after code changes):**
-
-  ```bash
-  bun run monitor:restart
-  ```
-
-  Use this command to restart the monitor process, for example after making code changes or updating dependencies. This ensures the monitor is running the latest version of your code.
-
-- **Stop the monitor process:**
-
-  ```bash
-  bun run monitor:stop
-  ```
-
-  This command will stop the monitor process if it is running in the background. Use this when you want to fully halt all automatic idle monitoring and timer management.
-
-- **Show monitor logs:**
-
-  ```bash
-  bun run monitor:logs
-  ```
-
-  This command will display logs related to the monitor process. Use it to review idle/active transitions, timer events, and session details that have been recorded while the monitor was running. This is useful for troubleshooting, auditing, or reviewing your time tracking history.
-
-### Database Cleanup
-
-To delete old session logs from the local SQLite database, use the `db:cleanup` command:
+When running from source, use `bun run clock` instead of `clocktopus`:
 
 ```bash
-bun run db:cleanup <older-than-number-in-days>
+# Build first
+bun run build
+
+# Dashboard
+bun run dashboard              # Start dashboard (foreground)
+
+# Timer
+bun run clock start "Task"     # Start a timer
+bun run clock start -j PROJ-1  # Start with Jira ticket
+bun run clock stop             # Stop timer
+bun run clock status           # Check timer status
+
+# Monitor
+bun run monitor                # Start idle monitor (PM2 daemon)
+bun run monitor:stop           # Stop monitor
+bun run monitor:restart        # Restart monitor
+bun run monitor:status         # Check monitor status
+bun run monitor:logs           # View monitor logs
+
+# Google Calendar
+bun run google-auth            # Authenticate Google account
+bun run log-calendar -t        # Log today's events
+
+# Database
+bun run db:cleanup             # Clean old session logs
 ```
 
-- `<older-than-number-in-days>` (Optional): Specifies the number of days. Session logs older than this number of days will be deleted. If not provided, logs older than 5 days will be deleted by default.
+### CLI Commands
 
-Examples:
-
-- Delete logs older than 5 days (default):
-
-  ```bash
-  bun run db:cleanup
-  ```
-
-- Delete logs older than 5 days:
-  ```bash
-  bun run db:cleanup 5
-  ```
-
-### Google Calendar Integration
-
-This tool can log your Google Calendar events as time entries in Clockify. This is particularly useful for automatically tracking time spent in meetings or other scheduled events.
-
-#### 1. Google Authentication
-
-Before you can log calendar events, you need to authenticate with your Google account. This will grant the tool read-only access to your Google Calendar.
+#### Timer Management
 
 ```bash
-bun run google-auth
+# Start a timer (interactive project selection)
+clocktopus start "Task description"
+
+# Start with a Jira ticket (auto-fetches ticket title)
+clocktopus start -j TICKET-123
+
+# Stop the current timer
+clocktopus stop
+
+# Check timer status
+clocktopus status
 ```
 
-Follow the prompts in your browser to complete the authentication process. A token will be stored locally to maintain your session.
+#### Idle Monitor
 
-#### 2. Log Calendar Events
-
-Once authenticated, you can log events for a specific date range:
+Automatically stops timers when you're idle (5 min) or lock your screen, and restarts when you're back.
 
 ```bash
-bun run log-calendar -s <start-date> -e <end-date>
+# Run in foreground
+clocktopus monitor
+
+# Or manage via dashboard UI (Start/Stop/Restart buttons)
 ```
 
-- `<start-date>`: The start date for fetching calendar events (e.g., `2025-07-21`).
-- `<end-date>`: The end date for fetching calendar events (e.g., `2025-07-22`).
+The dashboard's Idle Monitor buttons use PM2 under the hood:
 
-You can also log events for today using the `-t` or `--today` flag:
+| Action      | What it does                   |
+| ----------- | ------------------------------ |
+| **Start**   | Launches monitor as PM2 daemon |
+| **Stop**    | Stops the monitor daemon       |
+| **Restart** | Restarts after code changes    |
+
+#### Google Calendar Integration
+
+Log Google Calendar events as Clockify time entries.
 
 ```bash
-bun run log-calendar -t
+# Authenticate (one-time)
+clocktopus google-auth
+
+# Log events for a date range
+clocktopus log-calendar -s 2025-07-21 -e 2025-07-22
+
+# Log today's events
+clocktopus log-calendar -t
 ```
 
-For each calendar event, the tool will prompt you to select a Clockify project. Your selection will be cached based on the event's summary (name), so if you have recurring events with the same name, you will only be asked once for the project. If you provide a `project-id` using the `-p` flag, all events will be logged to that project without prompting.
+For each event, you'll be prompted to select a Clockify project. Selections are cached by event name for recurring meetings.
 
-Example:
+#### Database Cleanup
 
 ```bash
-bun run log-calendar -s 2025-07-21 -e 2025-07-22
+# Delete session logs older than 5 days (default)
+clocktopus db:cleanup
+
+# Delete logs older than N days
+clocktopus db:cleanup 10
 ```
 
-Or, to log all events to a specific project:
+### Configuration
+
+All configuration is stored in a local SQLite database (`data/sessions.db`) and managed through the dashboard Settings tab. No `.env` file is needed.
+
+| Setting          | How to configure                                 |
+| ---------------- | ------------------------------------------------ |
+| Clockify API Key | Dashboard > Settings > Clockify                  |
+| Jira (OAuth)     | Dashboard > Settings > Click "Connect Atlassian" |
+| Jira (API token) | Dashboard > Settings > "or use API token"        |
+| Google Calendar  | Dashboard > Settings > Click "Connect Google"    |
+
+#### OAuth Architecture
+
+- **Jira**: OAuth tokens are exchanged through a [Cloudflare Worker proxy](docs/atlassian-proxy-flow.md) that holds the client secret securely. Users just click Connect.
+- **Google**: Uses a Desktop-type OAuth client. Credentials are handled transparently.
+- **Clockify**: Each user provides their own API key.
+
+#### Environment Variables (Optional Override)
+
+Power users can override credentials via environment variables or a `.env` file:
+
+```
+CLOCKIFY_API_KEY="your_key"
+ATLASSIAN_CLIENT_ID="your_id"
+ATLASSIAN_CLIENT_SECRET="your_secret"
+GOOGLE_CLIENT_ID="your_id"
+GOOGLE_CLIENT_SECRET="your_secret"
+```
+
+The app checks the database first, then falls back to environment variables.
+
+### Local Project Filtering (CLI only)
+
+On first `clocktopus start`, all projects are saved to `data/local-projects.json`. Edit this file to keep only your frequently used projects:
+
+```json
+[
+  { "id": "671b783fbd91bc5e5ddcb944", "name": "Project A" },
+  { "id": "another_id", "name": "Project B" }
+]
+```
+
+### Shell Aliases
+
+For quick access, add to `~/.zshrc`:
 
 ```bash
-bun run log-calendar -s 2025-07-21 -e 2025-07-22 -p your_clockify_project_id
-```
-
-## Troubleshooting
-
-### No notifications on macOS
-
-If you are not receiving notifications on macOS, you may need to adjust your system settings.
-
-- **Check System Settings for Notifications:**
-  - Go to **System Settings > Notifications**.
-  - Look for **Terminal** (or your specific terminal application if you use another one like iTerm).
-  - Make sure that **Allow Notifications** is turned on for it.
-  - If you see an entry for **Node**, ensure it also has permissions.
-
-Often, the first time a script tries to send a notification, macOS will ask for permission. If this was accidentally denied, you won't see any notifications.
-
-## Linux Requirements
-
-X server development package and pkg-config are required to run `desktop-idle` package:
-
-```
-apt install libxss-dev pkg-config build-essential
-```
-
-## Zsh Alias
-
-If you super lazy just like me, then you can add aliases for different actions. Here is what I use:
-
-```bash
-# Clocktopus
 CLOCKTOPUS_PATH="$HOME/Projects/Personal/clocktopus"
 
 clocktopus() {
@@ -288,10 +227,46 @@ alias cstop="clocktopus clock stop"
 alias mstart="clocktopus monitor"
 alias mstop="clocktopus monitor:stop"
 alias mrestart="clocktopus monitor:restart"
-alias mstatus="clocktopus monitor:status"
 alias mlogs="clocktopus monitor:logs"
-alias cgcalauth="clocktopus google-auth"
-alias cgcal="clocktopus log-calendar"
 ```
 
-Copy the above code in `.zshrc` file, change `CLOCKTOPUS_PATH` based on your path and save it. Then source the file using `source ~/.zshrc`.
+---
+
+## Troubleshooting
+
+### No notifications on macOS
+
+Go to **System Settings > Notifications** and ensure **terminal-notifier** (or your terminal app) has notifications enabled.
+
+### Monitor not detecting display off
+
+The idle monitor detects screen lock and system idle (5 min). If your Mac's display turns off without locking, enable **Require password immediately** in System Settings > Lock Screen.
+
+### Linux Requirements
+
+```bash
+apt install libxss-dev pkg-config build-essential
+```
+
+---
+
+## Project Structure
+
+```
+clocktopus/
+├── index.ts              # CLI entry point (Commander)
+├── clockify.ts           # Clockify API client
+├── lib/                  # Core libraries (db, auth, credentials)
+├── dashboard/            # Web dashboard (Hono server)
+│   ├── server.ts         # Dashboard server
+│   ├── views.ts          # HTML/CSS/JS (single-page app)
+│   └── routes/           # API routes
+├── desktop/              # Tauri macOS menu bar app
+├── proxy/                # Cloudflare Worker (OAuth proxy)
+├── scripts/              # Google auth & calendar scripts
+└── data/                 # SQLite DB & config (gitignored)
+```
+
+## License
+
+MIT

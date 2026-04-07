@@ -65,7 +65,7 @@ For CLI-based workflows, scripting, and advanced features.
 ### Install from Source
 
 ```bash
-git clone https://github.com/pagevamp/clocktopus.git
+git clone https://github.com/sajxraj/clocktopus.git
 cd clocktopus
 bun install
 bun run build

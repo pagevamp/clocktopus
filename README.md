@@ -10,16 +10,18 @@ CLI-based time-tracking automation for Clockify with idle monitoring, Jira integ
 
 Most users only need the dashboard — a web UI to manage timers, connect integrations, and monitor idle time.
 
-### Install
+### Prerequisites
 
-```bash
-npm i -g clocktopus
-```
-
-Requires [Bun](https://bun.sh) runtime:
+[Bun](https://bun.sh) is required (used as the runtime):
 
 ```bash
 curl -fsSL https://bun.sh/install | bash
+```
+
+### Install
+
+```bash
+bun i -g clocktopus
 ```
 
 ### Run

@@ -99,7 +99,7 @@ pub fn run() {
             // Show error page if server is not running
             let window_for_check = window.clone();
             std::thread::spawn(move || {
-                std::thread::sleep(Duration::from_secs(2));
+                std::thread::sleep(Duration::from_secs(3));
                 let server_up = reqwest::blocking::Client::new()
                     .get("http://localhost:4001")
                     .timeout(Duration::from_secs(3))
@@ -107,16 +107,8 @@ pub fn run() {
                     .is_ok();
 
                 if !server_up {
-                    let _ = window_for_check.eval(r#"
-                        document.body.innerHTML = '';
-                        document.body.style.cssText = 'background:#0f1117;color:#e1e4e8;font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;';
-                        document.body.innerHTML = '<div>' +
-                            '<h2 style="color:#fff;margin-bottom:0.5rem;">Dashboard not running</h2>' +
-                            '<p style="color:#8b949e;font-size:0.9rem;margin-bottom:1.5rem;">Start the server to use Clocktopus</p>' +
-                            '<code style="background:#1c1f26;padding:0.75rem 1.25rem;border-radius:8px;font-size:0.95rem;color:#58a6ff;display:inline-block;">clocktopus serve</code>' +
-                            '<p style="color:#8b949e;font-size:0.8rem;margin-top:1.5rem;">Then click the tray icon to reload</p>' +
-                        '</div>';
-                    "#);
+                    let error_html = r#"data:text/html,<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box}body{background:%230f1117;color:%23e1e4e8;font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;text-align:center}code{background:%231c1f26;padding:0.75rem 1.25rem;border-radius:8px;font-size:0.95rem;color:%2358a6ff;display:inline-block}p{color:%238b949e;font-size:0.9rem}h2{color:white;margin-bottom:0.5rem}</style></head><body><div><h2>Dashboard not running</h2><p style="margin-bottom:1.5rem">Start the server to use Clocktopus</p><code>clocktopus serve</code><p style="margin-top:1.5rem;font-size:0.8rem">Then click the tray icon to reload</p></div></body></html>"#;
+                    let _ = window_for_check.navigate(error_html.parse().unwrap());
                 }
             });
 

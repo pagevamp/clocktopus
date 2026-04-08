@@ -320,6 +320,9 @@ program
     startDashboard();
   });
 
+const isDev = __dirname.includes('/Projects/') || __dirname.includes('/src/');
+const DASH_PM2_NAME = isDev ? 'clocktopus-dash-dev' : 'clocktopus-dash';
+
 program
   .command('serve')
   .description('Start dashboard as a background daemon (PM2).')
@@ -329,12 +332,11 @@ program
     const scriptPath = path.join(__dirname, 'index.js');
 
     try {
-      // Stop existing if running
       try {
-        execSync('bunx pm2 delete clocktopus-dash', { stdio: 'ignore' });
+        execSync(`bunx pm2 delete ${DASH_PM2_NAME}`, { stdio: 'ignore' });
       } catch {}
 
-      execSync(`bunx pm2 start ${scriptPath} --name clocktopus-dash --interpreter ${bunPath} -- dash`, {
+      execSync(`bunx pm2 start ${scriptPath} --name ${DASH_PM2_NAME} --interpreter ${bunPath} -- dash`, {
         stdio: 'inherit',
       });
       console.log(chalk.green('Dashboard running at http://localhost:4001'));
@@ -351,7 +353,7 @@ program
   .action(async () => {
     const { execSync } = await import('child_process');
     try {
-      execSync('bunx pm2 stop clocktopus-dash', { stdio: 'inherit' });
+      execSync(`bunx pm2 stop ${DASH_PM2_NAME}`, { stdio: 'inherit' });
     } catch {
       console.log(chalk.yellow('Dashboard is not running.'));
     }
@@ -363,7 +365,7 @@ program
   .action(async () => {
     const { execSync } = await import('child_process');
     try {
-      execSync('bunx pm2 logs clocktopus-dash --lines 50', { stdio: 'inherit' });
+      execSync(`bunx pm2 logs ${DASH_PM2_NAME} --lines 50`, { stdio: 'inherit' });
     } catch {
       console.log(chalk.yellow('Dashboard is not running.'));
     }

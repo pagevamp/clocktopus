@@ -6,7 +6,8 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const SCRIPT_PATH = path.resolve(__dirname, '../../index.js');
-const PM2_NAME = 'clocktopus-monitor';
+const isDev = SCRIPT_PATH.includes('/Projects/') || SCRIPT_PATH.includes('/src/');
+const PM2_NAME = isDev ? 'clocktopus-monitor-dev' : 'clocktopus-monitor';
 
 const monitorRoutes = new Hono();
 

@@ -47,16 +47,18 @@ That's it. Start/stop timers from the Home tab.
 
 ### Commands
 
-| Command                 | Description                          |
-| ----------------------- | ------------------------------------ |
-| `clocktopus dash`       | Start dashboard (foreground)         |
-| `clocktopus serve`      | Start dashboard as background daemon |
-| `clocktopus serve:stop` | Stop the dashboard daemon            |
-| `clocktopus serve:logs` | View dashboard daemon logs           |
-| `clocktopus start`      | Start a timer (interactive)          |
-| `clocktopus stop`       | Stop the current timer               |
-| `clocktopus status`     | Check timer status                   |
-| `clocktopus monitor`    | Start idle monitor (foreground)      |
+| Command                   | Description                             |
+| ------------------------- | --------------------------------------- |
+| `clocktopus dash`         | Start dashboard (foreground)            |
+| `clocktopus serve`        | Start dashboard as background daemon    |
+| `clocktopus serve:stop`   | Stop the dashboard daemon               |
+| `clocktopus serve:logs`   | View dashboard daemon logs              |
+| `clocktopus start`        | Start a timer (interactive)             |
+| `clocktopus stop`         | Stop the current timer                  |
+| `clocktopus status`       | Check timer status                      |
+| `clocktopus monitor`      | Start idle monitor as background daemon |
+| `clocktopus monitor:stop` | Stop the idle monitor                   |
+| `clocktopus monitor:logs` | View idle monitor logs                  |
 
 ### Desktop App (macOS)
 

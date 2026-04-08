@@ -167,8 +167,8 @@ function sleep(ms: number) {
 }
 
 program
-  .command('monitor')
-  .description('Monitor system idle time and screen state, and stop the Clockify timer if idle or screen is off.')
+  .command('monitor:run', { hidden: true })
+  .description('Run monitor in foreground (used by PM2).')
   .action(async () => {
     const { workspaceId, userId } = await getWorkspaceAndUser();
 
@@ -321,7 +321,56 @@ program
   });
 
 const isDev = __dirname.includes('/Projects/') || __dirname.includes('/src/');
+const MONITOR_PM2_NAME = isDev ? 'clocktopus-monitor-dev' : 'clocktopus-monitor';
 const DASH_PM2_NAME = isDev ? 'clocktopus-dash-dev' : 'clocktopus-dash';
+
+program
+  .command('monitor')
+  .description('Start idle monitor as a background daemon.')
+  .action(async () => {
+    const { execSync } = await import('child_process');
+    const bunPath = execSync('which bun', { encoding: 'utf-8' }).trim();
+    const scriptPath = path.join(__dirname, 'index.js');
+
+    try {
+      try {
+        execSync(`bunx pm2 delete ${MONITOR_PM2_NAME}`, { stdio: 'ignore' });
+      } catch {}
+
+      execSync(`bunx pm2 start ${scriptPath} --name ${MONITOR_PM2_NAME} --interpreter ${bunPath} -- monitor:run`, {
+        stdio: 'inherit',
+      });
+      console.log(chalk.green('Idle monitor started in background.'));
+      console.log(chalk.gray('  Stop:   clocktopus monitor:stop'));
+      console.log(chalk.gray('  Logs:   clocktopus monitor:logs'));
+    } catch {
+      console.error(chalk.red('Failed to start monitor.'));
+    }
+  });
+
+program
+  .command('monitor:stop')
+  .description('Stop the idle monitor daemon.')
+  .action(async () => {
+    const { execSync } = await import('child_process');
+    try {
+      execSync(`bunx pm2 stop ${MONITOR_PM2_NAME}`, { stdio: 'inherit' });
+    } catch {
+      console.log(chalk.yellow('Monitor is not running.'));
+    }
+  });
+
+program
+  .command('monitor:logs')
+  .description('Show idle monitor logs.')
+  .action(async () => {
+    const { execSync } = await import('child_process');
+    try {
+      execSync(`bunx pm2 logs ${MONITOR_PM2_NAME} --lines 50`, { stdio: 'inherit' });
+    } catch {
+      console.log(chalk.yellow('Monitor is not running.'));
+    }
+  });
 
 program
   .command('serve')

@@ -3,7 +3,16 @@ import * as path from 'path';
 import { Database } from 'bun:sqlite';
 import { z } from 'zod';
 
-const DB_DIR = path.join(process.cwd(), 'data/db');
+function getDataDir(): string {
+  const scriptDir = path.dirname(new URL(import.meta.url).pathname);
+  const isDev = scriptDir.includes('/Projects/') || scriptDir.includes('/src/');
+  if (isDev) {
+    return path.join(process.cwd(), 'data/db');
+  }
+  return path.join(process.env.HOME || '~', '.clocktopus', 'data');
+}
+
+const DB_DIR = getDataDir();
 const DB_PATH = path.join(DB_DIR, 'sessions.db');
 
 if (!fs.existsSync(DB_DIR)) {

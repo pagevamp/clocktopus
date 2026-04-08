@@ -48,7 +48,7 @@ monitorRoutes.post('/monitor/start', (c) => {
   try {
     execSync(`bunx pm2 delete ${PM2_NAME}`, { stdio: 'ignore' });
   } catch {}
-  const result = pm2Exec(`bunx pm2 start ${SCRIPT_PATH} --name ${PM2_NAME} --interpreter ${bunPath} -- monitor`);
+  const result = pm2Exec(`bunx pm2 start ${SCRIPT_PATH} --name ${PM2_NAME} --interpreter ${bunPath} -- monitor:run`);
   return c.json(result);
 });
 

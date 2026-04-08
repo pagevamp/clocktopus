@@ -96,6 +96,30 @@ pub fn run() {
                 })
                 .build(app)?;
 
+            // Show error page if server is not running
+            let window_for_check = window.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_secs(2));
+                let server_up = reqwest::blocking::Client::new()
+                    .get("http://localhost:4001")
+                    .timeout(Duration::from_secs(3))
+                    .send()
+                    .is_ok();
+
+                if !server_up {
+                    let _ = window_for_check.eval(r#"
+                        document.body.innerHTML = '';
+                        document.body.style.cssText = 'background:#0f1117;color:#e1e4e8;font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;';
+                        document.body.innerHTML = '<div>' +
+                            '<h2 style="color:#fff;margin-bottom:0.5rem;">Dashboard not running</h2>' +
+                            '<p style="color:#8b949e;font-size:0.9rem;margin-bottom:1.5rem;">Start the server to use Clocktopus</p>' +
+                            '<code style="background:#1c1f26;padding:0.75rem 1.25rem;border-radius:8px;font-size:0.95rem;color:#58a6ff;display:inline-block;">clocktopus serve</code>' +
+                            '<p style="color:#8b949e;font-size:0.8rem;margin-top:1.5rem;">Then click the tray icon to reload</p>' +
+                        '</div>';
+                    "#);
+                }
+            });
+
             // Hide window on close
             let window_clone = window.clone();
             window.on_window_event(move |event| {

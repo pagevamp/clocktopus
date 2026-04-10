@@ -22,7 +22,9 @@ async function jiraApiRequest(endpoint: string, method: 'POST' | 'GET', body?: u
       });
       return response.data;
     } catch (error: unknown) {
-      if (error instanceof Error) {
+      if (axios.isAxiosError(error)) {
+        console.error('Error making Jira API request (OAuth):', error.message, error.response?.data);
+      } else if (error instanceof Error) {
         console.error('Error making Jira API request (OAuth):', error.message);
       }
       return null;
@@ -52,7 +54,9 @@ async function jiraApiRequest(endpoint: string, method: 'POST' | 'GET', body?: u
     });
     return response.data;
   } catch (error: unknown) {
-    if (error instanceof Error) {
+    if (axios.isAxiosError(error)) {
+      console.error('Error making Jira API request:', error.message, error.response?.data);
+    } else if (error instanceof Error) {
       console.error('Error making Jira API request:', error.message);
     }
     return null;

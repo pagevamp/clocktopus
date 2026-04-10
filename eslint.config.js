@@ -5,7 +5,7 @@ import configPrettier from 'eslint-config-prettier';
 
 export default tseslint.config(
   {
-    ignores: ['desktop/src-tauri/**'],
+    ignores: ['desktop/src-tauri/**', 'scripts/postinstall.cjs'],
   },
   {
     files: ['**/*.{js,mjs,cjs,ts}'],

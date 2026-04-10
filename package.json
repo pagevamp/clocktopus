@@ -10,12 +10,13 @@
   "files": [
     "dist",
     "data/.gitkeep",
+    "scripts/postinstall.cjs",
     "!dist/desktop"
   ],
   "scripts": {
     "build": "bunx tsc",
     "prepublishOnly": "bunx tsc",
-    "postinstall": "node -e \"var p=require('path').dirname(require.resolve('macos-notification-state/package.json')); require('child_process').execSync('node-gyp rebuild',{cwd:p,stdio:'inherit'})\" 2>/dev/null; node -e \"var p=require('path').dirname(require.resolve('desktop-idle/package.json')); require('child_process').execSync('node-gyp rebuild',{cwd:p,stdio:'inherit'})\" 2>/dev/null; true",
+    "postinstall": "node scripts/postinstall.cjs",
     "lint": "eslint . --ext .ts",
     "clock": "bun dist/index.js",
     "monitor": "bun dist/index.js monitor",

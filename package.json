@@ -15,7 +15,7 @@
   "scripts": {
     "build": "bunx tsc",
     "prepublishOnly": "bunx tsc",
-    "postinstall": "cd node_modules/macos-notification-state && node-gyp rebuild 2>/dev/null; cd ../desktop-idle && node-gyp rebuild 2>/dev/null; true",
+    "postinstall": "node -e \"var p=require('path').dirname(require.resolve('macos-notification-state/package.json')); require('child_process').execSync('node-gyp rebuild',{cwd:p,stdio:'inherit'})\" 2>/dev/null; node -e \"var p=require('path').dirname(require.resolve('desktop-idle/package.json')); require('child_process').execSync('node-gyp rebuild',{cwd:p,stdio:'inherit'})\" 2>/dev/null; true",
     "lint": "eslint . --ext .ts",
     "clock": "bun dist/index.js",
     "monitor": "bun dist/index.js monitor",

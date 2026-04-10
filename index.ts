@@ -247,6 +247,10 @@ program
           throw new Error('getSessionState not found in module');
         }
 
+        // Verify the native addon actually works before setting up polling
+        const initialState = getSessionState();
+        console.log(chalk.gray(`Initial session state: ${initialState}`));
+
         pollInterval = setInterval(async () => {
           try {
             const state = getSessionState();
@@ -262,6 +266,11 @@ program
             }
           } catch (error) {
             console.error('Error polling session state:', error);
+            if (pollInterval) {
+              clearInterval(pollInterval);
+              pollInterval = null;
+              console.error(chalk.red('Display monitoring disabled due to repeated errors.'));
+            }
           }
         }, 3000);
       } else {

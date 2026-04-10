@@ -12,3 +12,6 @@
 # Proxy
 /proxy/node_modules/
 /proxy/.wrangler/
+
+/entities.json
+/mempalace.yaml

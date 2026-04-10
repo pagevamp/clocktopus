@@ -226,7 +226,12 @@ program
 
       if (!eligible) return;
 
-      await clockify.startTimer(workspaceId, latestSession.projectId, latestSession.description);
+      await clockify.startTimer(
+        workspaceId,
+        latestSession.projectId,
+        latestSession.description,
+        latestSession.jiraTicket ?? undefined,
+      );
       console.log(chalk.green('Timer restarted for the last used project.'));
       lastResumeAt = Date.now();
     }

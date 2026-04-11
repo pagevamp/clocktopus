@@ -8,6 +8,7 @@ import googleRoutes from './routes/google.js';
 import timerRoutes from './routes/timer.js';
 import dataRoutes from './routes/data.js';
 import monitorRoutes from './routes/monitor.js';
+import calendarRoutes from './routes/calendar.js';
 
 const app = new Hono();
 
@@ -19,6 +20,7 @@ app.route('/api', googleRoutes);
 app.route('/api', timerRoutes);
 app.route('/api', dataRoutes);
 app.route('/api', monitorRoutes);
+app.route('/api', calendarRoutes);
 
 export function startDashboard() {
   const port = 4001;

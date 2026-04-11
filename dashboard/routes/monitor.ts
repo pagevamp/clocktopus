@@ -25,7 +25,7 @@ function pm2Exec(command: string): { ok: boolean; output: string } {
 
 monitorRoutes.get('/monitor/status', (c) => {
   try {
-    const output = execSync('${pm2Bin} jlist', { encoding: 'utf-8', timeout: 10000 });
+    const output = execSync(`${pm2Bin} jlist`, { encoding: 'utf-8', timeout: 10000 });
     const processes = JSON.parse(output);
     const proc = processes.find((p: { name: string }) => p.name === PM2_NAME);
 

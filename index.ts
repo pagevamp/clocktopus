@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url';
 import { completeLatestSession, getLatestSession } from './lib/db.js';
 import { stopJiraTimer } from './lib/jira.js';
 import { startDashboard } from './dashboard/server.js';
+import { ensureNativeAddons } from './lib/ensure-native-addons.js';
 
 interface Project {
   id: string;
@@ -342,6 +343,8 @@ program
   .command('monitor')
   .description('Start idle monitor as a background daemon.')
   .action(async () => {
+    ensureNativeAddons();
+
     const { execSync } = await import('child_process');
     const bunPath = execSync('which bun', { encoding: 'utf-8' }).trim();
     const scriptPath = path.join(__dirname, 'index.js');

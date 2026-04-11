@@ -96,6 +96,7 @@ export function indexPage() {
       <button class="nav-btn active" onclick="switchTab('home')" id="nav-home">Home</button>
       <button class="nav-btn" onclick="switchTab('projects')" id="nav-projects">Projects</button>
       <button class="nav-btn" onclick="switchTab('settings')" id="nav-settings">Settings</button>
+      <button class="nav-btn" onclick="switchTab('calendar')" id="nav-calendar">Calendar</button>
     </div>
   </div>
 
@@ -259,6 +260,45 @@ export function indexPage() {
       </div>
       <div class="msg" id="projects-msg"></div>
       <div id="projects-list" style="margin-top:0.5rem;"></div>
+    </div>
+  </div>
+
+  <!-- CALENDAR TAB -->
+  <div id="tab-calendar" class="tab-content">
+    <div class="cards">
+      <div class="card card-full">
+        <h2>Log Calendar Events</h2>
+        <div class="form-row" style="margin-top:1rem;">
+          <div>
+            <label for="cal-from">From</label>
+            <input type="date" id="cal-from" />
+          </div>
+          <div>
+            <label for="cal-to">To</label>
+            <input type="date" id="cal-to" />
+          </div>
+        </div>
+        <button onclick="fetchCalendarEvents()">Fetch Events</button>
+        <div class="msg" id="cal-msg"></div>
+
+        <div id="cal-table-wrap" class="table-wrap" style="display:none; margin-top:1rem;">
+          <table class="sessions-table">
+            <thead>
+              <tr>
+                <th><input type="checkbox" id="cal-select-all" checked onchange="toggleCalSelectAll(this.checked)" /></th>
+                <th>Event</th>
+                <th>Start</th>
+                <th>End</th>
+                <th>Duration</th>
+                <th>Project</th>
+              </tr>
+            </thead>
+            <tbody id="cal-body"></tbody>
+          </table>
+          <button onclick="logCalendarEvents()" style="margin-top:1rem;">Log to Clockify</button>
+          <div class="msg" id="cal-log-msg"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -826,6 +866,127 @@ export function indexPage() {
         }, 100);
         window.history.replaceState({}, '', '/');
       }
+    })();
+
+    // --- Calendar ---
+    var calEvents = [];
+    var calProjects = [];
+
+    async function fetchCalendarEvents() {
+      var from = document.getElementById('cal-from').value;
+      var to = document.getElementById('cal-to').value;
+      if (!from || !to) return setMsg('cal-msg', 'Please select both dates.', false);
+
+      setMsg('cal-msg', '', true);
+      setMsg('cal-log-msg', '', true);
+      document.getElementById('cal-table-wrap').style.display = 'none';
+
+      try {
+        var res = await fetch('/api/calendar/events?start=' + encodeURIComponent(from) + '&end=' + encodeURIComponent(to));
+        var data = await res.json();
+        if (!res.ok) {
+          setMsg('cal-msg', data.error || 'Failed to fetch events.', false);
+          return;
+        }
+        calEvents = data.events || [];
+        calProjects = data.projects || [];
+
+        if (calEvents.length === 0) {
+          setMsg('cal-msg', 'No calendar events found for this date range.', false);
+          return;
+        }
+
+        setMsg('cal-msg', 'Found ' + calEvents.length + ' event(s).', true);
+        document.getElementById('cal-select-all').checked = true;
+        renderCalendarTable();
+        document.getElementById('cal-table-wrap').style.display = 'block';
+      } catch {
+        setMsg('cal-msg', 'Request failed.', false);
+      }
+    }
+
+    function renderCalendarTable() {
+      var tbody = document.getElementById('cal-body');
+      tbody.innerHTML = calEvents.map(function(ev, i) {
+        var startDate = formatDate(ev.start);
+        var endDate = formatDate(ev.end);
+        var durationMs = new Date(ev.end).getTime() - new Date(ev.start).getTime();
+        var duration = formatDuration(durationMs);
+
+        var projectOptions = '<option value="">-- Select project --</option>' +
+          calProjects.map(function(p) {
+            var selected = (ev.savedProjectId && ev.savedProjectId === p.id) ? ' selected' : '';
+            return '<option value="' + p.id + '"' + selected + '>' + escapeHtml(p.name) + '</option>';
+          }).join('');
+
+        return '<tr>' +
+          '<td><input type="checkbox" class="cal-row-cb" data-index="' + i + '" checked /></td>' +
+          '<td>' + escapeHtml(ev.summary || 'Untitled') + '</td>' +
+          '<td>' + startDate + '</td>' +
+          '<td>' + endDate + '</td>' +
+          '<td>' + duration + '</td>' +
+          '<td><select class="cal-project-sel" data-index="' + i + '" style="min-width:140px;">' + projectOptions + '</select></td>' +
+          '</tr>';
+      }).join('');
+
+      tbody.querySelectorAll('.cal-project-sel').forEach(function(sel) {
+        sel.addEventListener('change', function() {
+          var idx = parseInt(sel.dataset.index);
+          calEvents[idx].savedProjectId = sel.value || null;
+        });
+      });
+    }
+
+    function toggleCalSelectAll(checked) {
+      document.querySelectorAll('.cal-row-cb').forEach(function(cb) {
+        cb.checked = checked;
+      });
+    }
+
+    async function logCalendarEvents() {
+      var entries = [];
+      document.querySelectorAll('.cal-row-cb').forEach(function(cb) {
+        if (!cb.checked) return;
+        var idx = parseInt(cb.dataset.index);
+        var ev = calEvents[idx];
+        var sel = document.querySelector('.cal-project-sel[data-index="' + idx + '"]');
+        var projectId = sel ? sel.value : '';
+        entries.push({ index: idx, projectId: projectId, summary: ev.summary, start: ev.start, end: ev.end, calendarEventId: ev.id });
+      });
+
+      if (entries.length === 0) {
+        return setMsg('cal-log-msg', 'No events selected.', false);
+      }
+
+      var missing = entries.filter(function(e) { return !e.projectId; });
+      if (missing.length > 0) {
+        return setMsg('cal-log-msg', 'Please assign a project to all selected events (' + missing.length + ' missing).', false);
+      }
+
+      setMsg('cal-log-msg', '', true);
+
+      try {
+        var res = await fetch('/api/calendar/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ entries: entries }),
+        });
+        var data = await res.json();
+        if (data.ok) {
+          setMsg('cal-log-msg', 'Logged ' + (data.count || entries.length) + ' event(s) to Clockify.', true);
+        } else {
+          setMsg('cal-log-msg', data.error || 'Failed to log events.', false);
+        }
+      } catch {
+        setMsg('cal-log-msg', 'Request failed.', false);
+      }
+    }
+
+    // Set default calendar dates to today
+    (function setCalendarDefaults() {
+      var today = new Date().toISOString().split('T')[0];
+      document.getElementById('cal-from').value = today;
+      document.getElementById('cal-to').value = today;
     })();
 
     // --- Init ---

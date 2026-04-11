@@ -869,12 +869,12 @@ export function indexPage() {
     })();
 
     // --- Calendar ---
-    var calEvents = [];
-    var calProjects = [];
+    let calEvents = [];
+    let calProjects = [];
 
     async function fetchCalendarEvents() {
-      var from = document.getElementById('cal-from').value;
-      var to = document.getElementById('cal-to').value;
+      const from = document.getElementById('cal-from').value;
+      const to = document.getElementById('cal-to').value;
       if (!from || !to) return setMsg('cal-msg', 'Please select both dates.', false);
 
       setMsg('cal-msg', '', true);
@@ -882,8 +882,8 @@ export function indexPage() {
       document.getElementById('cal-table-wrap').style.display = 'none';
 
       try {
-        var res = await fetch('/api/calendar/events?start=' + encodeURIComponent(from) + '&end=' + encodeURIComponent(to));
-        var data = await res.json();
+        const res = await fetch('/api/calendar/events?start=' + encodeURIComponent(from) + '&end=' + encodeURIComponent(to));
+        const data = await res.json();
         if (!res.ok) {
           setMsg('cal-msg', data.error || 'Failed to fetch events.', false);
           return;
@@ -906,16 +906,16 @@ export function indexPage() {
     }
 
     function renderCalendarTable() {
-      var tbody = document.getElementById('cal-body');
+      const tbody = document.getElementById('cal-body');
       tbody.innerHTML = calEvents.map(function(ev, i) {
-        var startDate = formatDate(ev.start);
-        var endDate = formatDate(ev.end);
-        var durationMs = new Date(ev.end).getTime() - new Date(ev.start).getTime();
-        var duration = formatDuration(durationMs);
+        const startDate = formatDate(ev.start);
+        const endDate = formatDate(ev.end);
+        const durationMs = new Date(ev.end).getTime() - new Date(ev.start).getTime();
+        const duration = formatDuration(durationMs);
 
-        var projectOptions = '<option value="">-- Select project --</option>' +
+        const projectOptions = '<option value="">-- Select project --</option>' +
           calProjects.map(function(p) {
-            var selected = (ev.savedProjectId && ev.savedProjectId === p.id) ? ' selected' : '';
+            const selected = (ev.savedProjectId && ev.savedProjectId === p.id) ? ' selected' : '';
             return '<option value="' + p.id + '"' + selected + '>' + escapeHtml(p.name) + '</option>';
           }).join('');
 
@@ -931,7 +931,7 @@ export function indexPage() {
 
       tbody.querySelectorAll('.cal-project-sel').forEach(function(sel) {
         sel.addEventListener('change', function() {
-          var idx = parseInt(sel.dataset.index);
+          const idx = parseInt(sel.dataset.index);
           calEvents[idx].savedProjectId = sel.value || null;
         });
       });
@@ -944,13 +944,12 @@ export function indexPage() {
     }
 
     async function logCalendarEvents() {
-      var entries = [];
+      const entries = [];
       document.querySelectorAll('.cal-row-cb').forEach(function(cb) {
         if (!cb.checked) return;
-        var idx = parseInt(cb.dataset.index);
-        var ev = calEvents[idx];
-        var sel = document.querySelector('.cal-project-sel[data-index="' + idx + '"]');
-        var projectId = sel ? sel.value : '';
+        const idx = parseInt(cb.dataset.index);
+        const ev = calEvents[idx];
+        const projectId = ev.savedProjectId || '';
         entries.push({ index: idx, projectId: projectId, summary: ev.summary, start: ev.start, end: ev.end, calendarEventId: ev.id });
       });
 
@@ -958,7 +957,7 @@ export function indexPage() {
         return setMsg('cal-log-msg', 'No events selected.', false);
       }
 
-      var missing = entries.filter(function(e) { return !e.projectId; });
+      const missing = entries.filter(function(e) { return !e.projectId; });
       if (missing.length > 0) {
         return setMsg('cal-log-msg', 'Please assign a project to all selected events (' + missing.length + ' missing).', false);
       }
@@ -966,12 +965,12 @@ export function indexPage() {
       setMsg('cal-log-msg', '', true);
 
       try {
-        var res = await fetch('/api/calendar/log', {
+        const res = await fetch('/api/calendar/log', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ entries: entries }),
         });
-        var data = await res.json();
+        const data = await res.json();
         if (data.ok) {
           setMsg('cal-log-msg', 'Logged ' + (data.count || entries.length) + ' event(s) to Clockify.', true);
         } else {
@@ -984,7 +983,7 @@ export function indexPage() {
 
     // Set default calendar dates to today
     (function setCalendarDefaults() {
-      var today = new Date().toISOString().split('T')[0];
+      const today = new Date().toISOString().split('T')[0];
       document.getElementById('cal-from').value = today;
       document.getElementById('cal-to').value = today;
     })();

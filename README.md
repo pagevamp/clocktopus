@@ -150,6 +150,22 @@ Go to **System Settings > Notifications** and ensure **terminal-notifier** has n
 
 Enable **Require password immediately** in System Settings > Lock Screen.
 
+### Bun installs an old version
+
+Bun caches registry data aggressively. Clear the cache and reinstall:
+
+```bash
+bun pm cache rm && bun i -g clocktopus@latest
+```
+
+### Native addons not built (untrusted postinstall)
+
+If `bun install -g` skips the postinstall script, the monitor will auto-build native addons on first run (requires Node.js for `npx`). Alternatively, trust the package and reinstall:
+
+```bash
+bun pm trust clocktopus && bun i -g clocktopus
+```
+
 ### Linux
 
 ```bash

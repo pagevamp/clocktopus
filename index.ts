@@ -338,6 +338,7 @@ program
 const isDev = __dirname.includes('/Projects/') || __dirname.includes('/src/');
 const MONITOR_PM2_NAME = isDev ? 'clocktopus-monitor-dev' : 'clocktopus-monitor';
 const DASH_PM2_NAME = isDev ? 'clocktopus-dash-dev' : 'clocktopus-dash';
+const pm2Bin = path.join(__dirname, '..', 'node_modules', '.bin', 'pm2');
 
 program
   .command('monitor')
@@ -351,10 +352,10 @@ program
 
     try {
       try {
-        execSync(`bunx pm2 delete ${MONITOR_PM2_NAME}`, { stdio: 'ignore' });
+        execSync(`${pm2Bin} delete ${MONITOR_PM2_NAME}`, { stdio: 'ignore' });
       } catch {}
 
-      execSync(`bunx pm2 start ${scriptPath} --name ${MONITOR_PM2_NAME} --interpreter ${bunPath} -- monitor:run`, {
+      execSync(`${pm2Bin} start ${scriptPath} --name ${MONITOR_PM2_NAME} --interpreter ${bunPath} -- monitor:run`, {
         stdio: 'inherit',
       });
       console.log(chalk.green('Idle monitor started in background.'));
@@ -371,7 +372,7 @@ program
   .action(async () => {
     const { execSync } = await import('child_process');
     try {
-      execSync(`bunx pm2 stop ${MONITOR_PM2_NAME}`, { stdio: 'inherit' });
+      execSync(`${pm2Bin} stop ${MONITOR_PM2_NAME}`, { stdio: 'inherit' });
     } catch {
       console.log(chalk.yellow('Monitor is not running.'));
     }
@@ -383,7 +384,7 @@ program
   .action(async () => {
     const { execSync } = await import('child_process');
     try {
-      execSync(`bunx pm2 logs ${MONITOR_PM2_NAME} --lines 50`, { stdio: 'inherit' });
+      execSync(`${pm2Bin} logs ${MONITOR_PM2_NAME} --lines 50`, { stdio: 'inherit' });
     } catch {
       console.log(chalk.yellow('Monitor is not running.'));
     }
@@ -399,10 +400,10 @@ program
 
     try {
       try {
-        execSync(`bunx pm2 delete ${DASH_PM2_NAME}`, { stdio: 'ignore' });
+        execSync(`${pm2Bin} delete ${DASH_PM2_NAME}`, { stdio: 'ignore' });
       } catch {}
 
-      execSync(`bunx pm2 start ${scriptPath} --name ${DASH_PM2_NAME} --interpreter ${bunPath} -- dash`, {
+      execSync(`${pm2Bin} start ${scriptPath} --name ${DASH_PM2_NAME} --interpreter ${bunPath} -- dash`, {
         stdio: 'inherit',
       });
       console.log(chalk.green('Dashboard running at http://localhost:4001'));
@@ -419,7 +420,7 @@ program
   .action(async () => {
     const { execSync } = await import('child_process');
     try {
-      execSync(`bunx pm2 stop ${DASH_PM2_NAME}`, { stdio: 'inherit' });
+      execSync(`${pm2Bin} stop ${DASH_PM2_NAME}`, { stdio: 'inherit' });
     } catch {
       console.log(chalk.yellow('Dashboard is not running.'));
     }
@@ -431,7 +432,7 @@ program
   .action(async () => {
     const { execSync } = await import('child_process');
     try {
-      execSync(`bunx pm2 logs ${DASH_PM2_NAME} --lines 50`, { stdio: 'inherit' });
+      execSync(`${pm2Bin} logs ${DASH_PM2_NAME} --lines 50`, { stdio: 'inherit' });
     } catch {
       console.log(chalk.yellow('Dashboard is not running.'));
     }

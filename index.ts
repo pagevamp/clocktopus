@@ -7,6 +7,7 @@ import { Clockify } from './clockify.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
 import { completeLatestSession, getLatestSession } from './lib/db.js';
 import { stopJiraTimer } from './lib/jira.js';
 import { startDashboard } from './dashboard/server.js';
@@ -338,7 +339,7 @@ program
 const isDev = __dirname.includes('/Projects/') || __dirname.includes('/src/');
 const MONITOR_PM2_NAME = isDev ? 'clocktopus-monitor-dev' : 'clocktopus-monitor';
 const DASH_PM2_NAME = isDev ? 'clocktopus-dash-dev' : 'clocktopus-dash';
-const pm2Bin = path.join(__dirname, '..', 'node_modules', '.bin', 'pm2');
+const pm2Bin = path.join(path.dirname(createRequire(import.meta.url).resolve('pm2')), 'bin', 'pm2');
 
 program
   .command('monitor')

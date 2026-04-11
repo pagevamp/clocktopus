@@ -2,13 +2,14 @@ import { Hono } from 'hono';
 import { execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const SCRIPT_PATH = path.resolve(__dirname, '../../index.js');
 const isDev = SCRIPT_PATH.includes('/Projects/') || SCRIPT_PATH.includes('/src/');
 const PM2_NAME = isDev ? 'clocktopus-monitor-dev' : 'clocktopus-monitor';
-const pm2Bin = path.resolve(__dirname, '../../node_modules/.bin/pm2');
+const pm2Bin = path.join(path.dirname(createRequire(import.meta.url).resolve('pm2')), 'bin', 'pm2');
 
 const monitorRoutes = new Hono();
 

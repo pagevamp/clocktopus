@@ -60,7 +60,8 @@ export async function getRefreshedToken(token: Credentials): Promise<Credentials
     const client = getAuthenticatedClient();
     client.setCredentials(token);
     const refreshedToken = await client.refreshAccessToken();
-    return refreshedToken.credentials;
+    // Preserve refresh_token — Google doesn't return it on refresh
+    return { ...token, ...refreshedToken.credentials, refresh_token: token.refresh_token };
   }
 
   // Use proxy for refresh
@@ -69,5 +70,6 @@ export async function getRefreshedToken(token: Credentials): Promise<Credentials
     grant_type: 'refresh_token',
     refresh_token: token.refresh_token,
   });
-  return res.data as Credentials;
+  // Preserve refresh_token — proxy doesn't return it on refresh
+  return { ...token, ...(res.data as Credentials), refresh_token: token.refresh_token };
 }

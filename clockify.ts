@@ -194,6 +194,25 @@ export class Clockify {
     }
   }
 
+  async getTimeEntries(
+    workspaceId: string,
+    userId: string,
+    start: string,
+    end: string,
+  ): Promise<Array<{ description: string; timeInterval: { start: string; end: string } }>> {
+    try {
+      const response = await this.httpClient.get(`/workspaces/${workspaceId}/user/${userId}/time-entries`, {
+        params: { start, end, 'page-size': 200 },
+      });
+      return response.data;
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error('Error fetching time entries:', error.message);
+      }
+      return [];
+    }
+  }
+
   async logTime(workspaceId: string, projectId: string | null, start: string, end: string, description: string) {
     if (!projectId) {
       return null;

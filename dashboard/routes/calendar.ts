@@ -23,13 +23,14 @@ calendarRoutes.get('/calendar/events', async (c) => {
     }
 
     const oAuth2Client = getAuthenticatedClient(DASHBOARD_REDIRECT_URI);
-    oAuth2Client.setCredentials(token);
 
-    if (token.expiry_date && new Date(token.expiry_date) < new Date()) {
+    // Refresh if expired or if expiry_date is unknown (proxy tokens only have expires_in)
+    const isExpired = token.expiry_date ? new Date(token.expiry_date) < new Date() : true;
+    if (isExpired && token.refresh_token) {
       token = await getRefreshedToken(token);
       storeToken(token);
-      oAuth2Client.setCredentials(token);
     }
+    oAuth2Client.setCredentials(token);
 
     const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
 
@@ -46,24 +47,37 @@ calendarRoutes.get('/calendar/events', async (c) => {
       orderBy: 'startTime',
     });
 
+    // Fetch existing Clockify entries for the same range to detect duplicates
+    const clockify = new Clockify();
+    const user = await clockify.getUser();
+    const existingEntries = user ? await clockify.getTimeEntries(user.defaultWorkspace, user.id, timeMin, timeMax) : [];
+
+    // Build a set of "description|startEpoch" for quick lookup (normalize timezones)
+    const loggedSet = new Set(
+      existingEntries.map((e) => `${e.description}|${new Date(e.timeInterval.start).getTime()}`),
+    );
+
     const events = (res.data.items || [])
       .filter((event) => !event.start?.date) // Filter out all-day events
       .filter((event) => event.summary && event.start?.dateTime && event.end?.dateTime)
       .map((event) => {
         const savedProjectId = getEventProject(event.summary!);
+        const alreadyLogged = loggedSet.has(`${event.summary}|${new Date(event.start!.dateTime!).getTime()}`);
         return {
           summary: event.summary!,
           start: event.start!.dateTime!,
           end: event.end!.dateTime!,
           savedProjectId: savedProjectId ?? undefined,
           skipped: savedProjectId === null,
+          alreadyLogged,
         };
       });
 
     const projects = getActiveProjects();
 
     return c.json({ ok: true, events, projects });
-  } catch {
+  } catch (error) {
+    console.error('Calendar events error:', error instanceof Error ? error.message : error);
     return c.json({ ok: false, error: 'Failed to fetch calendar events.' }, 500);
   }
 });

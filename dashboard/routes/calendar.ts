@@ -88,9 +88,13 @@ calendarRoutes.post('/calendar/log', async (c) => {
     const failed: string[] = [];
 
     for (const entry of entries) {
+      if (!entry.summary || !entry.start || !entry.end || !entry.projectId) {
+        failed.push(entry.summary ?? '(unknown)');
+        continue;
+      }
       try {
-        setEventProject(entry.summary, entry.projectId);
         await clockify.logTime(user.defaultWorkspace, entry.projectId, entry.start, entry.end, entry.summary);
+        setEventProject(entry.summary, entry.projectId);
         logged.push(entry.summary);
       } catch {
         failed.push(entry.summary);

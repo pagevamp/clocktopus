@@ -125,7 +125,7 @@ export function logSessionStart(
 ) {
   const db = getDb();
   const stmt = db.prepare(
-    'INSERT INTO sessions (id, projectId, description, startedAt, isAutoCompleted, jiraTicket) VALUES (?, ?, ?, ?, ?, ?)',
+    'INSERT OR IGNORE INTO sessions (id, projectId, description, startedAt, isAutoCompleted, jiraTicket) VALUES (?, ?, ?, ?, ?, ?)',
   );
 
   stmt.run(id, projectId, description, startedAt, 0, jiraTicket ?? null);
@@ -155,6 +155,14 @@ export function getSessionCount() {
   const stmt = db.prepare('SELECT COUNT(*) as count FROM sessions');
   const row = stmt.get() as { count: number };
   return row.count;
+}
+
+export function getOpenSession() {
+  const db = getDb();
+  const stmt = db.prepare('SELECT * FROM sessions WHERE completedAt IS NULL ORDER BY startedAt DESC LIMIT 1');
+  const row = stmt.get();
+  if (!row) return null;
+  return SessionSchema.parse(row);
 }
 
 export function getLatestSession() {

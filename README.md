@@ -21,8 +21,10 @@ curl -fsSL https://bun.sh/install | bash
 ### Install
 
 ```bash
-bun i -g clocktopus
+bun install -g clocktopus --trust
 ```
+
+> **Note:** `--trust` allows the postinstall script to build native addons (required for idle monitor on macOS). Without it, addon compilation is skipped and the monitor may fail to load.
 
 ### Run
 
@@ -160,10 +162,16 @@ bun pm cache rm && bun i -g clocktopus@latest
 
 ### Native addons not built (untrusted postinstall)
 
-If `bun install -g` skips the postinstall script, the monitor will auto-build native addons on first run (requires Node.js for `npx`). Alternatively, trust the package and reinstall:
+Bun skips postinstall scripts for untrusted packages. Install with `--trust` to fix this:
 
 ```bash
-bun pm trust clocktopus && bun i -g clocktopus
+bun install -g clocktopus --trust
+```
+
+Or if already installed, rebuild manually:
+
+```bash
+cd ~/.bun/install/global/node_modules/macos-notification-state && npx node-gyp rebuild
 ```
 
 ### Linux

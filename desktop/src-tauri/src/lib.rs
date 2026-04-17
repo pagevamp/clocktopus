@@ -171,7 +171,6 @@ pub fn run() {
                 let mut is_active: bool = false;
                 let mut start_ms: Option<i64> = None;
                 let mut description: Option<String> = None;
-                let mut jira_ticket: Option<String> = None;
                 let mut tick: u32 = 0;
 
                 loop {
@@ -195,10 +194,6 @@ pub fn run() {
                                 .get("description")
                                 .and_then(|v| v.as_str())
                                 .map(|s| s.to_string());
-                            let new_jira_ticket = json
-                                .get("jiraTicket")
-                                .and_then(|v| v.as_str())
-                                .map(|s| s.to_string());
 
                             if new_active != is_active {
                                 is_active = new_active;
@@ -218,10 +213,8 @@ pub fn run() {
                             start_ms = if new_active { new_start_ms } else { None };
                             if new_active {
                                 description = new_description;
-                                jira_ticket = new_jira_ticket;
                             } else {
                                 description = None;
-                                jira_ticket = None;
                             }
                         }
                         // On request/parse failure: leave is_active and start_ms unchanged
@@ -233,7 +226,7 @@ pub fn run() {
                             let now_ms = chrono::Utc::now().timestamp_millis();
                             let elapsed = now_ms - start;
                             let elapsed_str = format_elapsed(elapsed);
-                            let label = format_label(jira_ticket.as_deref(), description.as_deref());
+                            let label = format_label(None, description.as_deref());
                             let title = match label {
                                 Some(l) => format!("{} {}", elapsed_str, l),
                                 None => elapsed_str,

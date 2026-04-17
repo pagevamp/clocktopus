@@ -99,7 +99,7 @@ pub fn run() {
 
             #[cfg(target_os = "macos")]
             apply_vibrancy(&window, NSVisualEffectMaterial::Popover, None, None)
-                .expect("failed to apply vibrancy");
+                .map_err(|e| e.to_string())?;
 
             let show = MenuItem::with_id(app, "show", "Open Dashboard", true, None::<&str>)?;
             let stop_timer = MenuItem::with_id(app, "stop-timer", "Stop Timer", false, None::<&str>)?;
@@ -145,13 +145,14 @@ pub fn run() {
                         ..
                     } = event
                     {
-                        let win = tray.app_handle().get_webview_window("main").unwrap();
-                        if win.is_visible().unwrap_or(false) {
-                            let _ = win.hide();
-                        } else {
-                            let _ = win.move_window(Position::TrayCenter);
-                            let _ = win.show();
-                            let _ = win.set_focus();
+                        if let Some(win) = tray.app_handle().get_webview_window("main") {
+                            if win.is_visible().unwrap_or(false) {
+                                let _ = win.hide();
+                            } else {
+                                let _ = win.move_window(Position::TrayCenter);
+                                let _ = win.show();
+                                let _ = win.set_focus();
+                            }
                         }
                     }
                 })

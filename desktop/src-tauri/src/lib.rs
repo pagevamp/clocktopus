@@ -5,6 +5,9 @@ use tauri::{
     Manager,
 };
 use std::time::Duration;
+use tauri_plugin_positioner::{Position, WindowExt};
+#[cfg(target_os = "macos")]
+use window_vibrancy::{NSVisualEffectMaterial, apply_vibrancy};
 
 /// Decode the embedded PNG into raw RGBA bytes and dimensions
 fn decode_png(bytes: &[u8]) -> (Vec<u8>, u32, u32) {
@@ -90,8 +93,13 @@ fn format_label(jira: Option<&str>, desc: Option<&str>) -> Option<String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_positioner::init())
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
+
+            #[cfg(target_os = "macos")]
+            apply_vibrancy(&window, NSVisualEffectMaterial::Popover, None, None)
+                .expect("failed to apply vibrancy");
 
             let show = MenuItem::with_id(app, "show", "Open Dashboard", true, None::<&str>)?;
             let stop_timer = MenuItem::with_id(app, "stop-timer", "Stop Timer", false, None::<&str>)?;
@@ -130,6 +138,7 @@ pub fn run() {
                     _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
+                    tauri_plugin_positioner::on_tray_event(tray.app_handle(), &event);
                     if let tauri::tray::TrayIconEvent::Click {
                         button: tauri::tray::MouseButton::Left,
                         button_state: tauri::tray::MouseButtonState::Up,
@@ -140,6 +149,7 @@ pub fn run() {
                         if win.is_visible().unwrap_or(false) {
                             let _ = win.hide();
                         } else {
+                            let _ = win.move_window(Position::TrayCenter);
                             let _ = win.show();
                             let _ = win.set_focus();
                         }
@@ -163,12 +173,18 @@ pub fn run() {
                 }
             });
 
-            // Hide window on close
+            // Hide window on close or focus loss
             let window_clone = window.clone();
             window.on_window_event(move |event| {
-                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                    api.prevent_close();
-                    let _ = window_clone.hide();
+                match event {
+                    tauri::WindowEvent::CloseRequested { api, .. } => {
+                        api.prevent_close();
+                        let _ = window_clone.hide();
+                    }
+                    tauri::WindowEvent::Focused(false) => {
+                        let _ = window_clone.hide();
+                    }
+                    _ => {}
                 }
             });
 

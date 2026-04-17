@@ -29,11 +29,13 @@ timerRoutes.get('/timer/active', async (c) => {
       logSessionStart(timer.id ?? uuidv4(), timer.projectId, timer.description ?? '', timerStart, jiraTicket);
     }
 
+    const jiraTicket = extractJiraTicket(timer.description ?? '');
     return c.json({
       active: true,
       description: timer.description,
       projectId: timer.projectId,
       start: timerStart,
+      ...(jiraTicket ? { jiraTicket } : {}),
     });
   } catch {
     return c.json({ active: false });

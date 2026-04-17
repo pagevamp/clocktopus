@@ -69,6 +69,7 @@ export function indexPage() {
 
     /* Inline form row */
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .form-row > div { min-width: 0; }
     /* Calendar event cards */
     .cal-event-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 0.75rem; margin-bottom: 0.5rem; }
     .cal-event-card .cal-card-name { color: #e1e4e8; font-size: 0.85rem; font-weight: 500; margin-bottom: 0.5rem; }

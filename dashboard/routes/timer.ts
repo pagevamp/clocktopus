@@ -22,14 +22,13 @@ timerRoutes.get('/timer/active', async (c) => {
 
     // Sync externally-started timers (e.g. from Clockify app or Jira plugin) to DB
     const timerStart = timer.timeInterval.start as string;
+    const jiraTicket = extractJiraTicket(timer.description ?? '');
     const openSession = getOpenSession();
     const alreadyTracked = openSession && openSession.startedAt.slice(0, 19) === timerStart.slice(0, 19);
     if (!alreadyTracked) {
-      const jiraTicket = extractJiraTicket(timer.description ?? '');
       logSessionStart(timer.id ?? uuidv4(), timer.projectId, timer.description ?? '', timerStart, jiraTicket);
     }
 
-    const jiraTicket = extractJiraTicket(timer.description ?? '');
     return c.json({
       active: true,
       description: timer.description,

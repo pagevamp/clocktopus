@@ -7,7 +7,7 @@ export function indexPage() {
   <title>Clocktopus Dashboard</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1117; color: #e1e4e8; padding: 2rem; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: transparent; color: #e1e4e8; padding: 2rem; }
     h1 { font-size: 1.8rem; margin-bottom: 0; color: #fff; }
     h2 { font-size: 1.1rem; color: #fff; margin-bottom: 1rem; }
 

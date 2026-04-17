@@ -240,10 +240,10 @@ pub fn run() {
                             };
                             let _ = tray.set_title(Some(&title));
                         } else {
-                            let _ = tray.set_title(None::<&str>);
+                            let _ = tray.set_title(Some(""));
                         }
                     } else {
-                        let _ = tray.set_title(None::<&str>);
+                        let _ = tray.set_title(Some(""));
                     }
 
                     tick = tick.wrapping_add(1);

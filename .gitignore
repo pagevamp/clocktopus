@@ -3,6 +3,7 @@
 /.env
 /dist/
 /data/
+/node-compile-cache/
 
 # Desktop (Tauri)
 /desktop/src-tauri/target/

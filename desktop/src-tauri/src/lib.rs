@@ -148,33 +148,64 @@ pub fn run() {
 
             std::thread::spawn(move || {
                 let client = reqwest::blocking::Client::new();
+                let mut is_active: bool = false;
+                let mut start_ms: Option<i64> = None;
+                let mut tick: u32 = 0;
 
                 loop {
-                    std::thread::sleep(Duration::from_secs(5));
+                    // Poll on first iteration and every 5th tick after
+                    if tick % 5 == 0 {
+                        let response = client
+                            .get("http://localhost:4001/api/timer/active")
+                            .timeout(Duration::from_secs(3))
+                            .send()
+                            .and_then(|r| r.text())
+                            .ok()
+                            .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok());
 
-                    let active = client
-                        .get("http://localhost:4001/api/timer/active")
-                        .timeout(Duration::from_secs(3))
-                        .send()
-                        .and_then(|r| r.text())
-                        .map(|t| t.contains("\"active\":true"))
-                        .unwrap_or(false);
+                        if let Some(json) = response {
+                            let new_active = json.get("active").and_then(|v| v.as_bool()).unwrap_or(false);
+                            let new_start_ms = json
+                                .get("start")
+                                .and_then(|v| v.as_str())
+                                .and_then(parse_start_to_ms);
 
-                    let prev = was_active_c.load(Ordering::Relaxed);
-                    if active != prev {
-                        was_active_c.store(active, Ordering::Relaxed);
+                            if new_active != is_active {
+                                is_active = new_active;
+                                was_active_c.store(new_active, Ordering::Relaxed);
 
-                        let rgba = if active { &active_rgba } else { &idle_rgba };
-                        let img = Image::new_owned(rgba.clone(), w, h);
-                        let _ = tray.set_icon(Some(img));
-                        let _ = tray.set_icon_as_template(true);
+                                let rgba = if new_active { &active_rgba } else { &idle_rgba };
+                                let img = Image::new_owned(rgba.clone(), w, h);
+                                let _ = tray.set_icon(Some(img));
+                                let _ = tray.set_icon_as_template(true);
 
-                        let _ = tray.set_tooltip(Some(if active {
-                            "Clocktopus - Timer running"
-                        } else {
-                            "Clocktopus"
-                        }));
+                                let _ = tray.set_tooltip(Some(if new_active {
+                                    "Clocktopus - Timer running"
+                                } else {
+                                    "Clocktopus"
+                                }));
+                            }
+
+                            start_ms = if new_active { new_start_ms } else { None };
+                        }
+                        // On request/parse failure: leave is_active and start_ms unchanged
                     }
+
+                    // Drive the title every tick
+                    if is_active {
+                        if let Some(start) = start_ms {
+                            let now_ms = chrono::Utc::now().timestamp_millis();
+                            let elapsed = now_ms - start;
+                            let _ = tray.set_title(Some(&format_elapsed(elapsed)));
+                        } else {
+                            let _ = tray.set_title(None::<&str>);
+                        }
+                    } else {
+                        let _ = tray.set_title(None::<&str>);
+                    }
+
+                    tick = tick.wrapping_add(1);
+                    std::thread::sleep(Duration::from_secs(1));
                 }
             });
 

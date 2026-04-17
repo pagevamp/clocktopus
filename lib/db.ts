@@ -131,6 +131,21 @@ export function logSessionStart(
   stmt.run(id, projectId, description, startedAt, 0, jiraTicket ?? null);
 }
 
+export function logCompletedSession(
+  id: string,
+  projectId: string,
+  description: string,
+  startedAt: string,
+  completedAt: string,
+  jiraTicket?: string,
+) {
+  const db = getDb();
+  const stmt = db.prepare(
+    'INSERT OR IGNORE INTO sessions (id, projectId, description, startedAt, completedAt, isAutoCompleted, jiraTicket) VALUES (?, ?, ?, ?, ?, 0, ?)',
+  );
+  stmt.run(id, projectId, description, startedAt, completedAt, jiraTicket ?? null);
+}
+
 export function completeLatestSession(completedAt: string, isAutoCompleted = false) {
   const db = getDb();
   const stmt = db.prepare(`

@@ -22,10 +22,17 @@ export function indexPage() {
 
     /* Cards */
     .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 1.5rem; }
-    .card { background: #1c1f26; border: 1px solid #2d3139; border-radius: 12px; padding: 1.5rem; }
+    .home-cards { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+    .card { background: #1c1f26; border: 1px solid #2d3139; border-radius: 12px; padding: 1.5rem; min-width: 0; }
     .card-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
     .card-header h2 { margin-bottom: 0; }
     .card-full { grid-column: 1 / -1; }
+
+    /* Track tabs */
+    .track-tabs { display: inline-flex; gap: 0.25rem; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 0.25rem; margin-bottom: 1rem; }
+    .track-tab-btn { margin-top: 0; padding: 0.4rem 1rem; border: none; border-radius: 6px; background: transparent; color: #8b949e; font-size: 0.85rem; cursor: pointer; }
+    .track-tab-btn:hover { color: #e1e4e8; }
+    .track-tab-btn.active { background: #30363d; color: #fff; }
 
     /* Active timer */
     .active-timer { border-left: 3px solid #3fb950; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
@@ -81,6 +88,7 @@ export function indexPage() {
     @media (max-width: 600px) {
       body { padding: 0.75rem; }
       .form-row { grid-template-columns: 1fr; }
+      .home-cards { grid-template-columns: 1fr; }
       .header { flex-direction: column; gap: 0; align-items: stretch; margin-bottom: 1rem; }
       .header h1 { display: none; }
       .nav { justify-content: center; flex-wrap: wrap; }
@@ -121,29 +129,64 @@ export function indexPage() {
       <button class="stop-btn" onclick="stopTimer()">Stop Timer</button>
     </div>
 
-    <div class="cards">
-      <!-- Start Timer -->
+    <div class="cards home-cards">
+      <!-- Track Time -->
       <div class="card">
-        <h2>Start Timer</h2>
-        <div id="start-timer-form">
-          <label for="project-select">Project</label>
-          <select id="project-select">
+        <div class="track-tabs">
+          <button class="track-tab-btn active" data-mode="auto" onclick="switchTrackMode('auto')">Auto Track</button>
+          <button class="track-tab-btn" data-mode="manual" onclick="switchTrackMode('manual')">Manual Log</button>
+        </div>
+
+        <div id="track-auto">
+          <div id="start-timer-form">
+            <label for="project-select">Project</label>
+            <select id="project-select">
+              <option value="">Loading projects...</option>
+            </select>
+            <div class="form-row">
+              <div>
+                <label for="timer-description">Description</label>
+                <input type="text" id="timer-description" placeholder="What are you working on?" />
+              </div>
+              <div>
+                <label for="timer-jira">Jira Ticket (optional)</label>
+                <input type="text" id="timer-jira" placeholder="e.g. PROJ-123" />
+              </div>
+            </div>
+            <button id="start-btn" onclick="startTimer()">Start Timer</button>
+          </div>
+          <div id="last-tasks" style="display:none; margin-top:0.75rem;"></div>
+          <div class="msg" id="timer-msg"></div>
+        </div>
+
+        <div id="track-manual" style="display:none;">
+          <label for="manual-project">Project</label>
+          <select id="manual-project">
             <option value="">Loading projects...</option>
           </select>
           <div class="form-row">
             <div>
-              <label for="timer-description">Description</label>
-              <input type="text" id="timer-description" placeholder="What are you working on?" />
+              <label for="manual-start">Start</label>
+              <input type="datetime-local" id="manual-start" />
             </div>
             <div>
-              <label for="timer-jira">Jira Ticket (optional)</label>
-              <input type="text" id="timer-jira" placeholder="e.g. PROJ-123" />
+              <label for="manual-end">End</label>
+              <input type="datetime-local" id="manual-end" />
             </div>
           </div>
-          <button id="start-btn" onclick="startTimer()">Start Timer</button>
+          <div class="form-row">
+            <div>
+              <label for="manual-description">Description</label>
+              <input type="text" id="manual-description" placeholder="What did you work on?" />
+            </div>
+            <div>
+              <label for="manual-jira">Jira Ticket (optional)</label>
+              <input type="text" id="manual-jira" placeholder="e.g. PROJ-123" />
+            </div>
+          </div>
+          <button id="manual-log-btn" onclick="logManualTime()">Log Time</button>
+          <div class="msg" id="manual-msg"></div>
         </div>
-        <div id="last-tasks" style="display:none; margin-top:0.75rem;"></div>
-        <div class="msg" id="timer-msg"></div>
       </div>
 
       <!-- Monitor Control -->
@@ -159,37 +202,6 @@ export function indexPage() {
           <button id="monitor-restart-btn" onclick="monitorAction('restart')" style="margin-top:0;background:#30363d;" disabled>Restart</button>
         </div>
         <div class="msg" id="monitor-msg"></div>
-      </div>
-
-      <!-- Manual Log -->
-      <div class="card">
-        <h2>Log Time</h2>
-        <label for="manual-project">Project</label>
-        <select id="manual-project">
-          <option value="">Loading projects...</option>
-        </select>
-        <div class="form-row">
-          <div>
-            <label for="manual-start">Start</label>
-            <input type="datetime-local" id="manual-start" />
-          </div>
-          <div>
-            <label for="manual-end">End</label>
-            <input type="datetime-local" id="manual-end" />
-          </div>
-        </div>
-        <div class="form-row">
-          <div>
-            <label for="manual-description">Description</label>
-            <input type="text" id="manual-description" placeholder="What did you work on?" />
-          </div>
-          <div>
-            <label for="manual-jira">Jira Ticket (optional)</label>
-            <input type="text" id="manual-jira" placeholder="e.g. PROJ-123" />
-          </div>
-        </div>
-        <button id="manual-log-btn" onclick="logManualTime()">Log Time</button>
-        <div class="msg" id="manual-msg"></div>
       </div>
 
       <!-- Session History -->
@@ -341,6 +353,14 @@ export function indexPage() {
       document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
       document.getElementById('tab-' + tab).classList.add('active');
       document.getElementById('nav-' + tab).classList.add('active');
+    }
+
+    function switchTrackMode(mode) {
+      document.querySelectorAll('.track-tab-btn').forEach(function(b) {
+        b.classList.toggle('active', b.dataset.mode === mode);
+      });
+      document.getElementById('track-auto').style.display = mode === 'auto' ? 'block' : 'none';
+      document.getElementById('track-manual').style.display = mode === 'manual' ? 'block' : 'none';
     }
 
     // --- Utilities ---

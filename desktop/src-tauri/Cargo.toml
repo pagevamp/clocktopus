@@ -27,3 +27,5 @@ tauri-plugin-opener = "2.5.3"
 reqwest = { version = "0.13.2", features = ["blocking"] }
 png = "0.18.1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+tauri-plugin-positioner = "2"
+window-vibrancy = "0.7"

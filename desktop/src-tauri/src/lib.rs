@@ -120,9 +120,11 @@ pub fn run() {
                 .tooltip("Clocktopus")
                 .on_menu_event(move |app, event| match event.id.as_ref() {
                     "show" => {
-                        let win = app.get_webview_window("main").unwrap();
-                        win.show().unwrap();
-                        win.set_focus().unwrap();
+                        if let Some(win) = app.get_webview_window("main") {
+                            let _ = win.move_window(Position::TrayCenter);
+                            let _ = win.show();
+                            let _ = win.set_focus();
+                        }
                     }
                     "stop-timer" => {
                         std::thread::spawn(|| {

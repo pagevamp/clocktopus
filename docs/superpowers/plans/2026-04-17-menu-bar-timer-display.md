@@ -149,20 +149,20 @@ Append these tests inside the existing `mod tests` block in `desktop/src-tauri/s
     #[test]
     fn parse_start_to_ms_utc_z() {
         let ms = parse_start_to_ms("2026-04-17T10:30:00Z").unwrap();
-        assert_eq!(ms, 1_776_429_000_000);
+        assert_eq!(ms, 1_776_421_800_000);
     }
 
     #[test]
     fn parse_start_to_ms_with_offset() {
         let ms = parse_start_to_ms("2026-04-17T16:15:00+05:45").unwrap();
         // Same instant as 10:30:00Z
-        assert_eq!(ms, 1_776_429_000_000);
+        assert_eq!(ms, 1_776_421_800_000);
     }
 
     #[test]
     fn parse_start_to_ms_with_fractional() {
         let ms = parse_start_to_ms("2026-04-17T10:30:00.500Z").unwrap();
-        assert_eq!(ms, 1_776_429_000_500);
+        assert_eq!(ms, 1_776_421_800_500);
     }
 
     #[test]

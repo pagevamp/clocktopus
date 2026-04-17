@@ -160,6 +160,37 @@ export function indexPage() {
         <div class="msg" id="monitor-msg"></div>
       </div>
 
+      <!-- Manual Log -->
+      <div class="card">
+        <h2>Log Time</h2>
+        <label for="manual-project">Project</label>
+        <select id="manual-project">
+          <option value="">Loading projects...</option>
+        </select>
+        <div class="form-row">
+          <div>
+            <label for="manual-start">Start</label>
+            <input type="datetime-local" id="manual-start" />
+          </div>
+          <div>
+            <label for="manual-end">End</label>
+            <input type="datetime-local" id="manual-end" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div>
+            <label for="manual-description">Description</label>
+            <input type="text" id="manual-description" placeholder="What did you work on?" />
+          </div>
+          <div>
+            <label for="manual-jira">Jira Ticket (optional)</label>
+            <input type="text" id="manual-jira" placeholder="e.g. PROJ-123" />
+          </div>
+        </div>
+        <button id="manual-log-btn" onclick="logManualTime()">Log Time</button>
+        <div class="msg" id="manual-msg"></div>
+      </div>
+
       <!-- Session History -->
       <div class="card card-full">
         <h2>Recent Sessions</h2>
@@ -430,6 +461,70 @@ export function indexPage() {
       }
     }
 
+    function toLocalInputValue(date) {
+      const pad = function(n) { return String(n).padStart(2, '0'); };
+      return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) +
+        'T' + pad(date.getHours()) + ':' + pad(date.getMinutes());
+    }
+
+    function setManualDefaults() {
+      const now = new Date();
+      const hourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+      const startEl = document.getElementById('manual-start');
+      const endEl = document.getElementById('manual-end');
+      if (startEl) startEl.value = toLocalInputValue(hourAgo);
+      if (endEl) endEl.value = toLocalInputValue(now);
+    }
+
+    async function logManualTime() {
+      const projectId = document.getElementById('manual-project').value;
+      const startVal = document.getElementById('manual-start').value;
+      const endVal = document.getElementById('manual-end').value;
+      const description = document.getElementById('manual-description').value.trim();
+      const jiraTicket = document.getElementById('manual-jira').value.trim();
+
+      if (!projectId) return setMsg('manual-msg', 'Please select a project.', false);
+      if (!startVal || !endVal) return setMsg('manual-msg', 'Please set start and end.', false);
+
+      const startMs = new Date(startVal).getTime();
+      const endMs = new Date(endVal).getTime();
+      if (isNaN(startMs) || isNaN(endMs)) return setMsg('manual-msg', 'Invalid date.', false);
+      if (endMs <= startMs) return setMsg('manual-msg', 'End must be after start.', false);
+      if (!description && !jiraTicket) return setMsg('manual-msg', 'Please enter a description or Jira ticket.', false);
+
+      const btn = document.getElementById('manual-log-btn');
+      btn.disabled = true;
+      btn.textContent = 'Logging...';
+
+      try {
+        const res = await fetch('/api/timer/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId: projectId,
+            description: description,
+            start: new Date(startMs).toISOString(),
+            end: new Date(endMs).toISOString(),
+            jiraTicket: jiraTicket || undefined,
+          }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          setMsg('manual-msg', 'Time logged.', true);
+          document.getElementById('manual-description').value = '';
+          document.getElementById('manual-jira').value = '';
+          setManualDefaults();
+          loadSessions();
+        } else {
+          setMsg('manual-msg', data.error || 'Failed to log time.', false);
+        }
+      } catch {
+        setMsg('manual-msg', 'Request failed.', false);
+      }
+      btn.disabled = false;
+      btn.textContent = 'Log Time';
+    }
+
     // --- Last Tasks ---
     var lastTasks = [];
 
@@ -542,20 +637,26 @@ export function indexPage() {
       try {
         const res = await fetch('/api/projects');
         const projects = await res.json();
-        const select = document.getElementById('project-select');
-        select.innerHTML = '<option value="">Select a project</option>';
-        if (projects.length === 0) {
-          select.innerHTML = '<option value="">No active projects \u2014 pull from Clockify in Settings</option>';
-          return;
-        }
-        projects.forEach(function(p) {
-          const opt = document.createElement('option');
-          opt.value = p.id;
-          opt.textContent = p.name;
-          select.appendChild(opt);
+        const selects = [document.getElementById('project-select'), document.getElementById('manual-project')];
+        selects.forEach(function(select) {
+          if (!select) return;
+          select.innerHTML = '<option value="">Select a project</option>';
+          if (projects.length === 0) {
+            select.innerHTML = '<option value="">No active projects \u2014 pull from Clockify in Settings</option>';
+            return;
+          }
+          projects.forEach(function(p) {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.name;
+            select.appendChild(opt);
+          });
         });
       } catch {
-        document.getElementById('project-select').innerHTML = '<option value="">Failed to load projects</option>';
+        const select = document.getElementById('project-select');
+        if (select) select.innerHTML = '<option value="">Failed to load projects</option>';
+        const manual = document.getElementById('manual-project');
+        if (manual) manual.innerHTML = '<option value="">Failed to load projects</option>';
       }
     }
 
@@ -1000,6 +1101,7 @@ export function indexPage() {
     checkActiveTimer();
     checkMonitorStatus();
     loadAllProjects();
+    setManualDefaults();
 
   </script>
 </body>

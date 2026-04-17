@@ -44,6 +44,16 @@ fn recolor(rgba: &[u8], r: u8, g: u8, b: u8) -> Vec<u8> {
     out
 }
 
+/// Format an elapsed millisecond count as `H:MM:SS`.
+/// Hours are unpadded; minutes and seconds are zero-padded to 2 digits.
+/// Negative input clamps to `0:00:00`.
+fn format_elapsed(ms: i64) -> String {
+    let total_secs = if ms < 0 { 0 } else { ms / 1000 };
+    let hours = total_secs / 3600;
+    let minutes = (total_secs % 3600) / 60;
+    let seconds = total_secs % 60;
+    format!("{}:{:02}:{:02}", hours, minutes, seconds)
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -164,4 +174,39 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn format_elapsed_zero() {
+        assert_eq!(format_elapsed(0), "0:00:00");
+    }
+
+    #[test]
+    fn format_elapsed_seconds() {
+        assert_eq!(format_elapsed(5_000), "0:00:05");
+    }
+
+    #[test]
+    fn format_elapsed_minutes() {
+        assert_eq!(format_elapsed(83_000), "0:01:23");
+    }
+
+    #[test]
+    fn format_elapsed_hours() {
+        assert_eq!(format_elapsed(5_025_000), "1:23:45");
+    }
+
+    #[test]
+    fn format_elapsed_twelve_hours() {
+        assert_eq!(format_elapsed(43_200_000), "12:00:00");
+    }
+
+    #[test]
+    fn format_elapsed_negative_clamps_to_zero() {
+        assert_eq!(format_elapsed(-1_000), "0:00:00");
+    }
 }

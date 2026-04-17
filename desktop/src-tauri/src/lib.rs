@@ -61,6 +61,31 @@ fn parse_start_to_ms(iso: &str) -> Option<i64> {
         .map(|dt| dt.timestamp_millis())
 }
 
+/// Maximum character count (not bytes) before a description is trimmed with an ellipsis.
+const DESC_MAX_CHARS: usize = 30;
+
+/// Pick a display label for the tray title.
+/// Jira ticket wins when present and non-empty. Otherwise trim the description
+/// to `DESC_MAX_CHARS` characters, appending `…` when trimmed.
+/// Returns `None` when neither source yields a usable string.
+fn format_label(jira: Option<&str>, desc: Option<&str>) -> Option<String> {
+    if let Some(j) = jira {
+        if !j.is_empty() {
+            return Some(j.to_string());
+        }
+    }
+    if let Some(d) = desc {
+        if !d.is_empty() {
+            if d.chars().count() <= DESC_MAX_CHARS {
+                return Some(d.to_string());
+            }
+            let head: String = d.chars().take(DESC_MAX_CHARS - 1).collect();
+            return Some(format!("{}…", head));
+        }
+    }
+    None
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -266,5 +291,62 @@ mod tests {
     fn parse_start_to_ms_invalid() {
         assert!(parse_start_to_ms("not-a-date").is_none());
         assert!(parse_start_to_ms("").is_none());
+    }
+
+    #[test]
+    fn format_label_jira_only() {
+        assert_eq!(format_label(Some("JIRA-123"), None), Some("JIRA-123".to_string()));
+    }
+
+    #[test]
+    fn format_label_description_short() {
+        assert_eq!(
+            format_label(None, Some("Refactor auth middleware")),
+            Some("Refactor auth middleware".to_string()),
+        );
+    }
+
+    #[test]
+    fn format_label_description_exactly_30() {
+        let desc = "a".repeat(30);
+        assert_eq!(format_label(None, Some(&desc)), Some(desc.clone()));
+    }
+
+    #[test]
+    fn format_label_description_truncates_at_31() {
+        let desc = "a".repeat(31);
+        let result = format_label(None, Some(&desc)).unwrap();
+        assert_eq!(result.chars().count(), 30);
+        assert!(result.ends_with('…'));
+        assert_eq!(result, format!("{}…", "a".repeat(29)));
+    }
+
+    #[test]
+    fn format_label_jira_wins_over_description() {
+        assert_eq!(
+            format_label(Some("JIRA-123"), Some("some description")),
+            Some("JIRA-123".to_string()),
+        );
+    }
+
+    #[test]
+    fn format_label_empty_strings_are_none() {
+        assert_eq!(format_label(Some(""), Some("")), None);
+        assert_eq!(format_label(None, Some("")), None);
+        assert_eq!(format_label(Some(""), None), None);
+    }
+
+    #[test]
+    fn format_label_both_none_is_none() {
+        assert_eq!(format_label(None, None), None);
+    }
+
+    #[test]
+    fn format_label_multibyte_description() {
+        // 31 emoji characters — each is multi-byte in UTF-8 but one char.
+        let desc = "🐙".repeat(31);
+        let result = format_label(None, Some(&desc)).unwrap();
+        assert_eq!(result.chars().count(), 30);
+        assert!(result.ends_with('…'));
     }
 }

@@ -4,8 +4,6 @@ use tauri::{
     tray::{TrayIconBuilder, TrayIconId},
     Manager,
 };
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 use std::time::Duration;
 
 /// Decode the embedded PNG into raw RGBA bytes and dimensions
@@ -143,9 +141,6 @@ pub fn run() {
             let (active_raw, _, _) = decode_png(include_bytes!("../icons/32x32-active.png"));
             let active_rgba = recolor(&active_raw, 0, 0, 0);
 
-            let was_active = Arc::new(AtomicBool::new(false));
-            let was_active_c = was_active.clone();
-
             std::thread::spawn(move || {
                 let client = reqwest::blocking::Client::new();
                 let mut is_active: bool = false;
@@ -172,7 +167,6 @@ pub fn run() {
 
                             if new_active != is_active {
                                 is_active = new_active;
-                                was_active_c.store(new_active, Ordering::Relaxed);
 
                                 let rgba = if new_active { &active_rgba } else { &idle_rgba };
                                 let img = Image::new_owned(rgba.clone(), w, h);

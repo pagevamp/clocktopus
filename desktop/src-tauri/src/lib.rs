@@ -55,6 +55,14 @@ fn format_elapsed(ms: i64) -> String {
     format!("{}:{:02}:{:02}", hours, minutes, seconds)
 }
 
+/// Parse an RFC 3339 timestamp (e.g. `2026-04-17T10:30:00Z` or with offset) to Unix millis.
+/// Returns `None` if the string cannot be parsed.
+fn parse_start_to_ms(iso: &str) -> Option<i64> {
+    chrono::DateTime::parse_from_rfc3339(iso)
+        .ok()
+        .map(|dt| dt.timestamp_millis())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -208,5 +216,30 @@ mod tests {
     #[test]
     fn format_elapsed_negative_clamps_to_zero() {
         assert_eq!(format_elapsed(-1_000), "0:00:00");
+    }
+
+    #[test]
+    fn parse_start_to_ms_utc_z() {
+        let ms = parse_start_to_ms("2026-04-17T10:30:00Z").unwrap();
+        assert_eq!(ms, 1_776_421_800_000);
+    }
+
+    #[test]
+    fn parse_start_to_ms_with_offset() {
+        let ms = parse_start_to_ms("2026-04-17T16:15:00+05:45").unwrap();
+        // Same instant as 10:30:00Z
+        assert_eq!(ms, 1_776_421_800_000);
+    }
+
+    #[test]
+    fn parse_start_to_ms_with_fractional() {
+        let ms = parse_start_to_ms("2026-04-17T10:30:00.500Z").unwrap();
+        assert_eq!(ms, 1_776_421_800_500);
+    }
+
+    #[test]
+    fn parse_start_to_ms_invalid() {
+        assert!(parse_start_to_ms("not-a-date").is_none());
+        assert!(parse_start_to_ms("").is_none());
     }
 }

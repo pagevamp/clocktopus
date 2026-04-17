@@ -1,6 +1,6 @@
 use tauri::{
     image::Image,
-    menu::{Menu, MenuItem},
+    menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{TrayIconBuilder, TrayIconId},
     Manager,
 };
@@ -94,8 +94,10 @@ pub fn run() {
             let window = app.get_webview_window("main").unwrap();
 
             let show = MenuItem::with_id(app, "show", "Open Dashboard", true, None::<&str>)?;
+            let stop_timer = MenuItem::with_id(app, "stop-timer", "Stop Timer", false, None::<&str>)?;
+            let sep = PredefinedMenuItem::separator(app)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show, &quit])?;
+            let menu = Menu::with_items(app, &[&show, &stop_timer, &sep, &quit])?;
 
             // Idle icon: black template — macOS auto-adapts white/black
             let (raw, w, h) = decode_png(include_bytes!("../icons/32x32.png"));
@@ -113,6 +115,14 @@ pub fn run() {
                         let win = app.get_webview_window("main").unwrap();
                         win.show().unwrap();
                         win.set_focus().unwrap();
+                    }
+                    "stop-timer" => {
+                        std::thread::spawn(|| {
+                            let _ = reqwest::blocking::Client::new()
+                                .post("http://localhost:4001/api/timer/stop")
+                                .timeout(Duration::from_secs(5))
+                                .send();
+                        });
                     }
                     "quit" => {
                         app.exit(0);
@@ -166,6 +176,7 @@ pub fn run() {
             let (active_raw, _, _) = decode_png(include_bytes!("../icons/32x32-active.png"));
             let active_rgba = recolor(&active_raw, 0, 0, 0);
 
+            let stop_timer_for_thread = stop_timer.clone();
             std::thread::spawn(move || {
                 let client = reqwest::blocking::Client::new();
                 let mut is_active: bool = false;
@@ -208,6 +219,8 @@ pub fn run() {
                                 } else {
                                     "Clocktopus"
                                 }));
+
+                                let _ = stop_timer_for_thread.set_enabled(new_active);
                             }
 
                             start_ms = if new_active { new_start_ms } else { None };

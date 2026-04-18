@@ -100,7 +100,8 @@ fn check_server() -> bool {
 
 #[tauri::command]
 fn check_clocktopus_installed() -> bool {
-    std::process::Command::new("/bin/zsh")
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
+    std::process::Command::new(&shell)
         .args(["-l", "-c", "which clocktopus"])
         .output()
         .map(|o| o.status.success())
@@ -119,7 +120,8 @@ fn install_clocktopus() {
 
 #[tauri::command]
 fn start_server() {
-    std::process::Command::new("/bin/zsh")
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
+    std::process::Command::new(&shell)
         .args(["-l", "-c", "clocktopus dash"])
         .spawn()
         .ok();

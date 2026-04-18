@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Clocktopus",
   "version": "0.4.0",
-  "identifier": "com.clocktopus.app",
+  "identifier": "com.clocktopus.desktop",
   "build": {
     "frontendDist": "http://localhost:4001",
     "devUrl": "http://localhost:4001"

@@ -155,12 +155,12 @@ pub fn run() {
                 apply_vibrancy(&window, NSVisualEffectMaterial::Popover, None, None)
                     .map_err(|e| e.to_string())?;
 
-                // Set collection behavior so the popup appears on the active Space
-                // without switching: CanJoinAllSpaces(1) | Transient(8) | IgnoresCycle(64)
+                // CanJoinAllSpaces(1) | FullScreenAuxiliary(256) | IgnoresCycle(64)
+                // FullScreenAuxiliary lets the popup appear over full-screen apps without switching Space
                 if let Ok(ptr) = window.ns_window() {
                     use objc::runtime::Object;
                     let ns_win = ptr as *mut Object;
-                    let behavior: usize = (1 << 0) | (1 << 3) | (1 << 6);
+                    let behavior: usize = (1 << 0) | (1 << 8) | (1 << 6);
                     unsafe { let _: () = msg_send![ns_win, setCollectionBehavior: behavior]; }
                 }
             }

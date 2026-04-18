@@ -96,10 +96,19 @@ fn start_server() {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let error_html: &'static str = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><style>*{margin:0;padding:0;box-sizing:border-box}:root{--bg:#1a1d23;--fg:#e1e4e8;--sub:#8b949e;--btn:#238636;--btn-h:#2ea043}@media(prefers-color-scheme:light){:root{--bg:#f6f8fa;--fg:#1f2328;--sub:#656d76;--btn:#1a7f37;--btn-h:#2da44e}}body{font-family:-apple-system,sans-serif;background:var(--bg);display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;color:var(--fg)}h2{margin-bottom:.4rem;font-size:1.1rem}p{color:var(--sub);font-size:.875rem}button{margin-top:1.1rem;padding:.55rem 1.4rem;background:var(--btn);border:none;border-radius:8px;color:white;font-size:.9rem;font-weight:500;cursor:pointer}button:hover:not(:disabled){background:var(--btn-h)}button:disabled{opacity:.5;cursor:not-allowed}#msg{font-size:.8rem;color:var(--sub);margin-top:.65rem;min-height:1.1em}</style></head><body><div><h2>Server not running</h2><p>Start the Clocktopus server to continue.</p><button id=\"b\" onclick=\"go()\">Start Server</button><div id=\"msg\"></div></div><script>async function go(){const b=document.getElementById('b'),m=document.getElementById('msg');b.disabled=true;b.textContent='Starting\u{2026}';await window.__TAURI__.core.invoke('start_server');m.textContent='Waiting for server\u{2026}';const t=setInterval(async()=>{try{if((await fetch('http://localhost:4001')).ok){clearInterval(t);location.href='http://localhost:4001'}}catch{}},1500)}</script></body></html>";
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_positioner::init())
         .invoke_handler(tauri::generate_handler![start_server])
+        .register_uri_scheme_protocol("clocktopus", move |_app, _request| {
+            tauri::http::Response::builder()
+                .header("Content-Type", "text/html; charset=utf-8")
+                .status(200)
+                .body(error_html.as_bytes().to_vec())
+                .unwrap()
+        })
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
 
@@ -177,12 +186,7 @@ pub fn run() {
                     .is_ok();
 
                 if !server_up {
-                    let html = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><style>*{margin:0;padding:0;box-sizing:border-box}:root{--bg:#1a1d23;--fg:#e1e4e8;--sub:#8b949e;--btn:#238636;--btn-h:#2ea043}@media(prefers-color-scheme:light){:root{--bg:#f6f8fa;--fg:#1f2328;--sub:#656d76;--btn:#1a7f37;--btn-h:#2da44e}}body{font-family:-apple-system,sans-serif;background:var(--bg);display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;color:var(--fg)}h2{margin-bottom:.4rem;font-size:1.1rem}p{color:var(--sub);font-size:.875rem}button{margin-top:1.1rem;padding:.55rem 1.4rem;background:var(--btn);border:none;border-radius:8px;color:white;font-size:.9rem;font-weight:500;cursor:pointer}button:hover:not(:disabled){background:var(--btn-h)}button:disabled{opacity:.5;cursor:not-allowed}#msg{font-size:.8rem;color:var(--sub);margin-top:.65rem;min-height:1.1em}</style></head><body><div><h2>Server not running</h2><p>Start the Clocktopus server to continue.</p><button id=\"b\" onclick=\"go()\">Start Server</button><div id=\"msg\"></div></div><script>async function go(){const b=document.getElementById('b'),m=document.getElementById('msg');b.disabled=true;b.textContent='Starting\u{2026}';await window.__TAURI__.core.invoke('start_server');m.textContent='Waiting for server\u{2026}';const t=setInterval(async()=>{try{if((await fetch('http://localhost:4001')).ok){clearInterval(t);location.href='http://localhost:4001'}}catch{}},1500)}</script></body></html>";
-                    let js = format!(
-                        "document.open('text/html','replace');document.write({});document.close();",
-                        serde_json::to_string(html).unwrap()
-                    );
-                    let _ = window_for_check.eval(&js);
+                    let _ = window_for_check.navigate("clocktopus://localhost/error".parse().unwrap());
                     let _ = window_for_check.show();
                     let _ = window_for_check.set_focus();
                 }

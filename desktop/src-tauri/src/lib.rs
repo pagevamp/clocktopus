@@ -145,6 +145,9 @@ pub fn run() {
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
 
+            // Appear on whichever Space is active — prevents switching Spaces on click
+            let _ = window.set_visible_on_all_workspaces(true);
+
             #[cfg(target_os = "macos")]
             apply_vibrancy(&window, NSVisualEffectMaterial::Popover, None, None)
                 .map_err(|e| e.to_string())?;

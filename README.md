@@ -152,6 +152,14 @@ Go to **System Settings > Notifications** and ensure **terminal-notifier** has n
 
 Enable **Require password immediately** in System Settings > Lock Screen.
 
+### Uninstall
+
+```bash
+bun remove -g clocktopus
+```
+
+> **Note:** `bun uninstall clocktopus` only removes a local install. Use `bun remove -g` to remove the global binary from `~/.bun/bin`.
+
 ### Bun installs an old version
 
 Bun caches registry data aggressively. Clear the cache and reinstall:

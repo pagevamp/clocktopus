@@ -91,7 +91,15 @@ fn format_label(jira: Option<&str>, desc: Option<&str>) -> Option<String> {
 
 #[tauri::command]
 fn start_server() {
-    std::process::Command::new("clocktopus").arg("serve").spawn().ok();
+    let home = std::env::var("HOME").unwrap_or_default();
+    let bun_bin_dir = format!("{}/.bun/bin", home);
+    let clocktopus_bin = format!("{}/clocktopus", bun_bin_dir);
+    let path = format!("{}:/usr/local/bin:/usr/bin:/bin", bun_bin_dir);
+    std::process::Command::new(&clocktopus_bin)
+        .arg("serve")
+        .env("PATH", &path)
+        .spawn()
+        .ok();
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

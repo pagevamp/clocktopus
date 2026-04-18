@@ -100,8 +100,11 @@ fn check_server() -> bool {
 
 #[tauri::command]
 fn check_clocktopus_installed() -> bool {
-    let home = std::env::var("HOME").unwrap_or_default();
-    std::path::Path::new(&format!("{}/.bun/bin/clocktopus", home)).exists()
+    std::process::Command::new("/bin/zsh")
+        .args(["-l", "-c", "which clocktopus"])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
 }
 
 #[tauri::command]
@@ -116,13 +119,8 @@ fn install_clocktopus() {
 
 #[tauri::command]
 fn start_server() {
-    let home = std::env::var("HOME").unwrap_or_default();
-    let bun_bin_dir = format!("{}/.bun/bin", home);
-    let clocktopus_bin = format!("{}/clocktopus", bun_bin_dir);
-    let path = format!("{}:/usr/local/bin:/usr/bin:/bin", bun_bin_dir);
-    std::process::Command::new(&clocktopus_bin)
-        .arg("dash")
-        .env("PATH", &path)
+    std::process::Command::new("/bin/zsh")
+        .args(["-l", "-c", "clocktopus dash"])
         .spawn()
         .ok();
 }

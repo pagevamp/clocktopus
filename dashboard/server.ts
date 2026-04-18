@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
 import { indexPage } from './views.js';
 import statusRoutes from './routes/status.js';
@@ -12,6 +13,7 @@ import calendarRoutes from './routes/calendar.js';
 
 const app = new Hono();
 
+app.use('*', cors());
 app.get('/', (c) => c.html(indexPage()));
 app.route('/api', statusRoutes);
 app.route('/api', clockifyRoutes);

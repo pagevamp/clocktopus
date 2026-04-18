@@ -96,7 +96,7 @@ fn start_server() {
     let clocktopus_bin = format!("{}/clocktopus", bun_bin_dir);
     let path = format!("{}:/usr/local/bin:/usr/bin:/bin", bun_bin_dir);
     std::process::Command::new(&clocktopus_bin)
-        .arg("serve")
+        .arg("dash")
         .env("PATH", &path)
         .spawn()
         .ok();

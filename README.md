@@ -157,14 +157,12 @@ Enable **Require password immediately** in System Settings > Lock Screen.
 Remove the global install using whichever package manager you used:
 
 ```bash
-# If installed via bun
-bun remove -g clocktopus
-
 # If installed via npm/npx
 npm uninstall -g clocktopus
-```
 
-> **Note:** `bun uninstall` (without `-g`) only removes a local project dependency, not the global binary.
+# If installed via bun (bun global uninstall is unreliable — delete the binary directly)
+rm ~/.bun/bin/clocktopus
+```
 
 ### Bun installs an old version
 

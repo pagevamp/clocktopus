@@ -187,7 +187,6 @@ pub fn run() {
                         if let Some(win) = app.get_webview_window("main") {
                             let _ = win.move_window(Position::TrayCenter);
                             let _ = win.show();
-                            let _ = win.set_focus();
                         }
                     }
                     "stop-timer" => {
@@ -237,7 +236,6 @@ pub fn run() {
                 if !server_up {
                     let _ = window_for_check.navigate("clocktopus://localhost/error".parse().unwrap());
                     let _ = window_for_check.show();
-                    let _ = window_for_check.set_focus();
                 }
             });
 

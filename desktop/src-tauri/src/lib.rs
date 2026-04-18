@@ -1,8 +1,3 @@
-#![allow(unexpected_cfgs)]
-#[cfg(target_os = "macos")]
-#[macro_use]
-extern crate objc;
-
 use tauri::{
     image::Image,
     menu::{Menu, MenuItem, PredefinedMenuItem},
@@ -13,6 +8,9 @@ use std::time::Duration;
 use tauri_plugin_positioner::{Position, WindowExt};
 #[cfg(target_os = "macos")]
 use window_vibrancy::{NSVisualEffectMaterial, apply_vibrancy};
+#[cfg(target_os = "macos")]
+#[allow(deprecated)]
+use tauri_nspanel::{WebviewWindowExt as NSPanelWebviewWindowExt, ManagerExt, cocoa::appkit::NSWindowCollectionBehavior};
 
 /// Decode the embedded PNG into raw RGBA bytes and dimensions
 fn decode_png(bytes: &[u8]) -> (Vec<u8>, u32, u32) {
@@ -136,9 +134,16 @@ fn start_server() {
 pub fn run() {
     let error_html: &'static str = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><style>*{margin:0;padding:0;box-sizing:border-box}:root{--bg:#1a1d23;--fg:#e1e4e8;--sub:#8b949e;--btn:#238636;--btn-h:#2ea043}@media(prefers-color-scheme:light){:root{--bg:#f6f8fa;--fg:#1f2328;--sub:#656d76;--btn:#1a7f37;--btn-h:#2da44e}}body{font-family:-apple-system,sans-serif;background:var(--bg);display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;color:var(--fg)}h2{margin-bottom:.4rem;font-size:1.1rem}p{color:var(--sub);font-size:.875rem}button{margin-top:1.1rem;padding:.55rem 1.4rem;background:var(--btn);border:none;border-radius:8px;color:white;font-size:.9rem;font-weight:500;cursor:pointer}button:hover:not(:disabled){background:var(--btn-h)}button:disabled{opacity:.5;cursor:not-allowed}#msg{font-size:.8rem;color:var(--sub);margin-top:.65rem;min-height:1.1em}</style></head><body><div><h2 id=\"t\">Server not running</h2><p id=\"sub\">Start the Clocktopus server to continue.</p><button id=\"b\">Start Server</button><div id=\"msg\"></div></div><script>const invoke=window.__TAURI__.core.invoke;async function init(){const ok=await invoke('check_clocktopus_installed');if(!ok){document.getElementById('t').textContent='Clocktopus not installed';document.getElementById('sub').textContent='Install the Clocktopus CLI to continue.';document.getElementById('b').textContent='Install Clocktopus';document.getElementById('b').onclick=doInstall;}else{document.getElementById('b').onclick=doStart;}}async function doInstall(){const b=document.getElementById('b'),m=document.getElementById('msg');b.disabled=true;b.textContent='Installing\u{2026}';await invoke('install_clocktopus');m.textContent='Installing Clocktopus\u{2026}';const t=setInterval(async()=>{if(await invoke('check_clocktopus_installed')){clearInterval(t);m.textContent='';document.getElementById('t').textContent='Server not running';document.getElementById('sub').textContent='Start the Clocktopus server to continue.';b.textContent='Start Server';b.disabled=false;b.onclick=doStart;}},1500);}async function doStart(){const b=document.getElementById('b'),m=document.getElementById('msg');b.disabled=true;b.textContent='Starting\u{2026}';await invoke('start_server');m.textContent='Waiting for server\u{2026}';const t=setInterval(async()=>{if(await invoke('check_server')){clearInterval(t);location.href='http://localhost:4001';}},1500);}init();</script></body></html>";
 
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_positioner::init())
+        .plugin(tauri_plugin_positioner::init());
+
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder.plugin(tauri_nspanel::init());
+    }
+
+    builder
         .invoke_handler(tauri::generate_handler![start_server, check_server, check_clocktopus_installed, install_clocktopus])
         .register_uri_scheme_protocol("clocktopus", move |_app, _request| {
             tauri::http::Response::builder()
@@ -152,17 +157,29 @@ pub fn run() {
 
             #[cfg(target_os = "macos")]
             {
+                // Accessory policy: no dock icon, no Cmd+Tab entry, no app activation on show
+                app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
                 apply_vibrancy(&window, NSVisualEffectMaterial::Popover, None, None)
                     .map_err(|e| e.to_string())?;
 
-                // CanJoinAllSpaces(1) | FullScreenAuxiliary(256) | IgnoresCycle(64)
-                // FullScreenAuxiliary lets the popup appear over full-screen apps
-                if let Ok(ptr) = window.ns_window() {
-                    use objc::runtime::Object;
-                    let ns_win = ptr as *mut Object;
-                    let behavior: usize = (1 << 0) | (1 << 8) | (1 << 6);
-                    unsafe { let _: () = msg_send![ns_win, setCollectionBehavior: behavior]; }
-                }
+                // Swizzle NSWindow -> NSPanel to enable non-activating show (no Space switch)
+                let panel = window.to_panel().map_err(|e| format!("to_panel failed: {:?}", e))?;
+
+                // NSWindowStyleMaskNonActivatingPanel: panel cannot activate the app on show
+                const NS_WINDOW_STYLE_MASK_NON_ACTIVATING_PANEL: i32 = 1 << 7;
+                panel.set_style_mask(NS_WINDOW_STYLE_MASK_NON_ACTIVATING_PANEL);
+
+                // NSFloatWindowLevel: above normal windows, doesn't cover menu bar
+                const NS_FLOAT_WINDOW_LEVEL: i32 = 4;
+                panel.set_level(NS_FLOAT_WINDOW_LEVEL);
+
+                // Appear on all spaces including full-screen app spaces
+                #[allow(deprecated)]
+                panel.set_collection_behaviour(
+                    NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces
+                        | NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenAuxiliary,
+                );
             }
 
             let show = MenuItem::with_id(app, "show", "Open Dashboard", true, None::<&str>)?;
@@ -186,6 +203,13 @@ pub fn run() {
                     "show" => {
                         if let Some(win) = app.get_webview_window("main") {
                             let _ = win.move_window(Position::TrayCenter);
+                        }
+                        #[cfg(target_os = "macos")]
+                        if let Ok(panel) = app.get_webview_panel("main") {
+                            panel.show();
+                        }
+                        #[cfg(not(target_os = "macos"))]
+                        if let Some(win) = app.get_webview_window("main") {
                             let _ = win.show();
                         }
                     }
@@ -210,6 +234,16 @@ pub fn run() {
                         ..
                     } = event
                     {
+                        #[cfg(target_os = "macos")]
+                        if let Ok(panel) = tray.app_handle().get_webview_panel("main") {
+                            if panel.is_visible() {
+                                panel.order_out(None);
+                            } else if let Some(win) = tray.app_handle().get_webview_window("main") {
+                                let _ = win.move_window(Position::TrayCenter);
+                                panel.show();
+                            }
+                        }
+                        #[cfg(not(target_os = "macos"))]
                         if let Some(win) = tray.app_handle().get_webview_window("main") {
                             if win.is_visible().unwrap_or(false) {
                                 let _ = win.hide();
@@ -225,6 +259,7 @@ pub fn run() {
 
             // Show error page if server is not running
             let window_for_check = window.clone();
+            let app_handle_for_check = app.handle().clone();
             std::thread::spawn(move || {
                 std::thread::sleep(Duration::from_secs(3));
                 let server_up = reqwest::blocking::Client::new()
@@ -235,23 +270,43 @@ pub fn run() {
 
                 if !server_up {
                     let _ = window_for_check.navigate("clocktopus://localhost/error".parse().unwrap());
+                    #[cfg(target_os = "macos")]
+                    if let Ok(panel) = app_handle_for_check.get_webview_panel("main") {
+                        panel.show();
+                    }
+                    #[cfg(not(target_os = "macos"))]
                     let _ = window_for_check.show();
                 }
+                #[cfg(not(target_os = "macos"))]
+                let _ = app_handle_for_check;
             });
 
-            // Hide window on close or focus loss
+            // Hide popup on close or focus loss (click outside to dismiss)
+            let app_handle_for_event = app.handle().clone();
             let window_clone = window.clone();
             window.on_window_event(move |event| {
                 match event {
                     tauri::WindowEvent::CloseRequested { api, .. } => {
                         api.prevent_close();
+                        #[cfg(target_os = "macos")]
+                        if let Ok(panel) = app_handle_for_event.get_webview_panel("main") {
+                            panel.order_out(None);
+                        }
+                        #[cfg(not(target_os = "macos"))]
                         let _ = window_clone.hide();
                     }
                     tauri::WindowEvent::Focused(false) => {
+                        #[cfg(target_os = "macos")]
+                        if let Ok(panel) = app_handle_for_event.get_webview_panel("main") {
+                            panel.order_out(None);
+                        }
+                        #[cfg(not(target_os = "macos"))]
                         let _ = window_clone.hide();
                     }
                     _ => {}
                 }
+                #[cfg(target_os = "macos")]
+                let _ = &window_clone;
             });
 
             // Active icon: separate logo for timer running

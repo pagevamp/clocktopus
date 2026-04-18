@@ -156,7 +156,7 @@ pub fn run() {
                     .map_err(|e| e.to_string())?;
 
                 // CanJoinAllSpaces(1) | FullScreenAuxiliary(256) | IgnoresCycle(64)
-                // FullScreenAuxiliary lets the popup appear over full-screen apps without switching Space
+                // FullScreenAuxiliary lets the popup appear over full-screen apps
                 if let Ok(ptr) = window.ns_window() {
                     use objc::runtime::Object;
                     let ns_win = ptr as *mut Object;

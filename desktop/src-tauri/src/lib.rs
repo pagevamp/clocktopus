@@ -89,11 +89,17 @@ fn format_label(jira: Option<&str>, desc: Option<&str>) -> Option<String> {
     None
 }
 
+#[tauri::command]
+fn start_server() {
+    std::process::Command::new("clocktopus").arg("serve").spawn().ok();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_positioner::init())
+        .invoke_handler(tauri::generate_handler![start_server])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
 
@@ -171,7 +177,7 @@ pub fn run() {
                     .is_ok();
 
                 if !server_up {
-                    let error_html = r#"data:text/html,<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box}body{background:%230f1117;color:%23e1e4e8;font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;text-align:center}code{background:%231c1f26;padding:0.75rem 1.25rem;border-radius:8px;font-size:0.95rem;color:%2358a6ff;display:inline-block}p{color:%238b949e;font-size:0.9rem}h2{color:white;margin-bottom:0.5rem}</style></head><body><div><h2>Dashboard not running</h2><p style="margin-bottom:1.5rem">Start the server to use Clocktopus</p><code>clocktopus serve</code><p style="margin-top:1.5rem;font-size:0.8rem">Then click the tray icon to reload</p></div></body></html>"#;
+                    let error_html = r#"data:text/html,<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box}body{background:%230f1117;color:%23e1e4e8;font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;text-align:center}p{color:%238b949e;font-size:0.9rem}h2{color:white;margin-bottom:0.5rem}button{margin-top:1.25rem;padding:0.6rem 1.5rem;background:%23238636;border:none;border-radius:8px;color:white;font-size:0.95rem;cursor:pointer}button:disabled{opacity:0.5;cursor:not-allowed}#status{font-size:0.8rem;color:%238b949e;margin-top:0.75rem;min-height:1.2em}</style></head><body><div><h2>Dashboard not running</h2><p>The Clocktopus server is not running.</p><button id="btn" onclick="startServer()">Start Server</button><div id="status"></div></div><script>async function startServer(){const btn=document.getElementById('btn');const status=document.getElementById('status');btn.disabled=true;btn.textContent='Starting...';await window.__TAURI__.core.invoke('start_server');status.textContent='Waiting for server...';const poll=setInterval(async()=>{try{const r=await fetch('http://localhost:4001');if(r.ok){clearInterval(poll);location.href='http://localhost:4001';}}catch{}},1500);}</script></body></html>"#;
                     let _ = window_for_check.navigate(error_html.parse().unwrap());
                 }
             });

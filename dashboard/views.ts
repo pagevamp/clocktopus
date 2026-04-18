@@ -343,6 +343,12 @@ export function indexPage() {
   </div>
 
   <script>
+    // Disable WebKit context menu (Back/Forward/Reload) when running inside
+    // the Tauri desktop app. Browsers retain their normal right-click menu.
+    if (window.__TAURI__) {
+      document.addEventListener('contextmenu', e => e.preventDefault());
+    }
+
     let elapsedInterval = null;
     let currentPage = 1;
     let totalPages = 1;

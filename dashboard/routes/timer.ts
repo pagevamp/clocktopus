@@ -18,7 +18,27 @@ timerRoutes.get('/timer/active', async (c) => {
     if (!user) return c.json({ active: false });
 
     const timer = await clockify.getActiveTimer(user.defaultWorkspace, user.id);
-    if (!timer) return c.json({ active: false });
+    if (!timer) {
+      // Timer stopped externally (e.g. in Clockify app) — close any lingering open session
+      const openSession = getOpenSession();
+      if (openSession) {
+        const completedAt = new Date().toISOString();
+        completeLatestSession(completedAt, false);
+        if (openSession.jiraTicket) {
+          const timeSpentSeconds = Math.round(
+            (new Date(completedAt).getTime() - new Date(openSession.startedAt).getTime()) / 1000,
+          );
+          if (timeSpentSeconds >= 60) {
+            try {
+              await stopJiraTimer(openSession.jiraTicket, timeSpentSeconds);
+            } catch (err) {
+              console.error('Error stopping Jira timer on external stop:', err);
+            }
+          }
+        }
+      }
+      return c.json({ active: false });
+    }
 
     // Sync externally-started timers (e.g. from Clockify app or Jira plugin) to DB
     const timerStart = timer.timeInterval.start as string;

@@ -106,7 +106,7 @@ export function indexPage() {
     .toggle input:checked + .slider::before { transform: translateX(16px); background: #fff; }
   </style>
 </head>
-<body>
+<body oncontextmenu="return false;">
   <div class="header">
     <h1>Clocktopus</h1>
     <div class="nav">
@@ -343,11 +343,10 @@ export function indexPage() {
   </div>
 
   <script>
-    // Disable WebKit context menu (Back/Forward/Reload) when running inside
-    // the Tauri desktop app. Browsers retain their normal right-click menu.
-    if (window.__TAURI__) {
-      document.addEventListener('contextmenu', e => e.preventDefault());
-    }
+    // Disable WebKit's Back/Forward/Reload context menu. Capture-phase and
+    // attached on window so it runs before any app handler and wins the race
+    // with the native WKWebView menu.
+    window.addEventListener('contextmenu', e => e.preventDefault(), { capture: true });
 
     let elapsedInterval = null;
     let currentPage = 1;

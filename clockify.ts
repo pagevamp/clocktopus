@@ -1,9 +1,27 @@
 import { AxiosInstance } from 'axios';
+import * as fs from 'fs';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
 import { HttpClient } from './lib/http-client.js';
 import { logSessionStart } from './lib/db.js';
 import { v4 as uuidv4 } from 'uuid';
 import { NotificationCenter } from 'node-notifier';
 import { getJiraTicket } from './lib/jira.js';
+
+/**
+ * Resolve `assets/logo.png` from the package root regardless of install layout.
+ * Walks up from this file until the assets dir is found.
+ */
+function resolveLogoPath(): string | undefined {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  for (let dir = here, prev = ''; dir !== prev; prev = dir, dir = path.dirname(dir)) {
+    const candidate = path.join(dir, 'assets', 'logo.png');
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return undefined;
+}
+
+const LOGO_PATH = resolveLogoPath();
 
 interface ClockifyProject {
   id: string;
@@ -21,18 +39,21 @@ export class Clockify {
   }
 
   private sendNotification(
-    title: string,
+    subtitle: string,
     message: string,
     actions?: string[],
     callback?: (err: unknown, response: unknown, metadata: { activationValue?: string }) => void,
   ) {
     this.notifier.notify(
       {
-        title,
+        title: 'Clocktopus',
+        subtitle,
         message,
         sound: true,
         wait: true,
         actions,
+        appIcon: LOGO_PATH,
+        contentImage: LOGO_PATH,
       },
       callback ??
         ((err: unknown) => {

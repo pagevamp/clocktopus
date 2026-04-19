@@ -373,7 +373,7 @@ pub fn run() {
             // clicks the tray. No auto-show — avoids blank-panel flash.
             let server_up_initially = reqwest::blocking::Client::new()
                 .get(&dashboard_url())
-                .timeout(Duration::from_millis(500))
+                .timeout(Duration::from_secs(2))
                 .send()
                 .is_ok();
             if server_up_initially {
@@ -420,6 +420,8 @@ pub fn run() {
             let stop_server_for_thread = stop_server_item.clone();
             let restart_server_for_thread = restart_server_item.clone();
             let active_url = format!("{}/api/timer/active", dashboard_url());
+            let dash_url_for_thread = dashboard_url();
+            let window_for_thread = window.clone();
             std::thread::spawn(move || {
                 let client = reqwest::blocking::Client::new();
                 let mut is_active: bool = false;
@@ -439,6 +441,17 @@ pub fn run() {
                         if last_server_up != Some(server_up) {
                             let _ = stop_server_for_thread.set_enabled(server_up);
                             let _ = restart_server_for_thread.set_enabled(server_up);
+                            // Auto-recover the webview when server status flips,
+                            // so the user sees the right page without restarting
+                            // the app or clicking around.
+                            let target = if server_up {
+                                dash_url_for_thread.clone()
+                            } else {
+                                "clocktopus://localhost/error".to_string()
+                            };
+                            if let Ok(parsed) = target.parse() {
+                                let _ = window_for_thread.navigate(parsed);
+                            }
                             last_server_up = Some(server_up);
                         }
                         let response = send_result

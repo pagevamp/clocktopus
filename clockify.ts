@@ -52,7 +52,6 @@ export class Clockify {
         sound: true,
         wait: true,
         actions,
-        appIcon: LOGO_PATH,
         contentImage: LOGO_PATH,
       },
       callback ??

@@ -5,8 +5,14 @@ export function indexPage() {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Clocktopus Dashboard</title>
+  <script>
+    if (!window.__TAURI_INTERNALS__ && !window.__TAURI__) {
+      document.documentElement.classList.add('browser');
+    }
+  </script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    html.browser { background: #0d1117; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: transparent; color: #e1e4e8; padding: 2rem; }
     h1 { font-size: 1.8rem; margin-bottom: 0; color: #fff; }
     h2 { font-size: 1.1rem; color: #fff; margin-bottom: 1rem; }

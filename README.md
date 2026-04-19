@@ -72,7 +72,13 @@ After installing, remove the quarantine flag (app is not code-signed):
 xattr -cr /Applications/Clocktopus.app
 ```
 
-The dashboard server must be running (`clocktopus serve`). See [desktop/README.md](desktop/README.md) for details.
+The app manages the dashboard server for you:
+
+- **Install Clocktopus** — if the CLI is not installed, the popup offers a one-click installer that runs `bun install -g clocktopus` for you.
+- **Start Server** — when the dashboard is not running, the popup shows a "Start Server" button. Click it and the app spawns `clocktopus dash` in the background, then loads the dashboard once it's up.
+- **Stop Server** / **Restart Server** — available from the tray menu when the server is reachable. Stop also kills any pre-existing process on port 4001 (terminal, PM2, prior session).
+
+See [desktop/README.md](desktop/README.md) for details.
 
 ---
 

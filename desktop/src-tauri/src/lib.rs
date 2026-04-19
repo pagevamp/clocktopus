@@ -7,6 +7,20 @@ use tauri::{
 use std::sync::Mutex;
 use std::time::Duration;
 
+/// Dashboard HTTP port. Override via CLOCKTOPUS_PORT env var if 4001 is busy.
+/// Must match the port the CLI binds (see lib/constants.ts on the TS side).
+fn dashboard_port() -> u16 {
+    std::env::var("CLOCKTOPUS_PORT")
+        .ok()
+        .and_then(|s| s.parse::<u16>().ok())
+        .filter(|&p| p > 0)
+        .unwrap_or(4001)
+}
+
+fn dashboard_url() -> String {
+    format!("http://localhost:{}", dashboard_port())
+}
+
 /// Tracks the server child process spawned by the "Start Server" button,
 /// so the app can stop it via tray menu and reap it on quit.
 #[derive(Default)]
@@ -19,21 +33,20 @@ fn kill_server_child(state: &ServerChild) {
     }
 }
 
-/// Kill any process listening on port 4001, regardless of origin.
+/// Kill any process listening on the dashboard port, regardless of origin.
 /// Used for the user-initiated "Stop Server" action — handles cases where
 /// the server was started outside this app (terminal, PM2, prior session).
 fn kill_server_by_port() {
-    let _ = std::process::Command::new("sh")
-        .args([
-            "-c",
-            "pids=$(lsof -ti :4001 2>/dev/null); \
-             [ -n \"$pids\" ] && kill -TERM $pids 2>/dev/null; \
-             sleep 1; \
-             pids=$(lsof -ti :4001 2>/dev/null); \
-             [ -n \"$pids\" ] && kill -KILL $pids 2>/dev/null; \
-             true",
-        ])
-        .status();
+    let port = dashboard_port();
+    let cmd = format!(
+        "pids=$(lsof -ti :{port} 2>/dev/null); \
+         [ -n \"$pids\" ] && kill -TERM $pids 2>/dev/null; \
+         sleep 1; \
+         pids=$(lsof -ti :{port} 2>/dev/null); \
+         [ -n \"$pids\" ] && kill -KILL $pids 2>/dev/null; \
+         true",
+    );
+    let _ = std::process::Command::new("sh").args(["-c", &cmd]).status();
 }
 use tauri_plugin_positioner::{Position, WindowExt};
 #[cfg(target_os = "macos")]
@@ -125,7 +138,7 @@ fn format_label(jira: Option<&str>, desc: Option<&str>) -> Option<String> {
 #[tauri::command]
 fn check_server() -> bool {
     reqwest::blocking::Client::new()
-        .get("http://localhost:4001")
+        .get(&dashboard_url())
         .timeout(Duration::from_secs(2))
         .send()
         .is_ok()
@@ -156,8 +169,7 @@ fn install_clocktopus() {
         .ok();
 }
 
-#[tauri::command]
-fn start_server(state: tauri::State<'_, ServerChild>) {
+fn spawn_server(state: &ServerChild) {
     // Resolve clocktopus binary directly — GUI apps lack shell PATH.
     let home = std::env::var("HOME").unwrap_or_default();
     let candidates = [
@@ -176,6 +188,7 @@ fn start_server(state: tauri::State<'_, ServerChild>) {
     if let Ok(child) = std::process::Command::new(&bin)
         .arg("dash")
         .env("PATH", new_path)
+        .env("CLOCKTOPUS_PORT", dashboard_port().to_string())
         .spawn()
     {
         *state.0.lock().unwrap() = Some(child);
@@ -183,10 +196,22 @@ fn start_server(state: tauri::State<'_, ServerChild>) {
 }
 
 #[tauri::command]
+fn start_server(state: tauri::State<'_, ServerChild>) {
+    spawn_server(&state);
+}
+
+#[tauri::command]
 fn stop_server(app: tauri::AppHandle, state: tauri::State<'_, ServerChild>) {
     kill_server_child(&state);
     kill_server_by_port();
     navigate_to_error(&app);
+}
+
+#[tauri::command]
+fn restart_server(state: tauri::State<'_, ServerChild>) {
+    kill_server_child(&state);
+    kill_server_by_port();
+    spawn_server(&state);
 }
 
 fn navigate_to_error(app: &tauri::AppHandle) {
@@ -197,7 +222,7 @@ fn navigate_to_error(app: &tauri::AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let error_html: &'static str = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><style>*{margin:0;padding:0;box-sizing:border-box}:root{--bg:#1a1d23;--fg:#e1e4e8;--sub:#8b949e;--btn:#238636;--btn-h:#2ea043}@media(prefers-color-scheme:light){:root{--bg:#f6f8fa;--fg:#1f2328;--sub:#656d76;--btn:#1a7f37;--btn-h:#2da44e}}body{font-family:-apple-system,sans-serif;background:var(--bg);display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;color:var(--fg)}h2{margin-bottom:.4rem;font-size:1.1rem}p{color:var(--sub);font-size:.875rem}button{margin-top:1.1rem;padding:.55rem 1.4rem;background:var(--btn);border:none;border-radius:8px;color:white;font-size:.9rem;font-weight:500;cursor:pointer}button:hover:not(:disabled){background:var(--btn-h)}button:disabled{opacity:.5;cursor:not-allowed}#msg{font-size:.8rem;color:var(--sub);margin-top:.65rem;min-height:1.1em}</style></head><body><div><h2 id=\"t\">Server not running</h2><p id=\"sub\">Start the Clocktopus server to continue.</p><button id=\"b\">Start Server</button><div id=\"msg\"></div></div><script>document.addEventListener('contextmenu',e=>e.preventDefault());const invoke=window.__TAURI__.core.invoke;async function init(){const ok=await invoke('check_clocktopus_installed');if(!ok){document.getElementById('t').textContent='Clocktopus not installed';document.getElementById('sub').textContent='Install the Clocktopus CLI to continue.';document.getElementById('b').textContent='Install Clocktopus';document.getElementById('b').onclick=doInstall;}else{document.getElementById('b').onclick=doStart;}}async function doInstall(){const b=document.getElementById('b'),m=document.getElementById('msg');b.disabled=true;b.textContent='Installing\u{2026}';await invoke('install_clocktopus');m.textContent='Installing Clocktopus\u{2026}';const t=setInterval(async()=>{if(await invoke('check_clocktopus_installed')){clearInterval(t);m.textContent='';document.getElementById('t').textContent='Server not running';document.getElementById('sub').textContent='Start the Clocktopus server to continue.';b.textContent='Start Server';b.disabled=false;b.onclick=doStart;}},1500);}async function doStart(){const b=document.getElementById('b'),m=document.getElementById('msg');b.disabled=true;b.textContent='Starting\u{2026}';await invoke('start_server');m.textContent='Waiting for server\u{2026}';const t=setInterval(async()=>{if(await invoke('check_server')){clearInterval(t);location.href='http://localhost:4001';}},1500);}init();</script></body></html>";
+    let error_html: String = format!("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><style>*{{margin:0;padding:0;box-sizing:border-box}}:root{{--bg:#1a1d23;--fg:#e1e4e8;--sub:#8b949e;--btn:#238636;--btn-h:#2ea043}}@media(prefers-color-scheme:light){{:root{{--bg:#f6f8fa;--fg:#1f2328;--sub:#656d76;--btn:#1a7f37;--btn-h:#2da44e}}}}body{{font-family:-apple-system,sans-serif;background:var(--bg);display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;color:var(--fg)}}h2{{margin-bottom:.4rem;font-size:1.1rem}}p{{color:var(--sub);font-size:.875rem}}button{{margin-top:1.1rem;padding:.55rem 1.4rem;background:var(--btn);border:none;border-radius:8px;color:white;font-size:.9rem;font-weight:500;cursor:pointer}}button:hover:not(:disabled){{background:var(--btn-h)}}button:disabled{{opacity:.5;cursor:not-allowed}}#msg{{font-size:.8rem;color:var(--sub);margin-top:.65rem;min-height:1.1em}}</style></head><body oncontextmenu=\"return false;\"><div><h2 id=\"t\">Server not running</h2><p id=\"sub\">Start the Clocktopus server to continue.</p><button id=\"b\">Start Server</button><div id=\"msg\"></div></div><script>const DASH_URL='{url}';const invoke=window.__TAURI__.core.invoke;async function init(){{const ok=await invoke('check_clocktopus_installed');if(!ok){{document.getElementById('t').textContent='Clocktopus not installed';document.getElementById('sub').textContent='Install the Clocktopus CLI to continue.';document.getElementById('b').textContent='Install Clocktopus';document.getElementById('b').onclick=doInstall;}}else{{document.getElementById('b').onclick=doStart;}}}}async function doInstall(){{const b=document.getElementById('b'),m=document.getElementById('msg');b.disabled=true;b.textContent='Installing…';await invoke('install_clocktopus');m.textContent='Installing Clocktopus…';const t=setInterval(async()=>{{if(await invoke('check_clocktopus_installed')){{clearInterval(t);m.textContent='';document.getElementById('t').textContent='Server not running';document.getElementById('sub').textContent='Start the Clocktopus server to continue.';b.textContent='Start Server';b.disabled=false;b.onclick=doStart;}}}},1500);}}async function doStart(){{const b=document.getElementById('b'),m=document.getElementById('msg');b.disabled=true;b.textContent='Starting…';await invoke('start_server');m.textContent='Waiting for server…';const t=setInterval(async()=>{{if(await invoke('check_server')){{clearInterval(t);location.href=DASH_URL;}}}},1500);}}init();</script></body></html>", url = dashboard_url());
 
     let mut builder = tauri::Builder::default()
         .manage(ServerChild::default())
@@ -210,7 +235,7 @@ pub fn run() {
     }
 
     builder
-        .invoke_handler(tauri::generate_handler![start_server, stop_server, check_server, check_clocktopus_installed, install_clocktopus])
+        .invoke_handler(tauri::generate_handler![start_server, stop_server, restart_server, check_server, check_clocktopus_installed, install_clocktopus])
         .register_uri_scheme_protocol("clocktopus", move |_app, _request| {
             tauri::http::Response::builder()
                 .header("Content-Type", "text/html; charset=utf-8")
@@ -251,9 +276,14 @@ pub fn run() {
             let show = MenuItem::with_id(app, "show", "Open Dashboard", true, None::<&str>)?;
             let stop_timer = MenuItem::with_id(app, "stop-timer", "Stop Timer", false, None::<&str>)?;
             let stop_server_item = MenuItem::with_id(app, "stop-server", "Stop Server", false, None::<&str>)?;
-            let sep = PredefinedMenuItem::separator(app)?;
+            let restart_server_item = MenuItem::with_id(app, "restart-server", "Restart Server", false, None::<&str>)?;
+            let sep1 = PredefinedMenuItem::separator(app)?;
+            let sep2 = PredefinedMenuItem::separator(app)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show, &stop_timer, &stop_server_item, &sep, &quit])?;
+            let menu = Menu::with_items(
+                app,
+                &[&show, &stop_timer, &sep1, &stop_server_item, &restart_server_item, &sep2, &quit],
+            )?;
 
             // Idle icon: black template — macOS auto-adapts white/black
             let (raw, w, h) = decode_png(include_bytes!("../icons/32x32.png"));
@@ -281,17 +311,25 @@ pub fn run() {
                         }
                     }
                     "stop-timer" => {
-                        std::thread::spawn(|| {
+                        let url = format!("{}/api/timer/stop", dashboard_url());
+                        std::thread::spawn(move || {
                             let _ = reqwest::blocking::Client::new()
-                                .post("http://localhost:4001/api/timer/stop")
+                                .post(&url)
                                 .timeout(Duration::from_secs(5))
                                 .send();
                         });
                     }
                     "stop-server" => {
-                        kill_server_child(&app.state::<ServerChild>());
+                        let state = app.state::<ServerChild>();
+                        kill_server_child(&state);
                         kill_server_by_port();
                         navigate_to_error(app);
+                    }
+                    "restart-server" => {
+                        let state = app.state::<ServerChild>();
+                        kill_server_child(&state);
+                        kill_server_by_port();
+                        spawn_server(&state);
                     }
                     "quit" => {
                         kill_server_child(&app.state::<ServerChild>());
@@ -334,11 +372,15 @@ pub fn run() {
             // to the error page immediately so content is ready before the user
             // clicks the tray. No auto-show — avoids blank-panel flash.
             let server_up_initially = reqwest::blocking::Client::new()
-                .get("http://localhost:4001")
+                .get(&dashboard_url())
                 .timeout(Duration::from_millis(500))
                 .send()
                 .is_ok();
-            if !server_up_initially {
+            if server_up_initially {
+                // tauri.conf.json frontendDist is fixed at build time. Navigate
+                // explicitly so a custom CLOCKTOPUS_PORT is honored at runtime.
+                let _ = window.navigate(dashboard_url().parse().unwrap());
+            } else {
                 let _ = window.navigate("clocktopus://localhost/error".parse().unwrap());
             }
 
@@ -376,6 +418,8 @@ pub fn run() {
 
             let stop_timer_for_thread = stop_timer.clone();
             let stop_server_for_thread = stop_server_item.clone();
+            let restart_server_for_thread = restart_server_item.clone();
+            let active_url = format!("{}/api/timer/active", dashboard_url());
             std::thread::spawn(move || {
                 let client = reqwest::blocking::Client::new();
                 let mut is_active: bool = false;
@@ -388,12 +432,13 @@ pub fn run() {
                     // Poll on first iteration and every 5th tick after
                     if tick % 5 == 0 {
                         let send_result = client
-                            .get("http://localhost:4001/api/timer/active")
+                            .get(&active_url)
                             .timeout(Duration::from_secs(3))
                             .send();
                         let server_up = send_result.is_ok();
                         if last_server_up != Some(server_up) {
                             let _ = stop_server_for_thread.set_enabled(server_up);
+                            let _ = restart_server_for_thread.set_enabled(server_up);
                             last_server_up = Some(server_up);
                         }
                         let response = send_result

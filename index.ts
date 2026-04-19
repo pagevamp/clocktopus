@@ -12,6 +12,7 @@ import { completeLatestSession, getLatestSession } from './lib/db.js';
 import { stopJiraTimer } from './lib/jira.js';
 import { startDashboard } from './dashboard/server.js';
 import { ensureNativeAddons } from './lib/ensure-native-addons.js';
+import { DASHBOARD_PORT, DASHBOARD_URL } from './lib/constants.js';
 
 interface Project {
   id: string;
@@ -331,7 +332,7 @@ program
 
 program
   .command('dash')
-  .description('Start the Clocktopus web dashboard on localhost:4001.')
+  .description(`Start the Clocktopus web dashboard on localhost:${DASHBOARD_PORT}.`)
   .action(() => {
     startDashboard();
   });
@@ -407,7 +408,7 @@ program
       execSync(`${pm2Bin} start ${scriptPath} --name ${DASH_PM2_NAME} --interpreter ${bunPath} -- dash`, {
         stdio: 'inherit',
       });
-      console.log(chalk.green('Dashboard running at http://localhost:4001'));
+      console.log(chalk.green(`Dashboard running at ${DASHBOARD_URL}`));
       console.log(chalk.gray('  Stop:   clocktopus serve:stop'));
       console.log(chalk.gray('  Logs:   clocktopus serve:logs'));
     } catch {

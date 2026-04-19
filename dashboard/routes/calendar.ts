@@ -4,6 +4,8 @@ import { getAuthenticatedClient, getRefreshedToken } from '../../lib/google.js';
 import { getLatestToken, storeToken, getEventProject, setEventProject, getActiveProjects } from '../../lib/db.js';
 import { Clockify } from '../../clockify.js';
 
+// Hardcoded — registered with Google OAuth; cannot vary with CLOCKTOPUS_PORT
+// without re-registering the redirect URI in the Google Cloud console.
 const DASHBOARD_REDIRECT_URI = 'http://localhost:4001/api/google/callback';
 
 const calendarRoutes = new Hono();

@@ -8,6 +8,8 @@ const AUTH_PROXY_URL = 'https://clocktopus-auth.clocktopus.workers.dev';
 // Fallback: direct Atlassian API (when user provides their own credentials)
 const ATLASSIAN_TOKEN_URL = 'https://auth.atlassian.com/oauth/token';
 const ATLASSIAN_RESOURCES_URL = 'https://api.atlassian.com/oauth/token/accessible-resources';
+// Hardcoded — registered with Atlassian; cannot vary with CLOCKTOPUS_PORT
+// without re-registering the redirect URI on the OAuth app.
 const REDIRECT_URI = 'http://localhost:4001/api/jira/callback';
 
 function hasLocalCredentials(): boolean {

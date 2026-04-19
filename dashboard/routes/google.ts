@@ -4,6 +4,8 @@ import { getAuthenticatedClient, getAuthUrl, exchangeGoogleCode } from '../../li
 import { storeToken } from '../../lib/db.js';
 import { saveCredential } from '../../lib/credentials.js';
 
+// Hardcoded — registered with Google OAuth; cannot vary with CLOCKTOPUS_PORT
+// without re-registering the redirect URI in the Google Cloud console.
 const DASHBOARD_REDIRECT_URI = 'http://localhost:4001/api/google/callback';
 const SCOPES = ['https://www.googleapis.com/auth/calendar.readonly', 'https://www.googleapis.com/auth/userinfo.email'];
 

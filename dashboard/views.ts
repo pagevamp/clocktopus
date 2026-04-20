@@ -111,23 +111,9 @@ export function indexPage() {
     .toggle input:checked + .slider { background: #238636; }
     .toggle input:checked + .slider::before { transform: translateX(16px); background: #fff; }
 
-    /* Server restart overlay */
-    .overlay { position: fixed; inset: 0; background: rgba(13, 17, 23, 0.92); display: none; align-items: center; justify-content: center; z-index: 9999; }
-    .overlay.active { display: flex; }
-    .overlay-box { background: #1c1f26; border: 1px solid #30363d; border-radius: 12px; padding: 2rem 2.5rem; display: flex; flex-direction: column; align-items: center; gap: 1rem; }
-    .spinner { width: 32px; height: 32px; border: 3px solid #30363d; border-top-color: #d29922; border-radius: 50%; animation: spin 0.8s linear infinite; }
-    .overlay-text { color: #e1e4e8; font-size: 0.95rem; }
-    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body oncontextmenu="return false;">
-  <div id="server-overlay" class="overlay">
-    <div class="overlay-box">
-      <div class="spinner"></div>
-      <div class="overlay-text" id="server-overlay-text">Restarting Server...</div>
-    </div>
-  </div>
-
   <div class="header">
     <h1>Clocktopus</h1>
     <div class="nav">
@@ -292,17 +278,6 @@ export function indexPage() {
         <p id="google-desc" style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Authorize access to your Google Calendar.</p>
         <button class="connect" id="google-connect-btn" onclick="connectGoogle()">Connect Google Account</button>
         <div class="msg" id="google-msg"></div>
-      </div>
-
-      <!-- Server -->
-      <div class="card">
-        <div class="card-header">
-          <div class="dot green"></div>
-          <h2>Server</h2>
-        </div>
-        <p style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Restart the Clocktopus dashboard server.</p>
-        <button id="server-restart-btn" onclick="restartServer()" style="background:#30363d;">Restart Server</button>
-        <div class="msg" id="server-msg"></div>
       </div>
 
       <!-- Jira -->
@@ -732,79 +707,6 @@ export function indexPage() {
         dot.className = prevDot;
         setTimeout(checkMonitorStatus, 2500);
       }
-    }
-
-    // --- Server restart ---
-    async function restartServer() {
-      const btn = document.getElementById('server-restart-btn');
-      const overlay = document.getElementById('server-overlay');
-      const overlayText = document.getElementById('server-overlay-text');
-      btn.disabled = true;
-      btn.textContent = 'Restarting...';
-      overlayText.textContent = 'Restarting Server...';
-      overlay.classList.add('active');
-      setMsg('server-msg', '', true);
-
-      const tauriApi = window.__TAURI__ || window.__TAURI_INTERNALS__;
-      const inTauri = !!(tauriApi && tauriApi.core && tauriApi.core.invoke);
-
-      if (inTauri) {
-        try {
-          await tauriApi.core.invoke('restart_server');
-        } catch (err) {
-          overlayText.textContent = 'Restart failed: ' + (err && err.message ? err.message : String(err));
-          setTimeout(function() {
-            overlay.classList.remove('active');
-            btn.disabled = false;
-            btn.textContent = 'Restart Server';
-          }, 4000);
-          return;
-        }
-      } else {
-        let managed = false;
-        try {
-          const res = await fetch('/api/server/restart', { method: 'POST' });
-          const data = await res.json();
-          managed = !!data.managed;
-        } catch {
-          // Expected — server dies mid-response
-        }
-        if (!managed) {
-          overlayText.textContent = 'Server stopped. Start it manually: clocktopus serve';
-          setMsg('server-msg', 'Not managed by PM2 — restart manually.', false);
-          setTimeout(function() {
-            overlay.classList.remove('active');
-            btn.disabled = false;
-            btn.textContent = 'Restart Server';
-          }, 3500);
-          return;
-        }
-      }
-
-      // Poll /api/status until server responds
-      const start = Date.now();
-      const MAX_WAIT_MS = 30000;
-      async function poll() {
-        try {
-          const r = await fetch('/api/status', { cache: 'no-store' });
-          if (r.ok) {
-            overlayText.textContent = 'Server back online. Reloading...';
-            setTimeout(function() { window.location.reload(); }, 400);
-            return;
-          }
-        } catch {}
-        if (Date.now() - start > MAX_WAIT_MS) {
-          overlayText.textContent = 'Server did not come back. Check logs.';
-          setTimeout(function() {
-            overlay.classList.remove('active');
-            btn.disabled = false;
-            btn.textContent = 'Restart Server';
-          }, 3000);
-          return;
-        }
-        setTimeout(poll, 500);
-      }
-      setTimeout(poll, 1000);
     }
 
     // --- Projects ---

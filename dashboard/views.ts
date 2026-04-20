@@ -110,9 +110,24 @@ export function indexPage() {
     .toggle .slider::before { content: ''; position: absolute; width: 16px; height: 16px; left: 2px; top: 2px; background: #8b949e; border-radius: 50%; transition: transform 0.2s, background 0.2s; }
     .toggle input:checked + .slider { background: #238636; }
     .toggle input:checked + .slider::before { transform: translateX(16px); background: #fff; }
+
+    /* Server restart overlay */
+    .overlay { position: fixed; inset: 0; background: rgba(13, 17, 23, 0.92); display: none; align-items: center; justify-content: center; z-index: 9999; }
+    .overlay.active { display: flex; }
+    .overlay-box { background: #1c1f26; border: 1px solid #30363d; border-radius: 12px; padding: 2rem 2.5rem; display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+    .spinner { width: 32px; height: 32px; border: 3px solid #30363d; border-top-color: #d29922; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    .overlay-text { color: #e1e4e8; font-size: 0.95rem; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body oncontextmenu="return false;">
+  <div id="server-overlay" class="overlay">
+    <div class="overlay-box">
+      <div class="spinner"></div>
+      <div class="overlay-text" id="server-overlay-text">Restarting Server...</div>
+    </div>
+  </div>
+
   <div class="header">
     <h1>Clocktopus</h1>
     <div class="nav">
@@ -215,7 +230,6 @@ export function indexPage() {
           <button id="monitor-stop-btn" onclick="monitorAction('stop')" class="stop-btn" style="margin-top:0;" disabled>Stop</button>
           <button id="monitor-restart-btn" onclick="monitorAction('restart')" style="margin-top:0;background:#30363d;" disabled>Restart</button>
         </div>
-        <div class="msg" id="monitor-msg"></div>
       </div>
 
       <!-- Session History -->
@@ -278,6 +292,17 @@ export function indexPage() {
         <p id="google-desc" style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Authorize access to your Google Calendar.</p>
         <button class="connect" id="google-connect-btn" onclick="connectGoogle()">Connect Google Account</button>
         <div class="msg" id="google-msg"></div>
+      </div>
+
+      <!-- Server -->
+      <div class="card">
+        <div class="card-header">
+          <div class="dot green"></div>
+          <h2>Server</h2>
+        </div>
+        <p style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Restart the Clocktopus dashboard server.</p>
+        <button id="server-restart-btn" onclick="restartServer()" style="background:#30363d;">Restart Server</button>
+        <div class="msg" id="server-msg"></div>
       </div>
 
       <!-- Jira -->
@@ -678,9 +703,8 @@ export function indexPage() {
       stopBtn.disabled = true;
       restartBtn.disabled = true;
       dot.className = 'dot gray';
-      desc.textContent = pending + ' server...';
+      desc.textContent = pending + ' monitor...';
       desc.style.color = '#d29922';
-      setMsg('monitor-msg', pending + ' server...', true);
 
       const MIN_DISPLAY_MS = 1500;
       const started = Date.now();
@@ -693,23 +717,78 @@ export function indexPage() {
         const res = await fetch('/api/monitor/' + action, { method: 'POST' });
         const data = await res.json();
         await waitMin();
-        if (data.ok) {
-          setMsg('monitor-msg', 'Monitor ' + action + (action === 'stop' ? 'ped' : 'ed') + '.', true);
-        } else {
-          setMsg('monitor-msg', data.output || 'Failed.', false);
-          desc.textContent = prevDesc;
-          desc.style.color = prevColor;
+        if (!data.ok) {
+          desc.textContent = data.output || 'Failed.';
+          desc.style.color = '#f85149';
           dot.className = prevDot;
+          setTimeout(checkMonitorStatus, 2500);
+          return;
         }
         setTimeout(checkMonitorStatus, 500);
       } catch {
         await waitMin();
-        setMsg('monitor-msg', 'Request failed.', false);
-        desc.textContent = prevDesc;
-        desc.style.color = prevColor;
+        desc.textContent = 'Request failed.';
+        desc.style.color = '#f85149';
         dot.className = prevDot;
-        checkMonitorStatus();
+        setTimeout(checkMonitorStatus, 2500);
       }
+    }
+
+    // --- Server restart ---
+    async function restartServer() {
+      const btn = document.getElementById('server-restart-btn');
+      const overlay = document.getElementById('server-overlay');
+      const overlayText = document.getElementById('server-overlay-text');
+      btn.disabled = true;
+      btn.textContent = 'Restarting...';
+      overlayText.textContent = 'Restarting Server...';
+      overlay.classList.add('active');
+      setMsg('server-msg', '', true);
+
+      let managed = false;
+      try {
+        const res = await fetch('/api/server/restart', { method: 'POST' });
+        const data = await res.json();
+        managed = !!data.managed;
+      } catch {
+        // Expected — server dies mid-response
+      }
+
+      if (!managed) {
+        overlayText.textContent = 'Server stopped. Start it manually: clocktopus serve';
+        setMsg('server-msg', 'Not managed by PM2 — restart manually.', false);
+        setTimeout(function() {
+          overlay.classList.remove('active');
+          btn.disabled = false;
+          btn.textContent = 'Restart Server';
+        }, 3500);
+        return;
+      }
+
+      // Poll /api/status until server responds
+      const start = Date.now();
+      const MAX_WAIT_MS = 30000;
+      async function poll() {
+        try {
+          const r = await fetch('/api/status', { cache: 'no-store' });
+          if (r.ok) {
+            overlayText.textContent = 'Server back online. Reloading...';
+            setTimeout(function() { window.location.reload(); }, 400);
+            return;
+          }
+        } catch {}
+        if (Date.now() - start > MAX_WAIT_MS) {
+          overlayText.textContent = 'Server did not come back. Check logs.';
+          setTimeout(function() {
+            overlay.classList.remove('active');
+            btn.disabled = false;
+            btn.textContent = 'Restart Server';
+          }, 3000);
+          return;
+        }
+        setTimeout(poll, 500);
+      }
+      setTimeout(poll, 1000);
     }
 
     // --- Projects ---

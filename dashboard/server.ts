@@ -11,6 +11,7 @@ import timerRoutes from './routes/timer.js';
 import dataRoutes from './routes/data.js';
 import monitorRoutes from './routes/monitor.js';
 import calendarRoutes from './routes/calendar.js';
+import serverRoutes from './routes/server.js';
 
 const app = new Hono();
 
@@ -24,6 +25,7 @@ app.route('/api', timerRoutes);
 app.route('/api', dataRoutes);
 app.route('/api', monitorRoutes);
 app.route('/api', calendarRoutes);
+app.route('/api', serverRoutes);
 
 export function startDashboard() {
   console.log(`Clocktopus dashboard running at http://localhost:${DASHBOARD_PORT}`);

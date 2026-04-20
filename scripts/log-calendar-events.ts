@@ -42,11 +42,12 @@ program
   .option('-e, --end-date <endDate>', 'End date for fetching calendar events')
   .option('-t, --today', 'Log time for today')
   .option('-p, --project-id <projectId>', 'Clockify project ID')
+  .option('--no-billable', 'Mark logged entries as non-billable')
   .parse(process.argv);
 
 const opts = program.opts();
 
-const { projectId, today } = opts;
+const { projectId, today, billable } = opts;
 let { startDate, endDate } = opts;
 
 if (today) {
@@ -154,6 +155,7 @@ async function main() {
               event.start.dateTime,
               event.end.dateTime,
               event.summary,
+              billable,
             );
           }
         }

@@ -125,7 +125,13 @@ export class Clockify {
     }
   }
 
-  async startTimer(workspaceId: string, projectId: string, description = 'Working on a task...', jiraTicket?: string) {
+  async startTimer(
+    workspaceId: string,
+    projectId: string,
+    description = 'Working on a task...',
+    jiraTicket?: string,
+    billable = true,
+  ) {
     try {
       const user = await this.getUser();
       if (!user) {
@@ -146,6 +152,7 @@ export class Clockify {
         projectId: projectId,
         description: finalDescription,
         start: startedAt,
+        billable,
       });
 
       // Log session to SQLite
@@ -233,7 +240,14 @@ export class Clockify {
     }
   }
 
-  async logTime(workspaceId: string, projectId: string | null, start: string, end: string, description: string) {
+  async logTime(
+    workspaceId: string,
+    projectId: string | null,
+    start: string,
+    end: string,
+    description: string,
+    billable = true,
+  ) {
     if (!projectId) {
       return null;
     }
@@ -244,6 +258,7 @@ export class Clockify {
         start: start,
         end: end,
         description: description,
+        billable,
       });
       return response.data;
     } catch (error: unknown) {

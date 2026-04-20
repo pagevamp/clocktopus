@@ -159,6 +159,10 @@ export function indexPage() {
                 <input type="text" id="timer-jira" placeholder="e.g. PROJ-123" />
               </div>
             </div>
+            <label style="display:flex; align-items:center; gap:0.5rem; font-weight:normal; cursor:pointer;">
+              <input type="checkbox" id="timer-billable" checked style="width:auto; margin:0;" />
+              Billable
+            </label>
             <button id="start-btn" onclick="startTimer()">Start Timer</button>
           </div>
           <div id="last-tasks" style="display:none; margin-top:0.75rem;"></div>
@@ -190,6 +194,10 @@ export function indexPage() {
               <input type="text" id="manual-jira" placeholder="e.g. PROJ-123" />
             </div>
           </div>
+          <label style="display:flex; align-items:center; gap:0.5rem; font-weight:normal; cursor:pointer;">
+            <input type="checkbox" id="manual-billable" checked style="width:auto; margin:0;" />
+            Billable
+          </label>
           <button id="manual-log-btn" onclick="logManualTime()">Log Time</button>
           <div class="msg" id="manual-msg"></div>
         </div>
@@ -442,6 +450,7 @@ export function indexPage() {
       const projectId = document.getElementById('project-select').value;
       const description = document.getElementById('timer-description').value.trim();
       const jiraTicket = document.getElementById('timer-jira').value.trim();
+      const billable = document.getElementById('timer-billable').checked;
 
       if (!projectId) return setMsg('timer-msg', 'Please select a project.', false);
       if (!description && !jiraTicket) return setMsg('timer-msg', 'Please enter a description or Jira ticket.', false);
@@ -454,7 +463,7 @@ export function indexPage() {
         const res = await fetch('/api/timer/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ projectId, description: description || 'Working on a task...', jiraTicket: jiraTicket || undefined }),
+          body: JSON.stringify({ projectId, description: description || 'Working on a task...', jiraTicket: jiraTicket || undefined, billable }),
         });
         const data = await res.json();
         if (data.ok) {
@@ -514,6 +523,7 @@ export function indexPage() {
       const endVal = document.getElementById('manual-end').value;
       const description = document.getElementById('manual-description').value.trim();
       const jiraTicket = document.getElementById('manual-jira').value.trim();
+      const billable = document.getElementById('manual-billable').checked;
 
       if (!projectId) return setMsg('manual-msg', 'Please select a project.', false);
       if (!startVal || !endVal) return setMsg('manual-msg', 'Please set start and end.', false);
@@ -538,6 +548,7 @@ export function indexPage() {
             start: new Date(startMs).toISOString(),
             end: new Date(endMs).toISOString(),
             jiraTicket: jiraTicket || undefined,
+            billable: billable,
           }),
         });
         const data = await res.json();
@@ -599,6 +610,7 @@ export function indexPage() {
             projectId: task.projectId,
             description: task.description || 'Working on a task...',
             jiraTicket: task.jiraTicket || undefined,
+            billable: document.getElementById('timer-billable').checked,
           }),
         });
         var data = await res.json();
@@ -1036,9 +1048,10 @@ export function indexPage() {
         document.getElementById('cal-table-wrap').style.display = 'block';
       } catch {
         setMsg('cal-msg', 'Request failed.', false);
+      } finally {
+        fetchBtn.disabled = false;
+        fetchBtn.textContent = 'Fetch Events';
       }
-      fetchBtn.disabled = false;
-      fetchBtn.textContent = 'Fetch Events';
     }
 
     function renderCalendarTable() {
@@ -1060,10 +1073,15 @@ export function indexPage() {
             return '<option value="' + p.id + '"' + selected + '>' + escapeHtml(p.name) + '</option>';
           }).join('');
 
+        const billableChecked = ev.billable === false ? '' : ' checked';
         return '<div class="cal-event-card' + (logged ? ' logged' : '') + '">' +
           '<div class="cal-card-name">' + escapeHtml(ev.summary || 'Untitled') + badge + '</div>' +
           '<div class="cal-card-time">' + startDay + ' ' + startTime + ' — ' + endTime + ' (' + formatDuration(durationMs) + ')</div>' +
           '<select class="cal-project-sel" data-index="' + i + '"' + selDisabled + '>' + projectOptions + '</select>' +
+          '<label style="display:flex; align-items:center; gap:0.4rem; font-size:0.75rem; color:#8b949e; margin-top:0.5rem; cursor:pointer;">' +
+            '<input type="checkbox" class="cal-billable-sel" data-index="' + i + '"' + billableChecked + (logged ? ' disabled' : '') + ' style="width:auto; margin:0;" />' +
+            'Billable' +
+          '</label>' +
         '</div>';
       }).join('');
 
@@ -1071,6 +1089,13 @@ export function indexPage() {
         sel.addEventListener('change', function() {
           const idx = parseInt(sel.dataset.index);
           calEvents[idx].savedProjectId = sel.value || null;
+        });
+      });
+
+      document.querySelectorAll('.cal-billable-sel').forEach(function(cb) {
+        cb.addEventListener('change', function() {
+          const idx = parseInt(cb.dataset.index);
+          calEvents[idx].billable = cb.checked;
         });
       });
     }
@@ -1082,7 +1107,9 @@ export function indexPage() {
         if (sel.value === 'skip' || !sel.value) return;
         const idx = parseInt(sel.dataset.index);
         const ev = calEvents[idx];
-        entries.push({ projectId: sel.value, summary: ev.summary, start: ev.start, end: ev.end });
+        const cb = document.querySelector('.cal-billable-sel[data-index="' + idx + '"]');
+        const billable = cb ? cb.checked : true;
+        entries.push({ projectId: sel.value, summary: ev.summary, start: ev.start, end: ev.end, billable: billable });
       });
 
       if (entries.length === 0) {

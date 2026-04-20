@@ -62,10 +62,11 @@ timerRoutes.get('/timer/active', async (c) => {
 });
 
 timerRoutes.post('/timer/start', async (c) => {
-  const { projectId, description, jiraTicket } = await c.req.json<{
+  const { projectId, description, jiraTicket, billable } = await c.req.json<{
     projectId: string;
     description: string;
     jiraTicket?: string;
+    billable?: boolean;
   }>();
 
   if (!projectId || !description) {
@@ -77,7 +78,13 @@ timerRoutes.post('/timer/start', async (c) => {
     const user = await clockify.getUser();
     if (!user) return c.json({ ok: false, error: 'Could not connect to Clockify.' }, 500);
 
-    const result = await clockify.startTimer(user.defaultWorkspace, projectId, description, jiraTicket);
+    const result = await clockify.startTimer(
+      user.defaultWorkspace,
+      projectId,
+      description,
+      jiraTicket,
+      billable ?? true,
+    );
     if (!result) return c.json({ ok: false, error: 'Failed to start timer.' }, 500);
 
     return c.json({ ok: true });
@@ -119,12 +126,13 @@ timerRoutes.post('/timer/stop', async (c) => {
 });
 
 timerRoutes.post('/timer/log', async (c) => {
-  const { projectId, description, start, end, jiraTicket } = await c.req.json<{
+  const { projectId, description, start, end, jiraTicket, billable } = await c.req.json<{
     projectId: string;
     description: string;
     start: string;
     end: string;
     jiraTicket?: string;
+    billable?: boolean;
   }>();
 
   if (!projectId) {
@@ -158,7 +166,14 @@ timerRoutes.post('/timer/log', async (c) => {
     const endIso = new Date(endMs).toISOString();
     const finalDescription = cleanDescription || cleanJira!;
 
-    const entry = await clockify.logTime(user.defaultWorkspace, projectId, startIso, endIso, finalDescription);
+    const entry = await clockify.logTime(
+      user.defaultWorkspace,
+      projectId,
+      startIso,
+      endIso,
+      finalDescription,
+      billable ?? true,
+    );
     if (!entry) return c.json({ ok: false, error: 'Failed to log time in Clockify.' }, 500);
 
     const entryId = (entry as { id?: string }).id ?? uuidv4();

@@ -70,6 +70,7 @@ program
   .description('Start a new time entry. Select a project interactively.')
   .argument('[message]', 'Description for the time entry')
   .option('-j, --jira <ticket>', 'Jira ticket number')
+  .option('--no-billable', 'Mark the time entry as non-billable')
   .action(async (message, options) => {
     const { workspaceId } = await getWorkspaceAndUser();
 
@@ -109,7 +110,7 @@ program
       },
     ]);
 
-    const entry = await clockify.startTimer(workspaceId, selectedProjectId, message, options.jira);
+    const entry = await clockify.startTimer(workspaceId, selectedProjectId, message, options.jira, options.billable);
     if (entry) {
       const projectName = projects.find((p: { name: string; id: string }) => p.id === selectedProjectId)?.name;
       console.log(chalk.green(`Timer started for project: ${chalk.bold(projectName)}`));

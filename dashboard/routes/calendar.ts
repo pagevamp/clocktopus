@@ -41,13 +41,35 @@ calendarRoutes.get('/calendar/events', async (c) => {
     endOfDay.setDate(endOfDay.getDate() + 1);
     const timeMax = endOfDay.toISOString();
 
-    const res = await calendar.events.list({
-      calendarId: 'primary',
-      timeMin,
-      timeMax,
-      singleEvents: true,
-      orderBy: 'startTime',
-    });
+    const listEvents = () =>
+      calendar.events.list({
+        calendarId: 'primary',
+        timeMin,
+        timeMax,
+        singleEvents: true,
+        orderBy: 'startTime',
+      });
+
+    let res;
+    try {
+      res = await listEvents();
+    } catch (err: unknown) {
+      const status = (err as { code?: number; status?: number })?.code ?? (err as { status?: number })?.status;
+      if (status === 401 && token.refresh_token) {
+        console.log('[calendar] Access token rejected (401). Refreshing and retrying...');
+        token = await getRefreshedToken(token);
+        storeToken(token);
+        oAuth2Client.setCredentials(token);
+        res = await listEvents();
+      } else if (status === 401) {
+        return c.json(
+          { ok: false, error: 'Google auth expired. Please reconnect your Google account in Settings.' },
+          401,
+        );
+      } else {
+        throw err;
+      }
+    }
 
     // Fetch existing Clockify entries for the same range to detect duplicates
     const clockify = new Clockify();
@@ -86,7 +108,7 @@ calendarRoutes.get('/calendar/events', async (c) => {
 
 calendarRoutes.post('/calendar/log', async (c) => {
   const { entries } = await c.req.json<{
-    entries: Array<{ summary: string; start: string; end: string; projectId: string }>;
+    entries: Array<{ summary: string; start: string; end: string; projectId: string; billable?: boolean }>;
   }>();
 
   if (!entries || !Array.isArray(entries) || entries.length === 0) {
@@ -109,7 +131,14 @@ calendarRoutes.post('/calendar/log', async (c) => {
         continue;
       }
       try {
-        await clockify.logTime(user.defaultWorkspace, entry.projectId, entry.start, entry.end, entry.summary);
+        await clockify.logTime(
+          user.defaultWorkspace,
+          entry.projectId,
+          entry.start,
+          entry.end,
+          entry.summary,
+          entry.billable ?? true,
+        );
         setEventProject(entry.summary, entry.projectId);
         logged.push(entry.summary);
       } catch {

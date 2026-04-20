@@ -224,6 +224,8 @@ fn navigate_to_error(app: &tauri::AppHandle) {
 pub fn run() {
     let error_html: String = format!("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><style>*{{margin:0;padding:0;box-sizing:border-box}}:root{{--bg:#1a1d23;--fg:#e1e4e8;--sub:#8b949e;--btn:#238636;--btn-h:#2ea043}}@media(prefers-color-scheme:light){{:root{{--bg:#f6f8fa;--fg:#1f2328;--sub:#656d76;--btn:#1a7f37;--btn-h:#2da44e}}}}body{{font-family:-apple-system,sans-serif;background:var(--bg);display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;color:var(--fg)}}h2{{margin-bottom:.4rem;font-size:1.1rem}}p{{color:var(--sub);font-size:.875rem}}button{{margin-top:1.1rem;padding:.55rem 1.4rem;background:var(--btn);border:none;border-radius:8px;color:white;font-size:.9rem;font-weight:500;cursor:pointer}}button:hover:not(:disabled){{background:var(--btn-h)}}button:disabled{{opacity:.5;cursor:not-allowed}}#msg{{font-size:.8rem;color:var(--sub);margin-top:.65rem;min-height:1.1em}}</style></head><body oncontextmenu=\"return false;\"><div><h2 id=\"t\">Server not running</h2><p id=\"sub\">Start the Clocktopus server to continue.</p><button id=\"b\">Start Server</button><div id=\"msg\"></div></div><script>const DASH_URL='{url}';const invoke=window.__TAURI__.core.invoke;async function init(){{const ok=await invoke('check_clocktopus_installed');if(!ok){{document.getElementById('t').textContent='Clocktopus not installed';document.getElementById('sub').textContent='Install the Clocktopus CLI to continue.';document.getElementById('b').textContent='Install Clocktopus';document.getElementById('b').onclick=doInstall;}}else{{document.getElementById('b').onclick=doStart;}}}}async function doInstall(){{const b=document.getElementById('b'),m=document.getElementById('msg');b.disabled=true;b.textContent='Installing…';await invoke('install_clocktopus');m.textContent='Installing Clocktopus…';const t=setInterval(async()=>{{if(await invoke('check_clocktopus_installed')){{clearInterval(t);m.textContent='';document.getElementById('t').textContent='Server not running';document.getElementById('sub').textContent='Start the Clocktopus server to continue.';b.textContent='Start Server';b.disabled=false;b.onclick=doStart;}}}},1500);}}async function doStart(){{const b=document.getElementById('b'),m=document.getElementById('msg');b.disabled=true;b.textContent='Starting…';await invoke('start_server');m.textContent='Waiting for server…';const t=setInterval(async()=>{{if(await invoke('check_server')){{clearInterval(t);location.href=DASH_URL;}}}},1500);}}init();</script></body></html>", url = dashboard_url());
 
+    let loading_html: String = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><style>*{margin:0;padding:0;box-sizing:border-box}:root{--bg:#1a1d23;--fg:#e1e4e8;--sub:#8b949e;--accent:#d29922}@media(prefers-color-scheme:light){:root{--bg:#f6f8fa;--fg:#1f2328;--sub:#656d76;--accent:#bf8700}}body{font-family:-apple-system,sans-serif;background:var(--bg);display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;color:var(--fg)}.sp{width:32px;height:32px;border:3px solid rgba(128,128,128,.25);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto .9rem}@keyframes sp{to{transform:rotate(360deg)}}h2{font-size:1rem;font-weight:500}p{color:var(--sub);font-size:.8rem;margin-top:.35rem}</style></head><body oncontextmenu=\"return false;\"><div><div class=\"sp\"></div><h2>Starting Clocktopus</h2><p>Launching server…</p></div></body></html>".to_string();
+
     let mut builder = tauri::Builder::default()
         .manage(ServerChild::default())
         .plugin(tauri_plugin_opener::init())
@@ -236,11 +238,16 @@ pub fn run() {
 
     builder
         .invoke_handler(tauri::generate_handler![start_server, stop_server, restart_server, check_server, check_clocktopus_installed, install_clocktopus])
-        .register_uri_scheme_protocol("clocktopus", move |_app, _request| {
+        .register_uri_scheme_protocol("clocktopus", move |_app, request| {
+            let body = if request.uri().path() == "/loading" {
+                loading_html.as_bytes().to_vec()
+            } else {
+                error_html.as_bytes().to_vec()
+            };
             tauri::http::Response::builder()
                 .header("Content-Type", "text/html; charset=utf-8")
                 .status(200)
-                .body(error_html.as_bytes().to_vec())
+                .body(body)
                 .unwrap()
         })
         .setup(|app| {
@@ -368,9 +375,9 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            // Synchronous server check: if server down at startup, redirect webview
-            // to the error page immediately so content is ready before the user
-            // clicks the tray. No auto-show — avoids blank-panel flash.
+            // Synchronous server check: if server down at startup, auto-spawn it
+            // when clocktopus is installed and show a loading page. The poller
+            // below detects server-up and navigates to the dashboard URL.
             let server_up_initially = reqwest::blocking::Client::new()
                 .get(&dashboard_url())
                 .timeout(Duration::from_secs(2))
@@ -380,6 +387,9 @@ pub fn run() {
                 // tauri.conf.json frontendDist is fixed at build time. Navigate
                 // explicitly so a custom CLOCKTOPUS_PORT is honored at runtime.
                 let _ = window.navigate(dashboard_url().parse().unwrap());
+            } else if check_clocktopus_installed() {
+                spawn_server(&app.state::<ServerChild>());
+                let _ = window.navigate("clocktopus://localhost/loading".parse().unwrap());
             } else {
                 let _ = window.navigate("clocktopus://localhost/error".parse().unwrap());
             }

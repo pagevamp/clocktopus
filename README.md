@@ -195,6 +195,44 @@ cd ~/.bun/install/global/node_modules/macos-notification-state && npx node-gyp r
 apt install libxss-dev pkg-config build-essential
 ```
 
+### node-gyp error: `Cannot find module './entry-index'`
+
+During install you may see:
+
+```
+gyp ERR! stack Error: Cannot find module './entry-index'
+gyp ERR! stack Require stack:
+gyp ERR! stack - .../node_modules/cacache/lib/get.js
+...
+error: install script from "desktop-idle" exited with 1
+```
+
+Caused by a broken `node-gyp@12.2.0` / `cacache` bundle fetched via `bunx` on newer Node versions (e.g. Node 25).
+
+Fixes, in order:
+
+1. **Use Node 20 LTS** (most reliable):
+
+   ```bash
+   nvm install 20 && nvm use 20
+   bun i -g clocktopus@latest --trust
+   ```
+
+2. **Clear the bunx node-gyp cache** and retry:
+
+   ```bash
+   rm -rf /var/folders/**/bunx-*-node-gyp@latest
+   bun i -g clocktopus@latest --trust
+   ```
+
+3. **Install via npm** (uses its own node-gyp):
+
+   ```bash
+   npm i -g clocktopus@latest
+   ```
+
+`desktop-idle` is a native addon and must be compiled at install time — skipping postinstall leaves idle detection disabled.
+
 ## License
 
 MIT

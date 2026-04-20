@@ -745,24 +745,39 @@ export function indexPage() {
       overlay.classList.add('active');
       setMsg('server-msg', '', true);
 
-      let managed = false;
-      try {
-        const res = await fetch('/api/server/restart', { method: 'POST' });
-        const data = await res.json();
-        managed = !!data.managed;
-      } catch {
-        // Expected — server dies mid-response
-      }
+      const inTauri = !!(window.__TAURI_INTERNALS__ || window.__TAURI__);
 
-      if (!managed) {
-        overlayText.textContent = 'Server stopped. Start it manually: clocktopus serve';
-        setMsg('server-msg', 'Not managed by PM2 — restart manually.', false);
-        setTimeout(function() {
-          overlay.classList.remove('active');
-          btn.disabled = false;
-          btn.textContent = 'Restart Server';
-        }, 3500);
-        return;
+      if (inTauri) {
+        try {
+          await window.__TAURI__.core.invoke('restart_server');
+        } catch (err) {
+          overlayText.textContent = 'Restart failed.';
+          setTimeout(function() {
+            overlay.classList.remove('active');
+            btn.disabled = false;
+            btn.textContent = 'Restart Server';
+          }, 2500);
+          return;
+        }
+      } else {
+        let managed = false;
+        try {
+          const res = await fetch('/api/server/restart', { method: 'POST' });
+          const data = await res.json();
+          managed = !!data.managed;
+        } catch {
+          // Expected — server dies mid-response
+        }
+        if (!managed) {
+          overlayText.textContent = 'Server stopped. Start it manually: clocktopus serve';
+          setMsg('server-msg', 'Not managed by PM2 — restart manually.', false);
+          setTimeout(function() {
+            overlay.classList.remove('active');
+            btn.disabled = false;
+            btn.textContent = 'Restart Server';
+          }, 3500);
+          return;
+        }
       }
 
       // Poll /api/status until server responds

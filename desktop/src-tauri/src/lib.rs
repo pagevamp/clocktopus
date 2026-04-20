@@ -26,6 +26,10 @@ fn dashboard_url() -> String {
 #[derive(Default)]
 struct ServerChild(Mutex<Option<std::process::Child>>);
 
+/// Set while a user-triggered restart is in flight so the background poller
+/// skips navigating to the error page during the expected server-down window.
+static RESTART_IN_PROGRESS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 fn kill_server_child(state: &ServerChild) {
     if let Some(mut child) = state.0.lock().unwrap().take() {
         let _ = child.kill();
@@ -39,10 +43,10 @@ fn kill_server_child(state: &ServerChild) {
 fn kill_server_by_port() {
     let port = dashboard_port();
     let cmd = format!(
-        "pids=$(lsof -ti :{port} 2>/dev/null); \
+        "pids=$(lsof -ti tcp:{port} -sTCP:LISTEN 2>/dev/null); \
          [ -n \"$pids\" ] && kill -TERM $pids 2>/dev/null; \
          sleep 1; \
-         pids=$(lsof -ti :{port} 2>/dev/null); \
+         pids=$(lsof -ti tcp:{port} -sTCP:LISTEN 2>/dev/null); \
          [ -n \"$pids\" ] && kill -KILL $pids 2>/dev/null; \
          true",
     );
@@ -189,6 +193,9 @@ fn spawn_server(state: &ServerChild) {
         .arg("dash")
         .env("PATH", new_path)
         .env("CLOCKTOPUS_PORT", dashboard_port().to_string())
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
         .spawn()
     {
         *state.0.lock().unwrap() = Some(child);
@@ -208,10 +215,18 @@ fn stop_server(app: tauri::AppHandle, state: tauri::State<'_, ServerChild>) {
 }
 
 #[tauri::command]
-fn restart_server(state: tauri::State<'_, ServerChild>) {
+fn restart_server(app: tauri::AppHandle) {
+    RESTART_IN_PROGRESS.store(true, std::sync::atomic::Ordering::SeqCst);
+    let state = app.state::<ServerChild>();
     kill_server_child(&state);
     kill_server_by_port();
     spawn_server(&state);
+    // Clear flag after a safety window so focus/close events during the
+    // tail of the restart are still suppressed.
+    std::thread::spawn(|| {
+        std::thread::sleep(Duration::from_secs(15));
+        RESTART_IN_PROGRESS.store(false, std::sync::atomic::Ordering::SeqCst);
+    });
 }
 
 fn navigate_to_error(app: &tauri::AppHandle) {
@@ -333,10 +348,18 @@ pub fn run() {
                         navigate_to_error(app);
                     }
                     "restart-server" => {
-                        let state = app.state::<ServerChild>();
-                        kill_server_child(&state);
-                        kill_server_by_port();
-                        spawn_server(&state);
+                        RESTART_IN_PROGRESS.store(true, std::sync::atomic::Ordering::SeqCst);
+                        let app_handle = app.clone();
+                        std::thread::spawn(move || {
+                            {
+                                let state = app_handle.state::<ServerChild>();
+                                kill_server_child(&state);
+                                kill_server_by_port();
+                                spawn_server(&state);
+                            }
+                            std::thread::sleep(Duration::from_secs(15));
+                            RESTART_IN_PROGRESS.store(false, std::sync::atomic::Ordering::SeqCst);
+                        });
                     }
                     "quit" => {
                         kill_server_child(&app.state::<ServerChild>());
@@ -401,6 +424,10 @@ pub fn run() {
                 match event {
                     tauri::WindowEvent::CloseRequested { api, .. } => {
                         api.prevent_close();
+                        // During restart, keep panel visible so overlay stays up.
+                        if RESTART_IN_PROGRESS.load(std::sync::atomic::Ordering::SeqCst) {
+                            return;
+                        }
                         #[cfg(target_os = "macos")]
                         if let Ok(panel) = app_handle_for_event.get_webview_panel("main") {
                             panel.order_out(None);
@@ -409,6 +436,12 @@ pub fn run() {
                         let _ = window_clone.hide();
                     }
                     tauri::WindowEvent::Focused(false) => {
+                        // Keep the panel open during a user-triggered restart so
+                        // the in-flight overlay stays visible instead of being
+                        // dismissed by a transient focus change.
+                        if RESTART_IN_PROGRESS.load(std::sync::atomic::Ordering::SeqCst) {
+                            return;
+                        }
                         #[cfg(target_os = "macos")]
                         if let Ok(panel) = app_handle_for_event.get_webview_panel("main") {
                             panel.order_out(None);
@@ -451,18 +484,27 @@ pub fn run() {
                         if last_server_up != Some(server_up) {
                             let _ = stop_server_for_thread.set_enabled(server_up);
                             let _ = restart_server_for_thread.set_enabled(server_up);
-                            // Auto-recover the webview when server status flips,
-                            // so the user sees the right page without restarting
-                            // the app or clicking around.
-                            let target = if server_up {
-                                dash_url_for_thread.clone()
-                            } else {
-                                "clocktopus://localhost/error".to_string()
-                            };
-                            if let Ok(parsed) = target.parse() {
-                                let _ = window_for_thread.navigate(parsed);
+                            // Skip navigation while a user-triggered restart is in
+                            // flight — the webview already shows the restart overlay
+                            // and should not flash the error page.
+                            let restarting =
+                                RESTART_IN_PROGRESS.load(std::sync::atomic::Ordering::SeqCst);
+                            let should_navigate = server_up || !restarting;
+                            if should_navigate {
+                                let target = if server_up {
+                                    dash_url_for_thread.clone()
+                                } else {
+                                    "clocktopus://localhost/error".to_string()
+                                };
+                                if let Ok(parsed) = target.parse() {
+                                    let _ = window_for_thread.navigate(parsed);
+                                }
+                                if server_up {
+                                    RESTART_IN_PROGRESS
+                                        .store(false, std::sync::atomic::Ordering::SeqCst);
+                                }
+                                last_server_up = Some(server_up);
                             }
-                            last_server_up = Some(server_up);
                         }
                         let response = send_result
                             .and_then(|r| r.text())

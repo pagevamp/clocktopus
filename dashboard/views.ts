@@ -745,18 +745,19 @@ export function indexPage() {
       overlay.classList.add('active');
       setMsg('server-msg', '', true);
 
-      const inTauri = !!(window.__TAURI_INTERNALS__ || window.__TAURI__);
+      const tauriApi = window.__TAURI__ || window.__TAURI_INTERNALS__;
+      const inTauri = !!(tauriApi && tauriApi.core && tauriApi.core.invoke);
 
       if (inTauri) {
         try {
-          await window.__TAURI__.core.invoke('restart_server');
+          await tauriApi.core.invoke('restart_server');
         } catch (err) {
-          overlayText.textContent = 'Restart failed.';
+          overlayText.textContent = 'Restart failed: ' + (err && err.message ? err.message : String(err));
           setTimeout(function() {
             overlay.classList.remove('active');
             btn.disabled = false;
             btn.textContent = 'Restart Server';
-          }, 2500);
+          }, 4000);
           return;
         }
       } else {

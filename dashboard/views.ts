@@ -661,7 +661,27 @@ export function indexPage() {
     }
 
     async function monitorAction(action) {
-      setMsg('monitor-msg', '', true);
+      const startBtn = document.getElementById('monitor-start-btn');
+      const stopBtn = document.getElementById('monitor-stop-btn');
+      const restartBtn = document.getElementById('monitor-restart-btn');
+      const desc = document.getElementById('monitor-desc');
+      const dot = document.getElementById('monitor-dot');
+
+      const labels = { start: 'Starting', stop: 'Stopping', restart: 'Restarting' };
+      const pending = labels[action] || 'Working';
+
+      const prevDesc = desc.textContent;
+      const prevColor = desc.style.color;
+      const prevDot = dot.className;
+
+      startBtn.disabled = true;
+      stopBtn.disabled = true;
+      restartBtn.disabled = true;
+      dot.className = 'dot gray';
+      desc.textContent = pending + ' server...';
+      desc.style.color = '#d29922';
+      setMsg('monitor-msg', pending + ' server...', true);
+
       try {
         const res = await fetch('/api/monitor/' + action, { method: 'POST' });
         const data = await res.json();
@@ -669,10 +689,17 @@ export function indexPage() {
           setMsg('monitor-msg', 'Monitor ' + action + (action === 'stop' ? 'ped' : 'ed') + '.', true);
         } else {
           setMsg('monitor-msg', data.output || 'Failed.', false);
+          desc.textContent = prevDesc;
+          desc.style.color = prevColor;
+          dot.className = prevDot;
         }
         setTimeout(checkMonitorStatus, 1000);
       } catch {
         setMsg('monitor-msg', 'Request failed.', false);
+        desc.textContent = prevDesc;
+        desc.style.color = prevColor;
+        dot.className = prevDot;
+        checkMonitorStatus();
       }
     }
 

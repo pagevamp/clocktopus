@@ -682,9 +682,17 @@ export function indexPage() {
       desc.style.color = '#d29922';
       setMsg('monitor-msg', pending + ' server...', true);
 
+      const MIN_DISPLAY_MS = 1500;
+      const started = Date.now();
+      const waitMin = function() {
+        const elapsed = Date.now() - started;
+        return new Promise(function(r) { setTimeout(r, Math.max(0, MIN_DISPLAY_MS - elapsed)); });
+      };
+
       try {
         const res = await fetch('/api/monitor/' + action, { method: 'POST' });
         const data = await res.json();
+        await waitMin();
         if (data.ok) {
           setMsg('monitor-msg', 'Monitor ' + action + (action === 'stop' ? 'ped' : 'ed') + '.', true);
         } else {
@@ -693,8 +701,9 @@ export function indexPage() {
           desc.style.color = prevColor;
           dot.className = prevDot;
         }
-        setTimeout(checkMonitorStatus, 1000);
+        setTimeout(checkMonitorStatus, 500);
       } catch {
+        await waitMin();
         setMsg('monitor-msg', 'Request failed.', false);
         desc.textContent = prevDesc;
         desc.style.color = prevColor;

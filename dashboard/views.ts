@@ -80,6 +80,18 @@ export function indexPage() {
     .sessions-table .in-progress { color: #3fb950; font-style: italic; }
     .delete-btn { background: transparent; color: #8b949e; border: none; cursor: pointer; font-size: 1.1rem; line-height: 1; padding: 0 0.4rem; margin-top: 0; }
     .delete-btn:hover { color: #f85149; background: transparent; }
+    .delete-btn[disabled] { color: #484f58; cursor: not-allowed; opacity: 0.5; }
+    .delete-btn[disabled]:hover { color: #484f58; }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 1000; }
+    .modal-backdrop.open { display: flex; }
+    .modal { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1.25rem 1.5rem; max-width: 420px; width: calc(100% - 2rem); }
+    .modal h3 { margin: 0 0 0.5rem 0; font-size: 1rem; color: #c9d1d9; }
+    .modal p { margin: 0 0 1rem 0; font-size: 0.875rem; color: #8b949e; }
+    .modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+    .modal-actions button { margin-top: 0; padding: 0.4rem 0.9rem; font-size: 0.85rem; }
+    .modal-actions .cancel-btn { background: #30363d; }
+    .modal-actions .danger-btn { background: #da3633; }
+    .modal-actions .danger-btn:hover { background: #f85149; }
     .empty-state { color: #8b949e; font-size: 0.9rem; padding: 2rem; text-align: center; }
 
     /* Inline form row */
@@ -245,6 +257,18 @@ export function indexPage() {
             <button id="next-btn" onclick="changePage(1)" style="background:#30363d; margin-top:0; padding:0.3rem 0.75rem;">&gt;</button>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm modal -->
+  <div id="confirm-modal" class="modal-backdrop" role="dialog" aria-modal="true">
+    <div class="modal">
+      <h3 id="confirm-title">Are you sure?</h3>
+      <p id="confirm-message"></p>
+      <div class="modal-actions">
+        <button type="button" class="cancel-btn" id="confirm-cancel">Cancel</button>
+        <button type="button" class="danger-btn" id="confirm-ok">Delete</button>
       </div>
     </div>
   </div>
@@ -859,8 +883,13 @@ export function indexPage() {
             duration = '<span class="in-progress">In progress</span>';
           }
           const jira = s.jiraTicket || '-';
+          const canDelete = !!s.completedAt && !(s.jiraTicket && !s.jiraWorklogId);
+          const disabledAttr = canDelete ? '' : ' disabled';
+          const btnTitle = canDelete
+            ? 'Delete entry'
+            : 'Cannot delete: Jira worklog id not tracked for this entry';
           const deleteBtn = s.completedAt
-            ? '<button class="delete-btn" title="Delete entry" data-delete-id="' + escapeHtml(s.id) + '">&times;</button>'
+            ? '<button class="delete-btn" title="' + btnTitle + '" data-delete-id="' + escapeHtml(s.id) + '"' + disabledAttr + '>&times;</button>'
             : '';
           return '<tr>' +
             '<td>' + escapeHtml(s.description) + '</td>' +
@@ -889,8 +918,41 @@ export function indexPage() {
       loadSessions();
     }
 
+    function showConfirm(message) {
+      return new Promise(function(resolve) {
+        const backdrop = document.getElementById('confirm-modal');
+        const msg = document.getElementById('confirm-message');
+        const okBtn = document.getElementById('confirm-ok');
+        const cancelBtn = document.getElementById('confirm-cancel');
+        msg.textContent = message;
+        backdrop.classList.add('open');
+
+        function cleanup(result) {
+          backdrop.classList.remove('open');
+          okBtn.removeEventListener('click', onOk);
+          cancelBtn.removeEventListener('click', onCancel);
+          backdrop.removeEventListener('click', onBackdrop);
+          document.removeEventListener('keydown', onKey);
+          resolve(result);
+        }
+        function onOk() { cleanup(true); }
+        function onCancel() { cleanup(false); }
+        function onBackdrop(e) { if (e.target === backdrop) cleanup(false); }
+        function onKey(e) {
+          if (e.key === 'Escape') cleanup(false);
+          if (e.key === 'Enter') cleanup(true);
+        }
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+        backdrop.addEventListener('click', onBackdrop);
+        document.addEventListener('keydown', onKey);
+        okBtn.focus();
+      });
+    }
+
     async function deleteSession(id) {
-      if (!confirm('Delete this entry from Clockify and Jira?')) return;
+      const ok = await showConfirm('Delete this entry from Clockify and Jira?');
+      if (!ok) return;
       try {
         const res = await fetch('/api/timer/' + encodeURIComponent(id), { method: 'DELETE' });
         const result = await res.json();
@@ -906,7 +968,7 @@ export function indexPage() {
 
     document.addEventListener('click', function(e) {
       const btn = e.target.closest && e.target.closest('[data-delete-id]');
-      if (!btn) return;
+      if (!btn || btn.disabled) return;
       deleteSession(btn.getAttribute('data-delete-id'));
     });
 

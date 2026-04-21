@@ -113,8 +113,13 @@ timerRoutes.post('/timer/start', async (c) => {
   const finalDescription = cleanDescription || cleanJira;
   const sessionId = uuidv4();
   const startedAt = new Date().toISOString();
-  logSessionStart(sessionId, projectId ?? null, finalDescription, startedAt, cleanJira);
-  return c.json({ ok: true });
+  try {
+    logSessionStart(sessionId, projectId ?? null, finalDescription, startedAt, cleanJira);
+    return c.json({ ok: true });
+  } catch (err) {
+    console.error('Error starting Jira-only session:', err);
+    return c.json({ ok: false, error: 'Failed to start timer.' }, 500);
+  }
 });
 
 timerRoutes.post('/timer/stop', async (c) => {

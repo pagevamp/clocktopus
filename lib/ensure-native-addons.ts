@@ -69,7 +69,7 @@ export function ensureNativeAddons(): void {
   if (!nodeGypCmd) {
     console.warn('Warning: node-gyp not found. Native addons could not be built.');
     console.warn('  Install Node.js (includes npx) then restart, or run:');
-    console.warn('  bun pm trust clocktopus && bun install -g clocktopus');
+    console.warn('  bun i -g clocktopus --trust');
     return;
   }
 

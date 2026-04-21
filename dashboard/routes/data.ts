@@ -8,6 +8,7 @@ import {
   toggleProjectActive,
 } from '../../lib/db.js';
 import { Clockify } from '../../clockify.js';
+import { isClockifyEnabled } from '../../lib/credentials.js';
 
 const dataRoutes = new Hono();
 
@@ -25,6 +26,9 @@ dataRoutes.get('/projects/all', (c) => {
 
 // Fetch projects from Clockify and save to DB
 dataRoutes.post('/projects/fetch', async (c) => {
+  if (!isClockifyEnabled()) {
+    return c.json({ ok: false, error: 'Clockify not configured.' }, 400);
+  }
   try {
     const clockify = new Clockify();
     const user = await clockify.getUser();

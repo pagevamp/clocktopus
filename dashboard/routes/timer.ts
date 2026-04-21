@@ -171,7 +171,7 @@ timerRoutes.post('/timer/stop', async (c) => {
 
 timerRoutes.post('/timer/log', async (c) => {
   const { projectId, description, start, end, jiraTicket, billable } = await c.req.json<{
-    projectId: string;
+    projectId?: string | null;
     description: string;
     start: string;
     end: string;
@@ -179,9 +179,6 @@ timerRoutes.post('/timer/log', async (c) => {
     billable?: boolean;
   }>();
 
-  if (!projectId) {
-    return c.json({ ok: false, error: 'Project is required.' }, 400);
-  }
   if (!start || !end) {
     return c.json({ ok: false, error: 'Start and end are required.' }, 400);
   }
@@ -197,31 +194,47 @@ timerRoutes.post('/timer/log', async (c) => {
 
   const cleanDescription = (description ?? '').trim();
   const cleanJira = jiraTicket?.trim() || undefined;
-  if (!cleanDescription && !cleanJira) {
-    return c.json({ ok: false, error: 'Description or Jira ticket is required.' }, 400);
+  const clockifyOn = isClockifyEnabled();
+
+  if (clockifyOn) {
+    if (!projectId) {
+      return c.json({ ok: false, error: 'Project is required.' }, 400);
+    }
+    if (!cleanDescription && !cleanJira) {
+      return c.json({ ok: false, error: 'Description or Jira ticket is required.' }, 400);
+    }
+  } else {
+    if (!cleanJira) {
+      return c.json({ ok: false, error: 'Jira ticket required in Jira-only mode.' }, 400);
+    }
   }
 
+  const startIso = new Date(startMs).toISOString();
+  const endIso = new Date(endMs).toISOString();
+  const finalDescription = cleanDescription || cleanJira!;
+  let entryId: string;
+
   try {
-    const clockify = new Clockify();
-    const user = await clockify.getUser();
-    if (!user) return c.json({ ok: false, error: 'Could not connect to Clockify.' }, 500);
+    if (clockifyOn) {
+      const clockify = new Clockify();
+      const user = await clockify.getUser();
+      if (!user) return c.json({ ok: false, error: 'Could not connect to Clockify.' }, 500);
 
-    const startIso = new Date(startMs).toISOString();
-    const endIso = new Date(endMs).toISOString();
-    const finalDescription = cleanDescription || cleanJira!;
+      const entry = await clockify.logTime(
+        user.defaultWorkspace,
+        projectId!,
+        startIso,
+        endIso,
+        finalDescription,
+        billable ?? true,
+      );
+      if (!entry) return c.json({ ok: false, error: 'Failed to log time in Clockify.' }, 500);
+      entryId = (entry as { id?: string }).id ?? uuidv4();
+    } else {
+      entryId = uuidv4();
+    }
 
-    const entry = await clockify.logTime(
-      user.defaultWorkspace,
-      projectId,
-      startIso,
-      endIso,
-      finalDescription,
-      billable ?? true,
-    );
-    if (!entry) return c.json({ ok: false, error: 'Failed to log time in Clockify.' }, 500);
-
-    const entryId = (entry as { id?: string }).id ?? uuidv4();
-    logCompletedSession(entryId, projectId, finalDescription, startIso, endIso, cleanJira);
+    logCompletedSession(entryId, projectId ?? null, finalDescription, startIso, endIso, cleanJira);
 
     if (cleanJira) {
       const timeSpentSeconds = Math.round((endMs - startMs) / 1000);

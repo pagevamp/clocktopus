@@ -9,7 +9,7 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { execSync } from 'child_process';
-import { completeLatestSession, getLatestSession } from './lib/db.js';
+import { completeLatestSession, getLatestSession, setSessionJiraWorklogId } from './lib/db.js';
 import { stopJiraTimer } from './lib/jira.js';
 import { startDashboard } from './dashboard/server.js';
 import { ensureNativeAddons } from './lib/ensure-native-addons.js';
@@ -134,7 +134,8 @@ program
         );
         if (timeSpentSeconds >= 60) {
           try {
-            await stopJiraTimer(latestSession.jiraTicket, timeSpentSeconds);
+            const worklog = await stopJiraTimer(latestSession.jiraTicket, timeSpentSeconds);
+            if (worklog?.id) setSessionJiraWorklogId(latestSession.id, worklog.id);
           } catch (error) {
             console.error('Error stopping Jira timer:', error);
           }
@@ -196,7 +197,8 @@ program
         );
         if (timeSpentSeconds >= 60) {
           try {
-            await stopJiraTimer(latestSession.jiraTicket, timeSpentSeconds);
+            const worklog = await stopJiraTimer(latestSession.jiraTicket, timeSpentSeconds);
+            if (worklog?.id) setSessionJiraWorklogId(latestSession.id, worklog.id);
           } catch (err) {
             console.error('Error stopping Jira timer:', err);
           }

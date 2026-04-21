@@ -27,7 +27,10 @@ const SessionSchema = z.object({
   completedAt: z.string().nullable(),
   isAutoCompleted: z.number(),
   jiraTicket: z.string().nullable(),
+  jiraWorklogId: z.string().nullable().optional(),
 });
+
+export type Session = z.infer<typeof SessionSchema>;
 
 let dbInstance: Database | null = null;
 
@@ -43,9 +46,15 @@ function getDb(): Database {
         startedAt TEXT NOT NULL,
         completedAt TEXT,
         isAutoCompleted INTEGER DEFAULT 0,
-        jiraTicket TEXT
+        jiraTicket TEXT,
+        jiraWorklogId TEXT
       )
     `);
+    // Migration: add jiraWorklogId to pre-existing sessions tables
+    const sessionCols = dbInstance.prepare('PRAGMA table_info(sessions)').all() as Array<{ name: string }>;
+    if (!sessionCols.some((c) => c.name === 'jiraWorklogId')) {
+      dbInstance.exec('ALTER TABLE sessions ADD COLUMN jiraWorklogId TEXT');
+    }
     dbInstance.exec(`
       CREATE TABLE IF NOT EXISTS google_tokens (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -157,6 +166,23 @@ export function completeLatestSession(completedAt: string, isAutoCompleted = fal
   `);
 
   stmt.run(completedAt, isAutoCompleted ? 1 : 0);
+}
+
+export function setSessionJiraWorklogId(sessionId: string, worklogId: string) {
+  const db = getDb();
+  db.prepare('UPDATE sessions SET jiraWorklogId = ? WHERE id = ?').run(worklogId, sessionId);
+}
+
+export function getSessionById(id: string): Session | null {
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM sessions WHERE id = ?').get(id);
+  if (!row) return null;
+  return SessionSchema.parse(row);
+}
+
+export function deleteSessionById(id: string) {
+  const db = getDb();
+  db.prepare('DELETE FROM sessions WHERE id = ?').run(id);
 }
 
 export function getRecentSessions(limit = 10, offset = 0) {

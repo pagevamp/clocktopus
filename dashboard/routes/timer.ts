@@ -1,8 +1,16 @@
 import { Hono } from 'hono';
 import { v4 as uuidv4 } from 'uuid';
 import { Clockify } from '../../clockify.js';
-import { completeLatestSession, getOpenSession, logCompletedSession, logSessionStart } from '../../lib/db.js';
-import { stopJiraTimer } from '../../lib/jira.js';
+import {
+  completeLatestSession,
+  deleteSessionById,
+  getOpenSession,
+  getSessionById,
+  logCompletedSession,
+  logSessionStart,
+  setSessionJiraWorklogId,
+} from '../../lib/db.js';
+import { deleteJiraWorklog, stopJiraTimer } from '../../lib/jira.js';
 
 function extractJiraTicket(description: string): string | undefined {
   const match = description.match(/\b([A-Z][A-Z0-9]+-\d+)\b/);
@@ -30,7 +38,8 @@ timerRoutes.get('/timer/active', async (c) => {
           );
           if (timeSpentSeconds >= 60) {
             try {
-              await stopJiraTimer(openSession.jiraTicket, timeSpentSeconds);
+              const worklog = await stopJiraTimer(openSession.jiraTicket, timeSpentSeconds);
+              if (worklog?.id) setSessionJiraWorklogId(openSession.id, worklog.id);
             } catch (err) {
               console.error('Error stopping Jira timer on external stop:', err);
             }
@@ -112,7 +121,8 @@ timerRoutes.post('/timer/stop', async (c) => {
       );
       if (timeSpentSeconds >= 60) {
         try {
-          await stopJiraTimer(openSession.jiraTicket, timeSpentSeconds);
+          const worklog = await stopJiraTimer(openSession.jiraTicket, timeSpentSeconds);
+          if (worklog?.id) setSessionJiraWorklogId(openSession.id, worklog.id);
         } catch (err) {
           console.error('Error stopping Jira timer:', err);
         }
@@ -183,7 +193,8 @@ timerRoutes.post('/timer/log', async (c) => {
       const timeSpentSeconds = Math.round((endMs - startMs) / 1000);
       if (timeSpentSeconds >= 60) {
         try {
-          await stopJiraTimer(cleanJira, timeSpentSeconds);
+          const worklog = await stopJiraTimer(cleanJira, timeSpentSeconds);
+          if (worklog?.id) setSessionJiraWorklogId(entryId, worklog.id);
         } catch (err) {
           console.error('Error posting Jira worklog for manual entry:', err);
         }
@@ -194,6 +205,38 @@ timerRoutes.post('/timer/log', async (c) => {
   } catch (err) {
     console.error('Error logging manual time:', err);
     return c.json({ ok: false, error: 'Failed to log time.' }, 500);
+  }
+});
+
+timerRoutes.delete('/timer/:id', async (c) => {
+  const id = c.req.param('id');
+  if (!id) return c.json({ ok: false, error: 'Missing id.' }, 400);
+
+  const session = getSessionById(id);
+  if (!session) return c.json({ ok: false, error: 'Session not found.' }, 404);
+
+  try {
+    const clockify = new Clockify();
+    const user = await clockify.getUser();
+    if (!user) return c.json({ ok: false, error: 'Could not connect to Clockify.' }, 500);
+
+    const clockifyOk = await clockify.deleteTimeEntry(user.defaultWorkspace, id);
+    // Continue even if Clockify delete fails — the entry may already be gone remotely.
+    if (!clockifyOk) console.warn(`Clockify delete returned failure for ${id}; removing local record anyway.`);
+
+    if (session.jiraTicket && session.jiraWorklogId) {
+      try {
+        await deleteJiraWorklog(session.jiraTicket, session.jiraWorklogId);
+      } catch (err) {
+        console.error('Error deleting Jira worklog:', err);
+      }
+    }
+
+    deleteSessionById(id);
+    return c.json({ ok: true });
+  } catch (err) {
+    console.error('Error deleting entry:', err);
+    return c.json({ ok: false, error: 'Failed to delete entry.' }, 500);
   }
 });
 

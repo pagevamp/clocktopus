@@ -240,6 +240,18 @@ export class Clockify {
     }
   }
 
+  async deleteTimeEntry(workspaceId: string, entryId: string): Promise<boolean> {
+    try {
+      await this.httpClient.delete(`/workspaces/${workspaceId}/time-entries/${entryId}`);
+      return true;
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error('Error deleting time entry:', error.message);
+      }
+      return false;
+    }
+  }
+
   async logTime(
     workspaceId: string,
     projectId: string | null,

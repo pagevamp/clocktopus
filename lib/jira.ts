@@ -2,7 +2,7 @@ import axios from 'axios';
 import { resolveCredential } from './credentials.js';
 import { getValidAccessToken } from './atlassian.js';
 
-async function jiraApiRequest(endpoint: string, method: 'POST' | 'GET', body?: unknown) {
+async function jiraApiRequest(endpoint: string, method: 'POST' | 'GET' | 'DELETE', body?: unknown) {
   // Try OAuth first
   const oauthToken = await getValidAccessToken();
 
@@ -63,7 +63,7 @@ async function jiraApiRequest(endpoint: string, method: 'POST' | 'GET', body?: u
   }
 }
 
-export async function stopJiraTimer(ticketId: string, timeSpentSeconds: number) {
+export async function stopJiraTimer(ticketId: string, timeSpentSeconds: number): Promise<{ id: string } | null> {
   const body = {
     timeSpentSeconds,
     comment: {
@@ -82,8 +82,14 @@ export async function stopJiraTimer(ticketId: string, timeSpentSeconds: number) 
       ],
     },
   };
-  console.log('Jira request body:', JSON.stringify(body, null, 2));
-  return await jiraApiRequest(`/issue/${ticketId}/worklog`, 'POST', body);
+  const response = await jiraApiRequest(`/issue/${ticketId}/worklog`, 'POST', body);
+  const id = (response as { id?: string | number } | null)?.id;
+  return id != null ? { id: String(id) } : null;
+}
+
+export async function deleteJiraWorklog(ticketId: string, worklogId: string): Promise<boolean> {
+  const result = await jiraApiRequest(`/issue/${ticketId}/worklog/${worklogId}`, 'DELETE');
+  return result !== null;
 }
 
 export async function getJiraTicket(ticketId: string) {

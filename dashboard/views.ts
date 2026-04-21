@@ -78,6 +78,8 @@ export function indexPage() {
     .sessions-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid #21262d; }
     .sessions-table tr:hover { background: #161b22; }
     .sessions-table .in-progress { color: #3fb950; font-style: italic; }
+    .delete-btn { background: transparent; color: #8b949e; border: none; cursor: pointer; font-size: 1.1rem; line-height: 1; padding: 0 0.4rem; margin-top: 0; }
+    .delete-btn:hover { color: #f85149; background: transparent; }
     .empty-state { color: #8b949e; font-size: 0.9rem; padding: 2rem; text-align: center; }
 
     /* Inline form row */
@@ -230,10 +232,11 @@ export function indexPage() {
                 <th>Started</th>
                 <th>Duration</th>
                 <th>Jira</th>
+                <th></th>
               </tr>
             </thead>
             <tbody id="sessions-body">
-              <tr><td colspan="5" class="empty-state">Loading...</td></tr>
+              <tr><td colspan="6" class="empty-state">Loading...</td></tr>
             </tbody>
           </table>
           <div id="pagination" style="display:none; margin-top:1rem; align-items:center; justify-content:center; gap:0.75rem; flex-wrap:wrap;">
@@ -841,7 +844,7 @@ export function indexPage() {
         const pagination = document.getElementById('pagination');
 
         if (sessions.length === 0 && currentPage === 1) {
-          tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No sessions yet. Start a timer to get going!</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No sessions yet. Start a timer to get going!</td></tr>';
           pagination.style.display = 'none';
           return;
         }
@@ -856,12 +859,16 @@ export function indexPage() {
             duration = '<span class="in-progress">In progress</span>';
           }
           const jira = s.jiraTicket || '-';
+          const deleteBtn = s.completedAt
+            ? '<button class="delete-btn" title="Delete entry" onclick="deleteSession(\'' + escapeHtml(s.id) + '\')">&times;</button>'
+            : '';
           return '<tr>' +
             '<td>' + escapeHtml(s.description) + '</td>' +
             '<td>' + escapeHtml(s.projectName) + '</td>' +
             '<td>' + started + '</td>' +
             '<td>' + duration + '</td>' +
             '<td>' + escapeHtml(jira) + '</td>' +
+            '<td style="text-align:right;">' + deleteBtn + '</td>' +
             '</tr>';
         }).join('');
 
@@ -871,7 +878,7 @@ export function indexPage() {
         document.getElementById('next-btn').disabled = currentPage >= totalPages;
         document.getElementById('page-info').textContent = 'Page ' + currentPage + ' of ' + totalPages + ' (' + result.total + ' sessions)';
       } catch {
-        document.getElementById('sessions-body').innerHTML = '<tr><td colspan="5" class="empty-state">Failed to load sessions.</td></tr>';
+        document.getElementById('sessions-body').innerHTML = '<tr><td colspan="6" class="empty-state">Failed to load sessions.</td></tr>';
       }
     }
 
@@ -880,6 +887,21 @@ export function indexPage() {
       if (newPage < 1 || newPage > totalPages) return;
       currentPage = newPage;
       loadSessions();
+    }
+
+    async function deleteSession(id) {
+      if (!confirm('Delete this entry from Clockify and Jira?')) return;
+      try {
+        const res = await fetch('/api/timer/' + encodeURIComponent(id), { method: 'DELETE' });
+        const result = await res.json();
+        if (!result.ok) {
+          alert(result.error || 'Failed to delete entry.');
+          return;
+        }
+        loadSessions();
+      } catch {
+        alert('Failed to delete entry.');
+      }
     }
 
     function escapeHtml(str) {

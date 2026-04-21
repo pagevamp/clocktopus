@@ -21,19 +21,19 @@ function extractJiraTicket(description: string): string | undefined {
 const timerRoutes = new Hono();
 
 timerRoutes.get('/timer/active', async (c) => {
-  if (!isClockifyEnabled()) {
-    const openSession = getOpenSession();
-    if (!openSession) return c.json({ active: false });
-    return c.json({
-      active: true,
-      description: openSession.description,
-      projectId: openSession.projectId,
-      start: openSession.startedAt,
-      ...(openSession.jiraTicket ? { jiraTicket: openSession.jiraTicket } : {}),
-    });
-  }
-
   try {
+    if (!isClockifyEnabled()) {
+      const openSession = getOpenSession();
+      if (!openSession) return c.json({ active: false });
+      return c.json({
+        active: true,
+        description: openSession.description,
+        projectId: openSession.projectId,
+        start: openSession.startedAt,
+        ...(openSession.jiraTicket ? { jiraTicket: openSession.jiraTicket } : {}),
+      });
+    }
+
     const clockify = new Clockify();
     const user = await clockify.getUser();
     if (!user) return c.json({ active: false });

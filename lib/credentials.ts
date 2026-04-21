@@ -9,3 +9,11 @@ export function resolveCredential(key: string): string | undefined {
 export function saveCredential(key: string, value: string) {
   setCredential(key, value);
 }
+
+export function isClockifyKeyValid(value: string | undefined): boolean {
+  return typeof value === 'string' && value.length > 0;
+}
+
+export function isClockifyEnabled(): boolean {
+  return isClockifyKeyValid(resolveCredential('CLOCKIFY_API_KEY'));
+}

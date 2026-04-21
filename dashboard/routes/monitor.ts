@@ -10,6 +10,14 @@ const SCRIPT_PATH = path.resolve(__dirname, '../../index.js');
 const isDev = SCRIPT_PATH.includes('/Projects/') || SCRIPT_PATH.includes('/src/');
 const PM2_NAME = isDev ? 'clocktopus-monitor-dev' : 'clocktopus-monitor';
 const pm2Bin = path.join(path.dirname(createRequire(import.meta.url).resolve('pm2')), 'bin', 'pm2');
+const bunBin = (() => {
+  try {
+    return execSync('which bun', { encoding: 'utf-8' }).trim();
+  } catch {
+    return 'bun';
+  }
+})();
+const pm2Cmd = `${bunBin} ${pm2Bin}`;
 
 const monitorRoutes = new Hono();
 
@@ -25,7 +33,7 @@ function pm2Exec(command: string): { ok: boolean; output: string } {
 
 monitorRoutes.get('/monitor/status', (c) => {
   try {
-    const output = execSync(`${pm2Bin} jlist`, { encoding: 'utf-8', timeout: 10000 });
+    const output = execSync(`${pm2Cmd} jlist`, { encoding: 'utf-8', timeout: 10000 });
     const processes = JSON.parse(output);
     const proc = processes.find((p: { name: string }) => p.name === PM2_NAME);
 
@@ -48,19 +56,19 @@ monitorRoutes.post('/monitor/start', (c) => {
   const bunPath = execSync('which bun', { encoding: 'utf-8' }).trim();
   // Delete any existing process to avoid duplicates
   try {
-    execSync(`${pm2Bin} delete ${PM2_NAME}`, { stdio: 'ignore' });
+    execSync(`${pm2Cmd} delete ${PM2_NAME}`, { stdio: 'ignore' });
   } catch {}
-  const result = pm2Exec(`${pm2Bin} start ${SCRIPT_PATH} --name ${PM2_NAME} --interpreter ${bunPath} -- monitor:run`);
+  const result = pm2Exec(`${pm2Cmd} start ${SCRIPT_PATH} --name ${PM2_NAME} --interpreter ${bunPath} -- monitor:run`);
   return c.json(result);
 });
 
 monitorRoutes.post('/monitor/stop', (c) => {
-  const result = pm2Exec(`${pm2Bin} stop ${PM2_NAME}`);
+  const result = pm2Exec(`${pm2Cmd} stop ${PM2_NAME}`);
   return c.json(result);
 });
 
 monitorRoutes.post('/monitor/restart', (c) => {
-  const result = pm2Exec(`${pm2Bin} restart ${PM2_NAME}`);
+  const result = pm2Exec(`${pm2Cmd} restart ${PM2_NAME}`);
   return c.json(result);
 });
 

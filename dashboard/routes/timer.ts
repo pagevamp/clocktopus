@@ -21,6 +21,18 @@ function extractJiraTicket(description: string): string | undefined {
 const timerRoutes = new Hono();
 
 timerRoutes.get('/timer/active', async (c) => {
+  if (!isClockifyEnabled()) {
+    const openSession = getOpenSession();
+    if (!openSession) return c.json({ active: false });
+    return c.json({
+      active: true,
+      description: openSession.description,
+      projectId: openSession.projectId,
+      start: openSession.startedAt,
+      ...(openSession.jiraTicket ? { jiraTicket: openSession.jiraTicket } : {}),
+    });
+  }
+
   try {
     const clockify = new Clockify();
     const user = await clockify.getUser();
@@ -28,7 +40,6 @@ timerRoutes.get('/timer/active', async (c) => {
 
     const timer = await clockify.getActiveTimer(user.defaultWorkspace, user.id);
     if (!timer) {
-      // Timer stopped externally (e.g. in Clockify app) — close any lingering open session
       const openSession = getOpenSession();
       if (openSession) {
         const completedAt = new Date().toISOString();
@@ -50,7 +61,6 @@ timerRoutes.get('/timer/active', async (c) => {
       return c.json({ active: false });
     }
 
-    // Sync externally-started timers (e.g. from Clockify app or Jira plugin) to DB
     const timerStart = timer.timeInterval.start as string;
     const jiraTicket = extractJiraTicket(timer.description ?? '');
     const openSession = getOpenSession();

@@ -147,13 +147,13 @@ export class Clockify {
       }
 
       const startedAt = new Date().toISOString();
-      const sessionId = uuidv4();
       const response = await this.httpClient.post(`/workspaces/${workspaceId}/time-entries`, {
         projectId: projectId,
         description: finalDescription,
         start: startedAt,
         billable,
       });
+      const sessionId = (response.data as { id?: string }).id ?? uuidv4();
 
       // Log session to SQLite
       logSessionStart(sessionId, projectId, finalDescription, startedAt, jiraTicket);

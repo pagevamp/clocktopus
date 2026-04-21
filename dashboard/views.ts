@@ -860,7 +860,7 @@ export function indexPage() {
           }
           const jira = s.jiraTicket || '-';
           const deleteBtn = s.completedAt
-            ? '<button class="delete-btn" title="Delete entry" onclick="deleteSession(\'' + escapeHtml(s.id) + '\')">&times;</button>'
+            ? '<button class="delete-btn" title="Delete entry" data-delete-id="' + escapeHtml(s.id) + '">&times;</button>'
             : '';
           return '<tr>' +
             '<td>' + escapeHtml(s.description) + '</td>' +
@@ -903,6 +903,12 @@ export function indexPage() {
         alert('Failed to delete entry.');
       }
     }
+
+    document.addEventListener('click', function(e) {
+      const btn = e.target.closest && e.target.closest('[data-delete-id]');
+      if (!btn) return;
+      deleteSession(btn.getAttribute('data-delete-id'));
+    });
 
     function escapeHtml(str) {
       const div = document.createElement('div');

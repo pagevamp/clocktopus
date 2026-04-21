@@ -1,7 +1,7 @@
 # Clocktopus
 
 <p align="center">
-  <img src="assets/logo.png" alt="Clocktopus Logo" width="300px" />
+  <img src="https://raw.githubusercontent.com/sajxraj/clocktopus/main/assets/logo.png" alt="Clocktopus Logo" width="300px" />
 </p>
 
 CLI-based time-tracking automation for Clockify with idle monitoring, Jira integration, Google Calendar sync, and a web dashboard.

@@ -11,6 +11,7 @@ import {
   setSessionJiraWorklogId,
 } from '../../lib/db.js';
 import { deleteJiraWorklog, stopJiraTimer } from '../../lib/jira.js';
+import { isClockifyEnabled } from '../../lib/credentials.js';
 
 function extractJiraTicket(description: string): string | undefined {
   const match = description.match(/\b([A-Z][A-Z0-9]+-\d+)\b/);
@@ -72,34 +73,48 @@ timerRoutes.get('/timer/active', async (c) => {
 
 timerRoutes.post('/timer/start', async (c) => {
   const { projectId, description, jiraTicket, billable } = await c.req.json<{
-    projectId: string;
+    projectId?: string | null;
     description: string;
     jiraTicket?: string;
     billable?: boolean;
   }>();
 
-  if (!projectId || !description) {
-    return c.json({ ok: false, error: 'Project and description are required.' }, 400);
+  const cleanDescription = (description ?? '').trim();
+  const cleanJira = jiraTicket?.trim() || undefined;
+  const clockifyOn = isClockifyEnabled();
+
+  if (clockifyOn) {
+    if (!projectId || !cleanDescription) {
+      return c.json({ ok: false, error: 'Project and description are required.' }, 400);
+    }
+    try {
+      const clockify = new Clockify();
+      const user = await clockify.getUser();
+      if (!user) return c.json({ ok: false, error: 'Could not connect to Clockify.' }, 500);
+
+      const result = await clockify.startTimer(
+        user.defaultWorkspace,
+        projectId,
+        cleanDescription,
+        cleanJira,
+        billable ?? true,
+      );
+      if (!result) return c.json({ ok: false, error: 'Failed to start timer.' }, 500);
+      return c.json({ ok: true });
+    } catch {
+      return c.json({ ok: false, error: 'Failed to start timer.' }, 500);
+    }
   }
 
-  try {
-    const clockify = new Clockify();
-    const user = await clockify.getUser();
-    if (!user) return c.json({ ok: false, error: 'Could not connect to Clockify.' }, 500);
-
-    const result = await clockify.startTimer(
-      user.defaultWorkspace,
-      projectId,
-      description,
-      jiraTicket,
-      billable ?? true,
-    );
-    if (!result) return c.json({ ok: false, error: 'Failed to start timer.' }, 500);
-
-    return c.json({ ok: true });
-  } catch {
-    return c.json({ ok: false, error: 'Failed to start timer.' }, 500);
+  // Jira-only mode
+  if (!cleanJira) {
+    return c.json({ ok: false, error: 'Jira ticket required in Jira-only mode.' }, 400);
   }
+  const finalDescription = cleanDescription || cleanJira;
+  const sessionId = uuidv4();
+  const startedAt = new Date().toISOString();
+  logSessionStart(sessionId, projectId ?? null, finalDescription, startedAt, cleanJira);
+  return c.json({ ok: true });
 });
 
 timerRoutes.post('/timer/stop', async (c) => {

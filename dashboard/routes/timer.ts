@@ -263,13 +263,16 @@ timerRoutes.delete('/timer/:id', async (c) => {
   if (!session) return c.json({ ok: false, error: 'Session not found.' }, 404);
 
   try {
-    const clockify = new Clockify();
-    const user = await clockify.getUser();
-    if (!user) return c.json({ ok: false, error: 'Could not connect to Clockify.' }, 500);
-
-    const clockifyOk = await clockify.deleteTimeEntry(user.defaultWorkspace, id);
-    // Continue even if Clockify delete fails — the entry may already be gone remotely.
-    if (!clockifyOk) console.warn(`Clockify delete returned failure for ${id}; removing local record anyway.`);
+    if (isClockifyEnabled()) {
+      const clockify = new Clockify();
+      const user = await clockify.getUser();
+      if (user) {
+        const clockifyOk = await clockify.deleteTimeEntry(user.defaultWorkspace, id);
+        if (!clockifyOk) console.warn(`Clockify delete returned failure for ${id}; removing local record anyway.`);
+      } else {
+        console.warn('Clockify enabled but getUser failed; skipping remote delete.');
+      }
+    }
 
     if (session.jiraTicket && session.jiraWorklogId) {
       try {

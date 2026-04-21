@@ -134,13 +134,17 @@ timerRoutes.post('/timer/start', async (c) => {
 
 timerRoutes.post('/timer/stop', async (c) => {
   try {
-    const clockify = new Clockify();
-    const user = await clockify.getUser();
-    if (!user) return c.json({ ok: false, error: 'Could not connect to Clockify.' }, 500);
-
     const openSession = getOpenSession();
-    const result = await clockify.stopTimer(user.defaultWorkspace, user.id);
-    if (!result) return c.json({ ok: false, error: 'Failed to stop timer.' }, 500);
+
+    if (isClockifyEnabled()) {
+      const clockify = new Clockify();
+      const user = await clockify.getUser();
+      if (!user) return c.json({ ok: false, error: 'Could not connect to Clockify.' }, 500);
+      const result = await clockify.stopTimer(user.defaultWorkspace, user.id);
+      if (!result) return c.json({ ok: false, error: 'Failed to stop timer.' }, 500);
+    } else if (!openSession) {
+      return c.json({ ok: false, error: 'No active timer.' }, 404);
+    }
 
     const completedAt = new Date().toISOString();
     completeLatestSession(completedAt, false);

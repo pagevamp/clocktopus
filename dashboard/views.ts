@@ -883,8 +883,17 @@ export function indexPage() {
             duration = '<span class="in-progress">In progress</span>';
           }
           const jira = s.jiraTicket || '-';
+          const durationSec = s.completedAt
+            ? Math.round((new Date(s.completedAt).getTime() - new Date(s.startedAt).getTime()) / 1000)
+            : 0;
+          const worklogExpected = !!s.jiraTicket && durationSec >= 60;
+          const canDelete = !!s.completedAt && !(worklogExpected && !s.jiraWorklogId);
+          const disabledAttr = canDelete ? '' : ' disabled';
+          const btnTitle = canDelete
+            ? 'Delete entry'
+            : 'Cannot delete: Jira worklog id not tracked';
           const deleteBtn = s.completedAt
-            ? '<button class="delete-btn" title="Delete entry" data-delete-id="' + escapeHtml(s.id) + '">&times;</button>'
+            ? '<button class="delete-btn" title="' + btnTitle + '" data-delete-id="' + escapeHtml(s.id) + '"' + disabledAttr + '>&times;</button>'
             : '';
           return '<tr>' +
             '<td>' + escapeHtml(s.description) + '</td>' +

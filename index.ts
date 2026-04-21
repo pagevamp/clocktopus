@@ -235,7 +235,7 @@ program
 
       await clockify.startTimer(
         workspaceId,
-        latestSession.projectId,
+        latestSession.projectId!,
         latestSession.description,
         latestSession.jiraTicket ?? undefined,
       );

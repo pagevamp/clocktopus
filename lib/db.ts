@@ -21,7 +21,7 @@ if (!fs.existsSync(DB_DIR)) {
 
 const SessionSchema = z.object({
   id: z.string(),
-  projectId: z.string(),
+  projectId: z.string().nullable(),
   description: z.string(),
   startedAt: z.string(),
   completedAt: z.string().nullable(),
@@ -41,7 +41,7 @@ function getDb(): Database {
     dbInstance.exec(`
       CREATE TABLE IF NOT EXISTS sessions (
         id TEXT PRIMARY KEY,
-        projectId TEXT NOT NULL,
+        projectId TEXT,
         description TEXT NOT NULL,
         startedAt TEXT NOT NULL,
         completedAt TEXT,
@@ -54,6 +54,35 @@ function getDb(): Database {
     const sessionCols = dbInstance.prepare('PRAGMA table_info(sessions)').all() as Array<{ name: string }>;
     if (!sessionCols.some((c) => c.name === 'jiraWorklogId')) {
       dbInstance.exec('ALTER TABLE sessions ADD COLUMN jiraWorklogId TEXT');
+    }
+    // Migration: drop NOT NULL on sessions.projectId if it was created with the old schema
+    const projectIdCol = (sessionCols as Array<{ name: string; notnull: number }>).find((c) => c.name === 'projectId');
+    if (projectIdCol && projectIdCol.notnull === 1) {
+      dbInstance.exec('BEGIN');
+      try {
+        dbInstance.exec(`
+          CREATE TABLE sessions_new (
+            id TEXT PRIMARY KEY,
+            projectId TEXT,
+            description TEXT NOT NULL,
+            startedAt TEXT NOT NULL,
+            completedAt TEXT,
+            isAutoCompleted INTEGER DEFAULT 0,
+            jiraTicket TEXT,
+            jiraWorklogId TEXT
+          )
+        `);
+        dbInstance.exec(
+          'INSERT INTO sessions_new (id, projectId, description, startedAt, completedAt, isAutoCompleted, jiraTicket, jiraWorklogId) ' +
+            'SELECT id, projectId, description, startedAt, completedAt, isAutoCompleted, jiraTicket, jiraWorklogId FROM sessions',
+        );
+        dbInstance.exec('DROP TABLE sessions');
+        dbInstance.exec('ALTER TABLE sessions_new RENAME TO sessions');
+        dbInstance.exec('COMMIT');
+      } catch (err) {
+        dbInstance.exec('ROLLBACK');
+        throw err;
+      }
     }
     dbInstance.exec(`
       CREATE TABLE IF NOT EXISTS google_tokens (
@@ -127,7 +156,7 @@ export function getLatestToken() {
 
 export function logSessionStart(
   id: string,
-  projectId: string,
+  projectId: string | null,
   description: string,
   startedAt: string,
   jiraTicket?: string,
@@ -137,12 +166,12 @@ export function logSessionStart(
     'INSERT OR IGNORE INTO sessions (id, projectId, description, startedAt, isAutoCompleted, jiraTicket) VALUES (?, ?, ?, ?, ?, ?)',
   );
 
-  stmt.run(id, projectId, description, startedAt, 0, jiraTicket ?? null);
+  stmt.run(id, projectId ?? null, description, startedAt, 0, jiraTicket ?? null);
 }
 
 export function logCompletedSession(
   id: string,
-  projectId: string,
+  projectId: string | null,
   description: string,
   startedAt: string,
   completedAt: string,
@@ -152,7 +181,7 @@ export function logCompletedSession(
   const stmt = db.prepare(
     'INSERT OR IGNORE INTO sessions (id, projectId, description, startedAt, completedAt, isAutoCompleted, jiraTicket) VALUES (?, ?, ?, ?, ?, 0, ?)',
   );
-  stmt.run(id, projectId, description, startedAt, completedAt, jiraTicket ?? null);
+  stmt.run(id, projectId ?? null, description, startedAt, completedAt, jiraTicket ?? null);
 }
 
 export function completeLatestSession(completedAt: string, isAutoCompleted = false) {

@@ -498,9 +498,7 @@ export function indexPage() {
       const jiraTicket = document.getElementById('timer-jira').value.trim();
       const billable = document.getElementById('timer-billable').checked;
       const typedDescription = document.getElementById('timer-description').value.trim();
-      const description = currentMode.clockifyOn
-        ? typedDescription
-        : (timerJiraSummary || jiraTicket);
+      const description = currentMode.clockifyOn ? typedDescription : '';
 
       if (currentMode.clockifyOn) {
         if (!projectId) return setMsg('timer-msg', 'Please select a project.', false);
@@ -585,9 +583,7 @@ export function indexPage() {
       const typedDescription = document.getElementById('manual-description').value.trim();
       const jiraTicket = document.getElementById('manual-jira').value.trim();
       const billable = document.getElementById('manual-billable').checked;
-      const description = currentMode.clockifyOn
-        ? typedDescription
-        : (manualJiraSummary || jiraTicket);
+      const description = currentMode.clockifyOn ? typedDescription : '';
 
       if (!startVal || !endVal) return setMsg('manual-msg', 'Please set start and end.', false);
 

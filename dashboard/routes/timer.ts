@@ -10,12 +10,24 @@ import {
   logSessionStart,
   setSessionJiraWorklogId,
 } from '../../lib/db.js';
-import { deleteJiraWorklog, stopJiraTimer } from '../../lib/jira.js';
+import { deleteJiraWorklog, getJiraTicket, stopJiraTimer } from '../../lib/jira.js';
 import { isClockifyEnabled } from '../../lib/credentials.js';
 
 function extractJiraTicket(description: string): string | undefined {
   const match = description.match(/\b([A-Z][A-Z0-9]+-\d+)\b/);
   return match?.[1];
+}
+
+async function buildJiraDescription(ticket: string, typed: string): Promise<string> {
+  if (typed && typed !== ticket) return typed;
+  try {
+    const issue = (await getJiraTicket(ticket)) as { fields?: { summary?: string } } | null;
+    const summary = issue?.fields?.summary?.trim();
+    if (summary) return ticket + ' ' + summary;
+  } catch (err) {
+    console.warn('Jira summary lookup failed for', ticket, err);
+  }
+  return ticket;
 }
 
 const timerRoutes = new Hono();
@@ -124,7 +136,7 @@ timerRoutes.post('/timer/start', async (c) => {
   if (!cleanJira) {
     return c.json({ ok: false, error: 'Jira ticket required in Jira-only mode.' }, 400);
   }
-  const finalDescription = cleanDescription || cleanJira;
+  const finalDescription = await buildJiraDescription(cleanJira, cleanDescription);
   const sessionId = uuidv4();
   const startedAt = new Date().toISOString();
   try {
@@ -223,8 +235,9 @@ timerRoutes.post('/timer/log', async (c) => {
 
   const startIso = new Date(startMs).toISOString();
   const endIso = new Date(endMs).toISOString();
-  const finalDescription = cleanDescription || cleanJira!;
+  const clockifyDescription = cleanDescription || cleanJira || '';
   let entryId: string | undefined;
+  let clockifySucceeded = false;
 
   try {
     if (clockifyOn) {
@@ -237,11 +250,15 @@ timerRoutes.post('/timer/log', async (c) => {
             projectId!,
             startIso,
             endIso,
-            finalDescription,
+            clockifyDescription,
             billable ?? true,
           );
-          if (entry) entryId = (entry as { id?: string }).id ?? uuidv4();
-          else console.warn('Clockify logTime returned null; falling through to Jira-only path.');
+          if (entry) {
+            entryId = (entry as { id?: string }).id ?? uuidv4();
+            clockifySucceeded = true;
+          } else {
+            console.warn('Clockify logTime returned null; falling through to Jira-only path.');
+          }
         } else {
           console.warn('Clockify enabled but getUser failed; falling through to Jira-only path.');
         }
@@ -256,6 +273,10 @@ timerRoutes.post('/timer/log', async (c) => {
       }
       entryId = uuidv4();
     }
+
+    const finalDescription = clockifySucceeded
+      ? clockifyDescription
+      : await buildJiraDescription(cleanJira!, cleanDescription);
 
     logCompletedSession(entryId, projectId ?? null, finalDescription, startIso, endIso, cleanJira);
 

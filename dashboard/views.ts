@@ -126,6 +126,10 @@ export function indexPage() {
     .toggle input:checked + .slider::before { transform: translateX(16px); background: #fff; }
 
     .empty-state-card { padding: 1.5rem; text-align: center; color: #8b949e; font-size: 0.9rem; }
+    .ticket-preview { margin-top: 0.5rem; padding: 0.6rem 0.8rem; border: 1px solid #30363d; border-radius: 6px; background: #161b22; color: #e1e4e8; font-size: 0.85rem; min-height: 2rem; }
+    .ticket-preview .ticket-id { color: #58a6ff; font-weight: 600; margin-right: 0.4rem; }
+    .ticket-preview .ticket-hint { color: #8b949e; font-style: italic; }
+    .ticket-preview .ticket-error { color: #f85149; }
 
   </style>
 </head>
@@ -169,7 +173,7 @@ export function indexPage() {
               </select>
             </div>
             <div class="form-row">
-              <div>
+              <div id="timer-description-wrap">
                 <label for="timer-description">Description</label>
                 <input type="text" id="timer-description" placeholder="What are you working on?" />
               </div>
@@ -178,6 +182,7 @@ export function indexPage() {
                 <input type="text" id="timer-jira" placeholder="e.g. PROJ-123" />
               </div>
             </div>
+            <div id="timer-description-preview" class="ticket-preview" style="display:none;"></div>
             <label id="timer-billable-wrap" style="display:flex; align-items:center; gap:0.5rem; font-weight:normal; cursor:pointer;">
               <input type="checkbox" id="timer-billable" checked style="width:auto; margin:0;" />
               Billable
@@ -206,7 +211,7 @@ export function indexPage() {
             </div>
           </div>
           <div class="form-row">
-            <div>
+            <div id="manual-description-wrap">
               <label for="manual-description">Description</label>
               <input type="text" id="manual-description" placeholder="What did you work on?" />
             </div>
@@ -215,6 +220,7 @@ export function indexPage() {
               <input type="text" id="manual-jira" placeholder="e.g. PROJ-123" />
             </div>
           </div>
+          <div id="manual-description-preview" class="ticket-preview" style="display:none;"></div>
           <label id="manual-billable-wrap" style="display:flex; align-items:center; gap:0.5rem; font-weight:normal; cursor:pointer;">
             <input type="checkbox" id="manual-billable" checked style="width:auto; margin:0;" />
             Billable
@@ -489,12 +495,19 @@ export function indexPage() {
 
     async function startTimer() {
       const projectId = document.getElementById('project-select').value;
-      const description = document.getElementById('timer-description').value.trim();
       const jiraTicket = document.getElementById('timer-jira').value.trim();
       const billable = document.getElementById('timer-billable').checked;
+      const typedDescription = document.getElementById('timer-description').value.trim();
+      const description = currentMode.clockifyOn
+        ? typedDescription
+        : (timerJiraSummary || jiraTicket);
 
-      if (!projectId) return setMsg('timer-msg', 'Please select a project.', false);
-      if (!description && !jiraTicket) return setMsg('timer-msg', 'Please enter a description or Jira ticket.', false);
+      if (currentMode.clockifyOn) {
+        if (!projectId) return setMsg('timer-msg', 'Please select a project.', false);
+        if (!typedDescription && !jiraTicket) return setMsg('timer-msg', 'Please enter a description or Jira ticket.', false);
+      } else {
+        if (!jiraTicket) return setMsg('timer-msg', 'Please enter a Jira ticket.', false);
+      }
 
       const btn = document.getElementById('start-btn');
       btn.disabled = true;
@@ -504,13 +517,20 @@ export function indexPage() {
         const res = await fetch('/api/timer/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ projectId, description: description || 'Working on a task...', jiraTicket: jiraTicket || undefined, billable }),
+          body: JSON.stringify({
+            projectId: projectId || undefined,
+            description: description || 'Working on a task...',
+            jiraTicket: jiraTicket || undefined,
+            billable,
+          }),
         });
         const data = await res.json();
         if (data.ok) {
           setMsg('timer-msg', 'Timer started!', true);
           document.getElementById('timer-description').value = '';
           document.getElementById('timer-jira').value = '';
+          timerJiraSummary = '';
+          renderTicketPreview('timer-description-preview', '', '');
           checkActiveTimer();
           loadSessions();
         } else {
@@ -562,18 +582,26 @@ export function indexPage() {
       const projectId = document.getElementById('manual-project').value;
       const startVal = document.getElementById('manual-start').value;
       const endVal = document.getElementById('manual-end').value;
-      const description = document.getElementById('manual-description').value.trim();
+      const typedDescription = document.getElementById('manual-description').value.trim();
       const jiraTicket = document.getElementById('manual-jira').value.trim();
       const billable = document.getElementById('manual-billable').checked;
+      const description = currentMode.clockifyOn
+        ? typedDescription
+        : (manualJiraSummary || jiraTicket);
 
-      if (!projectId) return setMsg('manual-msg', 'Please select a project.', false);
       if (!startVal || !endVal) return setMsg('manual-msg', 'Please set start and end.', false);
 
       const startMs = new Date(startVal).getTime();
       const endMs = new Date(endVal).getTime();
       if (isNaN(startMs) || isNaN(endMs)) return setMsg('manual-msg', 'Invalid date.', false);
       if (endMs <= startMs) return setMsg('manual-msg', 'End must be after start.', false);
-      if (!description && !jiraTicket) return setMsg('manual-msg', 'Please enter a description or Jira ticket.', false);
+
+      if (currentMode.clockifyOn) {
+        if (!projectId) return setMsg('manual-msg', 'Please select a project.', false);
+        if (!typedDescription && !jiraTicket) return setMsg('manual-msg', 'Please enter a description or Jira ticket.', false);
+      } else {
+        if (!jiraTicket) return setMsg('manual-msg', 'Please enter a Jira ticket.', false);
+      }
 
       const btn = document.getElementById('manual-log-btn');
       btn.disabled = true;
@@ -584,7 +612,7 @@ export function indexPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            projectId: projectId,
+            projectId: projectId || undefined,
             description: description,
             start: new Date(startMs).toISOString(),
             end: new Date(endMs).toISOString(),
@@ -597,6 +625,8 @@ export function indexPage() {
           setMsg('manual-msg', 'Time logged.', true);
           document.getElementById('manual-description').value = '';
           document.getElementById('manual-jira').value = '';
+          manualJiraSummary = '';
+          renderTicketPreview('manual-description-preview', '', '');
           setManualDefaults();
           loadSessions();
         } else {
@@ -1115,16 +1145,83 @@ export function indexPage() {
     }
 
     // --- Status ---
+    var currentMode = { clockifyOn: true, jiraOn: false };
+    var timerJiraSummary = '';
+    var manualJiraSummary = '';
+
+    function renderTicketPreview(previewId, ticket, description) {
+      var el = document.getElementById(previewId);
+      if (!el) return;
+      if (!ticket) {
+        el.innerHTML = '<span class="ticket-hint">Enter a Jira ticket above to preview the description.</span>';
+        return;
+      }
+      if (description) {
+        el.innerHTML = '<span class="ticket-id">' + escapeHtml(ticket) + '</span>' + escapeHtml(description);
+      } else {
+        el.innerHTML = '<span class="ticket-id">' + escapeHtml(ticket) + '</span><span class="ticket-hint">No prior description on file. We will log with the ticket id.</span>';
+      }
+    }
+
+    async function fetchLastDescription(ticket) {
+      if (!/^[A-Z][A-Z0-9]+-\d+$/.test(ticket)) return null;
+      try {
+        const res = await fetch('/api/sessions/last-description?jira=' + encodeURIComponent(ticket));
+        const data = await res.json();
+        if (data.ok) return data.description || '';
+      } catch {}
+      return null;
+    }
+
+    function debounce(fn, ms) {
+      var t;
+      return function() {
+        var ctx = this, args = arguments;
+        clearTimeout(t);
+        t = setTimeout(function(){ fn.apply(ctx, args); }, ms);
+      };
+    }
+
+    async function onTimerJiraInput() {
+      var ticket = document.getElementById('timer-jira').value.trim().toUpperCase();
+      if (!currentMode.clockifyOn) {
+        var desc = await fetchLastDescription(ticket);
+        timerJiraSummary = desc || '';
+        renderTicketPreview('timer-description-preview', ticket, timerJiraSummary);
+      }
+    }
+    async function onManualJiraInput() {
+      var ticket = document.getElementById('manual-jira').value.trim().toUpperCase();
+      if (!currentMode.clockifyOn) {
+        var desc = await fetchLastDescription(ticket);
+        manualJiraSummary = desc || '';
+        renderTicketPreview('manual-description-preview', ticket, manualJiraSummary);
+      }
+    }
+
+    (function wireTicketPreviewInputs() {
+      var t = document.getElementById('timer-jira');
+      var m = document.getElementById('manual-jira');
+      if (t) t.addEventListener('input', debounce(onTimerJiraInput, 300));
+      if (m) m.addEventListener('input', debounce(onManualJiraInput, 300));
+    })();
+
     function applyMode(data) {
       const clockifyOn = !!data.clockify;
       const jiraOn = !!data.jira;
       const noProvider = !clockifyOn && !jiraOn;
+      currentMode.clockifyOn = clockifyOn;
+      currentMode.jiraOn = jiraOn;
 
       // Timer form: hide project + mark Jira required in Jira-only; hide entire form when no provider
       const trackCard = document.getElementById('track-card');
       const noProviderCard = document.getElementById('no-provider-card');
       const projWrap = document.getElementById('timer-project-wrap');
       const manualProjWrap = document.getElementById('manual-project-wrap');
+      const descWrap = document.getElementById('timer-description-wrap');
+      const manualDescWrap = document.getElementById('manual-description-wrap');
+      const descPreview = document.getElementById('timer-description-preview');
+      const manualDescPreview = document.getElementById('manual-description-preview');
       const jiraInput = document.getElementById('timer-jira');
       const manualJiraInput = document.getElementById('manual-jira');
       const jiraLabel = document.getElementById('timer-jira-label');
@@ -1141,6 +1238,10 @@ export function indexPage() {
         if (clockifyOn) {
           if (projWrap) projWrap.style.display = '';
           if (manualProjWrap) manualProjWrap.style.display = '';
+          if (descWrap) descWrap.style.display = '';
+          if (manualDescWrap) manualDescWrap.style.display = '';
+          if (descPreview) descPreview.style.display = 'none';
+          if (manualDescPreview) manualDescPreview.style.display = 'none';
           if (jiraInput) jiraInput.required = false;
           if (manualJiraInput) manualJiraInput.required = false;
           if (jiraLabel) jiraLabel.textContent = 'Jira Ticket (optional)';
@@ -1150,12 +1251,18 @@ export function indexPage() {
         } else {
           if (projWrap) projWrap.style.display = 'none';
           if (manualProjWrap) manualProjWrap.style.display = 'none';
+          if (descWrap) descWrap.style.display = 'none';
+          if (manualDescWrap) manualDescWrap.style.display = 'none';
+          if (descPreview) { descPreview.style.display = ''; renderTicketPreview('timer-description-preview', (jiraInput ? jiraInput.value.trim().toUpperCase() : ''), timerJiraSummary); }
+          if (manualDescPreview) { manualDescPreview.style.display = ''; renderTicketPreview('manual-description-preview', (manualJiraInput ? manualJiraInput.value.trim().toUpperCase() : ''), manualJiraSummary); }
           if (jiraInput) jiraInput.required = true;
           if (manualJiraInput) manualJiraInput.required = true;
           if (jiraLabel) jiraLabel.textContent = 'Jira Ticket';
           if (manualJiraLabel) manualJiraLabel.textContent = 'Jira Ticket';
           if (billableWrap) billableWrap.style.display = 'none';
           if (manualBillableWrap) manualBillableWrap.style.display = 'none';
+          onTimerJiraInput();
+          onManualJiraInput();
         }
       }
 

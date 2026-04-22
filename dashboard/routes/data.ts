@@ -6,6 +6,7 @@ import {
   getAllProjects,
   upsertProjects,
   toggleProjectActive,
+  getLastDescriptionByJiraTicket,
 } from '../../lib/db.js';
 import { Clockify } from '../../clockify.js';
 import { isClockifyEnabled } from '../../lib/credentials.js';
@@ -75,6 +76,16 @@ dataRoutes.get('/sessions', (c) => {
     total,
     totalPages: Math.ceil(total / limit),
   });
+});
+
+// Lookup last saved description for a Jira ticket (Jira-only preview)
+dataRoutes.get('/sessions/last-description', (c) => {
+  const ticket = (c.req.query('jira') || '').trim();
+  if (!ticket || !/^[A-Z][A-Z0-9]+-\d+$/.test(ticket)) {
+    return c.json({ ok: false, error: 'Invalid ticket.' }, 400);
+  }
+  const description = getLastDescriptionByJiraTicket(ticket);
+  return c.json({ ok: true, description });
 });
 
 export default dataRoutes;

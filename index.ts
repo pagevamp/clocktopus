@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { execSync } from 'child_process';
 import { completeLatestSession, getLatestSession, setSessionJiraWorklogId } from './lib/db.js';
+import { isClockifyEnabled } from './lib/credentials.js';
 import { stopJiraTimer } from './lib/jira.js';
 import { startDashboard } from './dashboard/server.js';
 import { ensureNativeAddons } from './lib/ensure-native-addons.js';
@@ -73,6 +74,20 @@ program
   .option('-j, --jira <ticket>', 'Jira ticket number')
   .option('--no-billable', 'Mark the time entry as non-billable')
   .action(async (message, options) => {
+    if (!isClockifyEnabled()) {
+      if (!options.jira) {
+        console.error(chalk.red('Jira-only mode requires --jira <ticket>.'));
+        process.exit(1);
+      }
+      const { v4: uuidv4 } = await import('uuid');
+      const { logSessionStart } = await import('./lib/db.js');
+      const sessionId = uuidv4();
+      const startedAt = new Date().toISOString();
+      const description = (message && String(message).trim()) || options.jira;
+      logSessionStart(sessionId, null, description, startedAt, options.jira);
+      console.log(chalk.green(`Timer started for ${chalk.bold(options.jira)} (Jira-only mode).`));
+      return;
+    }
     const { workspaceId } = await getWorkspaceAndUser();
 
     let projects: Project[] = await clockify.getProjects(workspaceId);
@@ -122,50 +137,79 @@ program
   .command('stop')
   .description('Stop the currently running time entry.')
   .action(async () => {
-    const { workspaceId, userId } = await getWorkspaceAndUser();
     const latestSession = getLatestSession();
-    const stoppedEntry = await clockify.stopTimer(workspaceId, userId);
-    if (stoppedEntry) {
-      const completedAt = new Date().toISOString();
-      completeLatestSession(completedAt);
-      if (latestSession.jiraTicket) {
-        const timeSpentSeconds = Math.round(
-          (new Date(completedAt).getTime() - new Date(latestSession.startedAt).getTime()) / 1000,
-        );
-        if (timeSpentSeconds >= 60) {
-          try {
-            const worklog = await stopJiraTimer(latestSession.jiraTicket, timeSpentSeconds);
-            if (worklog?.id) setSessionJiraWorklogId(latestSession.id, worklog.id);
-          } catch (error) {
-            console.error('Error stopping Jira timer:', error);
-          }
+
+    if (isClockifyEnabled()) {
+      const { workspaceId, userId } = await getWorkspaceAndUser();
+      const stoppedEntry = await clockify.stopTimer(workspaceId, userId);
+      if (!stoppedEntry) {
+        console.log(chalk.yellow('No timer was running.'));
+        return;
+      }
+    } else {
+      if (!latestSession || latestSession.completedAt) {
+        console.log(chalk.yellow('No timer was running.'));
+        return;
+      }
+    }
+
+    const completedAt = new Date().toISOString();
+    completeLatestSession(completedAt);
+
+    if (latestSession?.jiraTicket) {
+      const timeSpentSeconds = Math.round(
+        (new Date(completedAt).getTime() - new Date(latestSession.startedAt).getTime()) / 1000,
+      );
+      if (timeSpentSeconds >= 60) {
+        try {
+          const worklog = await stopJiraTimer(latestSession.jiraTicket, timeSpentSeconds);
+          if (worklog?.id) setSessionJiraWorklogId(latestSession.id, worklog.id);
+        } catch (error) {
+          console.error('Error stopping Jira timer:', error);
         }
       }
-      console.log(chalk.red('Timer stopped.'));
-    } else {
-      console.log(chalk.yellow('No timer was running.'));
     }
+    console.log(chalk.red('Timer stopped.'));
   });
 
 program
   .command('status')
   .description('Check the status of the current timer.')
   .action(async () => {
-    const { workspaceId, userId } = await getWorkspaceAndUser();
-    const activeEntry = await clockify.getActiveTimer(workspaceId, userId);
+    if (isClockifyEnabled()) {
+      const { workspaceId, userId } = await getWorkspaceAndUser();
+      const activeEntry = await clockify.getActiveTimer(workspaceId, userId);
 
-    if (activeEntry) {
-      const startTime = new Date(activeEntry.timeInterval.start);
-      const duration = (new Date().getTime() - startTime.getTime()) / 1000; // in seconds
-      const hours = Math.floor(duration / 3600);
-      const minutes = Math.floor((duration % 3600) / 60);
+      if (activeEntry) {
+        const startTime = new Date(activeEntry.timeInterval.start);
+        const duration = (new Date().getTime() - startTime.getTime()) / 1000;
+        const hours = Math.floor(duration / 3600);
+        const minutes = Math.floor((duration % 3600) / 60);
 
-      console.log(chalk.green('🕒 A timer is currently running.'));
-      console.log(`   - ${chalk.bold('Project:')} ${activeEntry.project.name}`);
-      console.log(`   - ${chalk.bold('Running for:')} ${hours}h ${minutes}m`);
-    } else {
+        console.log(chalk.green('🕒 A timer is currently running.'));
+        console.log(`   - ${chalk.bold('Project:')} ${activeEntry.project.name}`);
+        console.log(`   - ${chalk.bold('Running for:')} ${hours}h ${minutes}m`);
+        return;
+      }
       console.log(chalk.yellow('No timer is currently running.'));
+      return;
     }
+
+    // Jira-only mode: read from DB
+    const { getOpenSession } = await import('./lib/db.js');
+    const open = getOpenSession();
+    if (!open) {
+      console.log(chalk.yellow('No timer is currently running.'));
+      return;
+    }
+    const startTime = new Date(open.startedAt);
+    const duration = (new Date().getTime() - startTime.getTime()) / 1000;
+    const hours = Math.floor(duration / 3600);
+    const minutes = Math.floor((duration % 3600) / 60);
+    console.log(chalk.green('🕒 A timer is currently running (Jira-only mode).'));
+    if (open.jiraTicket) console.log(`   - ${chalk.bold('Jira:')} ${open.jiraTicket}`);
+    console.log(`   - ${chalk.bold('Description:')} ${open.description}`);
+    console.log(`   - ${chalk.bold('Running for:')} ${hours}h ${minutes}m`);
   });
 
 function sleep(ms: number) {
@@ -176,18 +220,27 @@ program
   .command('monitor:run', { hidden: true })
   .description('Run monitor in foreground (used by PM2).')
   .action(async () => {
-    const { workspaceId, userId } = await getWorkspaceAndUser();
+    const creds = isClockifyEnabled() ? await getWorkspaceAndUser() : { workspaceId: '', userId: '' };
+    const { workspaceId, userId } = creds;
 
     async function stopTimerAndLog(reason: string) {
-      const activeEntry = await clockify.getActiveTimer(workspaceId, userId);
-      if (!activeEntry) return false;
+      const clockifyOn = isClockifyEnabled();
+      const latestSession = getLatestSession();
+
+      if (clockifyOn) {
+        const activeEntry = await clockify.getActiveTimer(workspaceId, userId);
+        if (!activeEntry) return false;
+      } else {
+        if (!latestSession || latestSession.completedAt) return false;
+      }
 
       console.log(chalk.yellow(reason));
       const completedAt = new Date().toISOString();
-      const latestSession = getLatestSession();
 
-      const stoppedEntry = await clockify.stopTimer(workspaceId, userId);
-      if (!stoppedEntry) return false;
+      if (clockifyOn) {
+        const stoppedEntry = await clockify.stopTimer(workspaceId, userId);
+        if (!stoppedEntry) return false;
+      }
 
       completeLatestSession(completedAt, true);
 
@@ -223,23 +276,42 @@ program
       const latestSession = getLatestSession();
       if (!latestSession) return;
 
-      const activeEntry = await clockify.getActiveTimer(workspaceId, userId);
-      if (activeEntry) return;
-
       const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
-      const completedAt = latestSession.completedAt ? new Date(latestSession.completedAt).getTime() : 0;
+      const completedMs = latestSession.completedAt ? new Date(latestSession.completedAt).getTime() : 0;
 
-      const eligible = latestSession.isAutoCompleted && completedAt > twoHoursAgo && !!latestSession.projectId;
+      if (!latestSession.isAutoCompleted || completedMs <= twoHoursAgo) return;
 
-      if (!eligible) return;
+      if (isClockifyEnabled()) {
+        if (!latestSession.projectId) return;
 
-      await clockify.startTimer(
-        workspaceId,
-        latestSession.projectId,
+        const activeEntry = await clockify.getActiveTimer(workspaceId, userId);
+        if (activeEntry) return;
+
+        await clockify.startTimer(
+          workspaceId,
+          latestSession.projectId,
+          latestSession.description,
+          latestSession.jiraTicket ?? undefined,
+        );
+        console.log(chalk.green('Timer restarted for the last used project.'));
+        lastResumeAt = Date.now();
+        return;
+      }
+
+      // Jira-only resume: new DB session with a fresh uuid, same ticket
+      if (!latestSession.jiraTicket) return;
+      const { v4: uuidv4 } = await import('uuid');
+      const { logSessionStart } = await import('./lib/db.js');
+      const sessionId = uuidv4();
+      const startedAt = new Date().toISOString();
+      logSessionStart(
+        sessionId,
+        latestSession.projectId ?? null,
         latestSession.description,
-        latestSession.jiraTicket ?? undefined,
+        startedAt,
+        latestSession.jiraTicket,
       );
-      console.log(chalk.green('Timer restarted for the last used project.'));
+      console.log(chalk.green(`Resumed Jira timer for ${latestSession.jiraTicket}.`));
       lastResumeAt = Date.now();
     }
 

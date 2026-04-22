@@ -8,6 +8,8 @@ import {
   toggleProjectActive,
 } from '../../lib/db.js';
 import { Clockify } from '../../clockify.js';
+import { isClockifyEnabled, isJiraDisabled } from '../../lib/credentials.js';
+import { getJiraTicket } from '../../lib/jira.js';
 
 const dataRoutes = new Hono();
 
@@ -25,6 +27,9 @@ dataRoutes.get('/projects/all', (c) => {
 
 // Fetch projects from Clockify and save to DB
 dataRoutes.post('/projects/fetch', async (c) => {
+  if (!isClockifyEnabled()) {
+    return c.json({ ok: false, error: 'Clockify not configured.' }, 400);
+  }
   try {
     const clockify = new Clockify();
     const user = await clockify.getUser();
@@ -61,7 +66,7 @@ dataRoutes.get('/sessions', (c) => {
 
   const enriched = (sessions as Array<Record<string, unknown>>).map((s) => ({
     ...s,
-    projectName: projectMap.get(s.projectId as string) ?? 'Unknown',
+    projectName: s.projectId ? (projectMap.get(s.projectId as string) ?? 'Unknown') : null,
   }));
 
   return c.json({
@@ -71,6 +76,23 @@ dataRoutes.get('/sessions', (c) => {
     total,
     totalPages: Math.ceil(total / limit),
   });
+});
+
+// Current Jira ticket summary for timer description preview
+dataRoutes.get('/jira/ticket-summary', async (c) => {
+  const ticket = (c.req.query('jira') || '').trim().toUpperCase();
+  if (!ticket || !/^[A-Z][A-Z0-9]+-\d+$/.test(ticket)) {
+    return c.json({ ok: false, error: 'Invalid ticket.' }, 400);
+  }
+  if (isJiraDisabled()) return c.json({ ok: true, description: null });
+  try {
+    const issue = (await getJiraTicket(ticket)) as { fields?: { summary?: string } } | null;
+    const summary = issue?.fields?.summary?.trim();
+    if (summary) return c.json({ ok: true, description: summary });
+  } catch (err) {
+    console.warn('Jira summary lookup failed for', ticket, err);
+  }
+  return c.json({ ok: true, description: null });
 });
 
 export default dataRoutes;

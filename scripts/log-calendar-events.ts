@@ -62,6 +62,11 @@ if (!startDate || !endDate) {
 }
 
 async function main() {
+  const { isClockifyEnabled } = await import('../lib/credentials.js');
+  if (!isClockifyEnabled()) {
+    console.log('Calendar sync requires Clockify. Configure Clockify API key and re-run.');
+    return;
+  }
   const clockify = new Clockify();
   const user = await clockify.getUser();
 

@@ -3,6 +3,7 @@ import { google } from 'googleapis';
 import { getAuthenticatedClient, getRefreshedToken } from '../../lib/google.js';
 import { getLatestToken, storeToken, getEventProject, setEventProject, getActiveProjects } from '../../lib/db.js';
 import { Clockify } from '../../clockify.js';
+import { isClockifyEnabled } from '../../lib/credentials.js';
 
 // Hardcoded — registered with Google OAuth; cannot vary with CLOCKTOPUS_PORT
 // without re-registering the redirect URI in the Google Cloud console.
@@ -11,6 +12,9 @@ const DASHBOARD_REDIRECT_URI = 'http://localhost:4001/api/google/callback';
 const calendarRoutes = new Hono();
 
 calendarRoutes.get('/calendar/events', async (c) => {
+  if (!isClockifyEnabled()) {
+    return c.json({ ok: false, error: 'Calendar sync requires Clockify.' }, 400);
+  }
   const start = c.req.query('start');
   const end = c.req.query('end');
 
@@ -107,6 +111,9 @@ calendarRoutes.get('/calendar/events', async (c) => {
 });
 
 calendarRoutes.post('/calendar/log', async (c) => {
+  if (!isClockifyEnabled()) {
+    return c.json({ ok: false, error: 'Calendar sync requires Clockify.' }, 400);
+  }
   const { entries } = await c.req.json<{
     entries: Array<{ summary: string; start: string; end: string; projectId: string; billable?: boolean }>;
   }>();

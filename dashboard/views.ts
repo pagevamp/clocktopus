@@ -125,9 +125,24 @@ export function indexPage() {
     .toggle input:checked + .slider { background: #238636; }
     .toggle input:checked + .slider::before { transform: translateX(16px); background: #fff; }
 
+    .empty-state-card { padding: 1.5rem; text-align: center; color: #8b949e; font-size: 0.9rem; }
+    .ticket-preview { margin-top: 0.5rem; padding: 0.6rem 0.8rem; border: 1px solid #30363d; border-radius: 6px; background: #161b22; color: #e1e4e8; font-size: 0.85rem; min-height: 2rem; }
+    .ticket-preview .ticket-id { color: #58a6ff; font-weight: 600; margin-right: 0.4rem; }
+    .ticket-preview .ticket-hint { color: #8b949e; font-style: italic; }
+    .ticket-preview .ticket-error { color: #f85149; }
+    .local-hint { margin-top: 0.4rem; color: #8b949e; font-size: 0.8rem; font-style: italic; }
+    .local-hint a { color: #58a6ff; }
+
+    #ctx-menu { position: fixed; display: none; z-index: 9999; background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 0.25rem; min-width: 140px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+    #ctx-menu button { display: block; width: 100%; margin: 0; text-align: left; background: transparent; border: none; color: #e1e4e8; padding: 0.4rem 0.7rem; border-radius: 4px; font-size: 0.85rem; cursor: pointer; }
+    #ctx-menu button:hover { background: #21262d; }
+
   </style>
 </head>
-<body oncontextmenu="return false;">
+<body>
+  <div id="ctx-menu">
+    <button type="button" onclick="location.reload()">Reload</button>
+  </div>
   <div class="header">
     <h1>Clocktopus</h1>
     <div class="nav">
@@ -152,29 +167,33 @@ export function indexPage() {
 
     <div class="cards home-cards">
       <!-- Track Time -->
-      <div class="card">
-        <div class="track-tabs">
+      <div class="card" id="track-card">
+        <div class="track-tabs" id="track-tabs">
           <button class="track-tab-btn active" data-mode="auto" onclick="switchTrackMode('auto')">Auto Track</button>
           <button class="track-tab-btn" data-mode="manual" onclick="switchTrackMode('manual')">Manual Log</button>
         </div>
 
         <div id="track-auto">
           <div id="start-timer-form">
-            <label for="project-select">Project</label>
-            <select id="project-select">
-              <option value="">Loading projects...</option>
-            </select>
+            <div id="timer-project-wrap">
+              <label for="project-select">Project</label>
+              <select id="project-select">
+                <option value="">Loading projects...</option>
+              </select>
+            </div>
             <div class="form-row">
-              <div>
+              <div id="timer-description-wrap">
                 <label for="timer-description">Description</label>
                 <input type="text" id="timer-description" placeholder="What are you working on?" />
+                <div id="timer-local-hint" class="local-hint" style="display:none;">Time will be logged locally only. Configure Clockify or Jira in <a href="#" onclick="switchTab('settings');return false;">Settings</a> to sync.</div>
               </div>
               <div>
-                <label for="timer-jira">Jira Ticket (optional)</label>
+                <label for="timer-jira" id="timer-jira-label">Jira Ticket (optional)</label>
                 <input type="text" id="timer-jira" placeholder="e.g. PROJ-123" />
               </div>
             </div>
-            <label style="display:flex; align-items:center; gap:0.5rem; font-weight:normal; cursor:pointer;">
+            <div id="timer-description-preview" class="ticket-preview" style="display:none;"></div>
+            <label id="timer-billable-wrap" style="display:flex; align-items:center; gap:0.5rem; font-weight:normal; cursor:pointer;">
               <input type="checkbox" id="timer-billable" checked style="width:auto; margin:0;" />
               Billable
             </label>
@@ -185,10 +204,12 @@ export function indexPage() {
         </div>
 
         <div id="track-manual" style="display:none;">
-          <label for="manual-project">Project</label>
-          <select id="manual-project">
-            <option value="">Loading projects...</option>
-          </select>
+          <div id="manual-project-wrap">
+            <label for="manual-project">Project</label>
+            <select id="manual-project">
+              <option value="">Loading projects...</option>
+            </select>
+          </div>
           <div class="form-row">
             <div>
               <label for="manual-start">Start</label>
@@ -200,16 +221,18 @@ export function indexPage() {
             </div>
           </div>
           <div class="form-row">
-            <div>
+            <div id="manual-description-wrap">
               <label for="manual-description">Description</label>
               <input type="text" id="manual-description" placeholder="What did you work on?" />
+              <div id="manual-local-hint" class="local-hint" style="display:none;">Time will be logged locally only. Configure Clockify or Jira in <a href="#" onclick="switchTab('settings');return false;">Settings</a> to sync.</div>
             </div>
             <div>
-              <label for="manual-jira">Jira Ticket (optional)</label>
+              <label for="manual-jira" id="manual-jira-label">Jira Ticket (optional)</label>
               <input type="text" id="manual-jira" placeholder="e.g. PROJ-123" />
             </div>
           </div>
-          <label style="display:flex; align-items:center; gap:0.5rem; font-weight:normal; cursor:pointer;">
+          <div id="manual-description-preview" class="ticket-preview" style="display:none;"></div>
+          <label id="manual-billable-wrap" style="display:flex; align-items:center; gap:0.5rem; font-weight:normal; cursor:pointer;">
             <input type="checkbox" id="manual-billable" checked style="width:auto; margin:0;" />
             Billable
           </label>
@@ -217,6 +240,7 @@ export function indexPage() {
           <div class="msg" id="manual-msg"></div>
         </div>
       </div>
+
 
       <!-- Monitor Control -->
       <div class="card">
@@ -293,6 +317,13 @@ export function indexPage() {
         <label for="clockify-key">API Key</label>
         <input type="password" id="clockify-key" placeholder="Enter your Clockify API key" />
         <button onclick="saveClockify()">Save &amp; Validate</button>
+        <div style="display:flex; align-items:center; gap:0.6rem; margin-top:0.75rem;">
+          <label class="toggle">
+            <input type="checkbox" id="clockify-enabled-toggle" onchange="toggleClockifyEnabled()" />
+            <span class="slider"></span>
+          </label>
+          <span id="clockify-enabled-label" style="font-size:0.9rem; color:#8b949e;">Enabled</span>
+        </div>
         <div class="msg" id="clockify-msg"></div>
       </div>
 
@@ -304,6 +335,7 @@ export function indexPage() {
         </div>
         <p id="google-desc" style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Authorize access to your Google Calendar.</p>
         <button class="connect" id="google-connect-btn" onclick="connectGoogle()">Connect Google Account</button>
+        <p id="google-connect-note" style="font-size:0.75rem;color:#8b949e;margin-top:0.5rem;display:none;"></p>
         <div class="msg" id="google-msg"></div>
       </div>
 
@@ -315,6 +347,13 @@ export function indexPage() {
         </div>
         <p id="jira-desc" style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Connect your Atlassian account to log time on Jira tickets.</p>
         <button class="connect" id="jira-connect-btn" onclick="connectJira()">Connect Atlassian</button>
+        <div style="display:flex; align-items:center; gap:0.6rem; margin-top:0.75rem;">
+          <label class="toggle">
+            <input type="checkbox" id="jira-enabled-toggle" onchange="toggleJiraEnabled()" />
+            <span class="slider"></span>
+          </label>
+          <span id="jira-enabled-label" style="font-size:0.9rem; color:#8b949e;">Enabled</span>
+        </div>
         <div class="msg" id="jira-msg"></div>
         <div style="margin-top:1rem;">
           <a href="#" id="jira-toggle" onclick="toggleJiraForm(event)" style="font-size:0.8rem;color:#8b949e;text-decoration:none;">or use API token &darr;</a>
@@ -384,10 +423,26 @@ export function indexPage() {
   </div>
 
   <script>
-    // Disable WebKit's Back/Forward/Reload context menu. Capture-phase and
-    // attached on window so it runs before any app handler and wins the race
-    // with the native WKWebView menu.
-    window.addEventListener('contextmenu', e => e.preventDefault(), { capture: true });
+    // Suppress WebKit's Back/Forward menu. Capture-phase wins the race with
+    // the native WKWebView menu. Our custom menu offers Reload only.
+    (function wireContextMenu() {
+      const menu = document.getElementById('ctx-menu');
+      if (!menu) return;
+      const hide = () => { menu.style.display = 'none'; };
+      window.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const pad = 4;
+        const x = Math.min(e.clientX, window.innerWidth - menu.offsetWidth - pad);
+        const y = Math.min(e.clientY, window.innerHeight - menu.offsetHeight - pad);
+        menu.style.left = x + 'px';
+        menu.style.top = y + 'px';
+        menu.style.display = 'block';
+      }, { capture: true });
+      window.addEventListener('click', hide);
+      window.addEventListener('scroll', hide, { capture: true });
+      window.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
+      window.addEventListener('blur', hide);
+    })();
 
     let elapsedInterval = null;
     let currentPage = 1;
@@ -395,10 +450,12 @@ export function indexPage() {
 
     // --- Tab switching ---
     function switchTab(tab) {
+      const nav = document.getElementById('nav-' + tab);
+      if (nav && nav.getAttribute('aria-disabled') === 'true') return;
       document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
       document.getElementById('tab-' + tab).classList.add('active');
-      document.getElementById('nav-' + tab).classList.add('active');
+      if (nav) nav.classList.add('active');
     }
 
     function switchTrackMode(mode) {
@@ -475,12 +532,19 @@ export function indexPage() {
 
     async function startTimer() {
       const projectId = document.getElementById('project-select').value;
-      const description = document.getElementById('timer-description').value.trim();
       const jiraTicket = document.getElementById('timer-jira').value.trim();
       const billable = document.getElementById('timer-billable').checked;
+      const typedDescription = document.getElementById('timer-description').value.trim();
+      const description = typedDescription;
 
-      if (!projectId) return setMsg('timer-msg', 'Please select a project.', false);
-      if (!description && !jiraTicket) return setMsg('timer-msg', 'Please enter a description or Jira ticket.', false);
+      if (currentMode.clockifyOn) {
+        if (!projectId) return setMsg('timer-msg', 'Please select a project.', false);
+        if (!typedDescription && !jiraTicket) return setMsg('timer-msg', 'Please enter a description or Jira ticket.', false);
+      } else if (currentMode.jiraOn) {
+        if (!jiraTicket) return setMsg('timer-msg', 'Please enter a Jira ticket.', false);
+      } else {
+        if (!typedDescription) return setMsg('timer-msg', 'Please enter a description.', false);
+      }
 
       const btn = document.getElementById('start-btn');
       btn.disabled = true;
@@ -490,13 +554,20 @@ export function indexPage() {
         const res = await fetch('/api/timer/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ projectId, description: description || 'Working on a task...', jiraTicket: jiraTicket || undefined, billable }),
+          body: JSON.stringify({
+            projectId: projectId || undefined,
+            description: currentMode.clockifyOn ? (description || 'Working on a task...') : description,
+            jiraTicket: jiraTicket || undefined,
+            billable,
+          }),
         });
         const data = await res.json();
         if (data.ok) {
           setMsg('timer-msg', 'Timer started!', true);
           document.getElementById('timer-description').value = '';
           document.getElementById('timer-jira').value = '';
+          timerJiraSummary = '';
+          renderTicketPreview('timer-description-preview', '', '');
           checkActiveTimer();
           loadSessions();
         } else {
@@ -548,18 +619,26 @@ export function indexPage() {
       const projectId = document.getElementById('manual-project').value;
       const startVal = document.getElementById('manual-start').value;
       const endVal = document.getElementById('manual-end').value;
-      const description = document.getElementById('manual-description').value.trim();
+      const typedDescription = document.getElementById('manual-description').value.trim();
       const jiraTicket = document.getElementById('manual-jira').value.trim();
       const billable = document.getElementById('manual-billable').checked;
+      const description = typedDescription;
 
-      if (!projectId) return setMsg('manual-msg', 'Please select a project.', false);
       if (!startVal || !endVal) return setMsg('manual-msg', 'Please set start and end.', false);
 
       const startMs = new Date(startVal).getTime();
       const endMs = new Date(endVal).getTime();
       if (isNaN(startMs) || isNaN(endMs)) return setMsg('manual-msg', 'Invalid date.', false);
       if (endMs <= startMs) return setMsg('manual-msg', 'End must be after start.', false);
-      if (!description && !jiraTicket) return setMsg('manual-msg', 'Please enter a description or Jira ticket.', false);
+
+      if (currentMode.clockifyOn) {
+        if (!projectId) return setMsg('manual-msg', 'Please select a project.', false);
+        if (!typedDescription && !jiraTicket) return setMsg('manual-msg', 'Please enter a description or Jira ticket.', false);
+      } else if (currentMode.jiraOn) {
+        if (!jiraTicket) return setMsg('manual-msg', 'Please enter a Jira ticket.', false);
+      } else {
+        if (!typedDescription) return setMsg('manual-msg', 'Please enter a description.', false);
+      }
 
       const btn = document.getElementById('manual-log-btn');
       btn.disabled = true;
@@ -570,7 +649,7 @@ export function indexPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            projectId: projectId,
+            projectId: projectId || undefined,
             description: description,
             start: new Date(startMs).toISOString(),
             end: new Date(endMs).toISOString(),
@@ -583,6 +662,8 @@ export function indexPage() {
           setMsg('manual-msg', 'Time logged.', true);
           document.getElementById('manual-description').value = '';
           document.getElementById('manual-jira').value = '';
+          manualJiraSummary = '';
+          renderTicketPreview('manual-description-preview', '', '');
           setManualDefaults();
           loadSessions();
         } else {
@@ -893,7 +974,7 @@ export function indexPage() {
             : '';
           return '<tr>' +
             '<td>' + escapeHtml(s.description) + '</td>' +
-            '<td>' + escapeHtml(s.projectName) + '</td>' +
+            '<td>' + (s.projectName ? escapeHtml(s.projectName) : '—') + '</td>' +
             '<td>' + started + '</td>' +
             '<td>' + duration + '</td>' +
             '<td>' + escapeHtml(jira) + '</td>' +
@@ -1001,6 +1082,27 @@ export function indexPage() {
       }
     }
 
+    async function toggleClockifyEnabled() {
+      const enabled = document.getElementById('clockify-enabled-toggle').checked;
+      document.getElementById('clockify-enabled-label').textContent = enabled ? 'Enabled' : 'Disabled';
+      try {
+        const res = await fetch('/api/clockify/enabled', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          setMsg('clockify-msg', enabled ? 'Clockify enabled.' : 'Clockify disabled.', true);
+          fetchStatus();
+        } else {
+          setMsg('clockify-msg', data.error || 'Failed to update.', false);
+        }
+      } catch {
+        setMsg('clockify-msg', 'Request failed.', false);
+      }
+    }
+
     // --- Settings: Google ---
     function setGoogleConnected(connected, email) {
       const btn = document.getElementById('google-connect-btn');
@@ -1076,6 +1178,27 @@ export function indexPage() {
       }
     }
 
+    async function toggleJiraEnabled() {
+      const enabled = document.getElementById('jira-enabled-toggle').checked;
+      document.getElementById('jira-enabled-label').textContent = enabled ? 'Enabled' : 'Disabled';
+      try {
+        const res = await fetch('/api/jira/enabled', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          setMsg('jira-msg', enabled ? 'Jira enabled.' : 'Jira disabled.', true);
+          fetchStatus();
+        } else {
+          setMsg('jira-msg', data.error || 'Failed to update.', false);
+        }
+      } catch {
+        setMsg('jira-msg', 'Request failed.', false);
+      }
+    }
+
     async function saveJira() {
       const url = document.getElementById('jira-url').value.trim();
       const email = document.getElementById('jira-email').value.trim();
@@ -1101,6 +1224,173 @@ export function indexPage() {
     }
 
     // --- Status ---
+    var currentMode = { clockifyOn: true, jiraOn: false };
+    var timerJiraSummary = '';
+    var manualJiraSummary = '';
+
+    function renderTicketPreview(previewId, ticket, description) {
+      var el = document.getElementById(previewId);
+      if (!el) return;
+      if (!ticket) {
+        el.style.display = 'none';
+        el.innerHTML = '';
+        return;
+      }
+      el.style.display = '';
+      if (description) {
+        el.innerHTML = '<span class="ticket-id">' + escapeHtml(ticket) + '</span>' + escapeHtml(description);
+      } else {
+        el.innerHTML = '<span class="ticket-id">' + escapeHtml(ticket) + '</span><span class="ticket-hint">Could not fetch title from Jira. We will log with the ticket id.</span>';
+      }
+    }
+
+    async function fetchTicketSummary(ticket) {
+      if (!/^[A-Z][A-Z0-9]+-\d+$/.test(ticket)) return null;
+      try {
+        const res = await fetch('/api/jira/ticket-summary?jira=' + encodeURIComponent(ticket));
+        const data = await res.json();
+        if (data.ok) return data.description || '';
+      } catch {}
+      return null;
+    }
+
+    function debounce(fn, ms) {
+      var t;
+      return function() {
+        var ctx = this, args = arguments;
+        clearTimeout(t);
+        t = setTimeout(function(){ fn.apply(ctx, args); }, ms);
+      };
+    }
+
+    async function onTimerJiraInput() {
+      var ticket = document.getElementById('timer-jira').value.trim().toUpperCase();
+      if (!currentMode.clockifyOn) {
+        var desc = await fetchTicketSummary(ticket);
+        timerJiraSummary = desc || '';
+        renderTicketPreview('timer-description-preview', ticket, timerJiraSummary);
+      }
+    }
+    async function onManualJiraInput() {
+      var ticket = document.getElementById('manual-jira').value.trim().toUpperCase();
+      if (!currentMode.clockifyOn) {
+        var desc = await fetchTicketSummary(ticket);
+        manualJiraSummary = desc || '';
+        renderTicketPreview('manual-description-preview', ticket, manualJiraSummary);
+      }
+    }
+
+    (function wireTicketPreviewInputs() {
+      var t = document.getElementById('timer-jira');
+      var m = document.getElementById('manual-jira');
+      if (t) t.addEventListener('input', debounce(onTimerJiraInput, 300));
+      if (m) m.addEventListener('input', debounce(onManualJiraInput, 300));
+    })();
+
+    function applyMode(data) {
+      const clockifyOn = !!data.clockify;
+      const jiraOn = !!data.jira;
+      const localOnly = !clockifyOn && !jiraOn;
+      currentMode.clockifyOn = clockifyOn;
+      currentMode.jiraOn = jiraOn;
+
+      const trackCard = document.getElementById('track-card');
+      const timerLocalHint = document.getElementById('timer-local-hint');
+      const manualLocalHint = document.getElementById('manual-local-hint');
+      const projWrap = document.getElementById('timer-project-wrap');
+      const manualProjWrap = document.getElementById('manual-project-wrap');
+      const descWrap = document.getElementById('timer-description-wrap');
+      const manualDescWrap = document.getElementById('manual-description-wrap');
+      const descPreview = document.getElementById('timer-description-preview');
+      const manualDescPreview = document.getElementById('manual-description-preview');
+      const jiraInput = document.getElementById('timer-jira');
+      const manualJiraInput = document.getElementById('manual-jira');
+      const jiraLabel = document.getElementById('timer-jira-label');
+      const manualJiraLabel = document.getElementById('manual-jira-label');
+      const jiraWrap = jiraInput ? jiraInput.closest('.row') || jiraInput.parentElement : null;
+      const manualJiraWrap = manualJiraInput ? manualJiraInput.closest('.row') || manualJiraInput.parentElement : null;
+      const billableWrap = document.getElementById('timer-billable-wrap');
+      const manualBillableWrap = document.getElementById('manual-billable-wrap');
+
+      if (trackCard) trackCard.style.display = '';
+      if (timerLocalHint) timerLocalHint.style.display = localOnly ? '' : 'none';
+      if (manualLocalHint) manualLocalHint.style.display = localOnly ? '' : 'none';
+
+      if (clockifyOn) {
+        if (projWrap) projWrap.style.display = '';
+        if (manualProjWrap) manualProjWrap.style.display = '';
+        if (descWrap) descWrap.style.display = '';
+        if (manualDescWrap) manualDescWrap.style.display = '';
+        if (descPreview) descPreview.style.display = 'none';
+        if (manualDescPreview) manualDescPreview.style.display = 'none';
+        if (jiraWrap) jiraWrap.style.display = jiraOn ? '' : 'none';
+        if (manualJiraWrap) manualJiraWrap.style.display = jiraOn ? '' : 'none';
+        if (jiraInput) jiraInput.required = false;
+        if (manualJiraInput) manualJiraInput.required = false;
+        if (jiraLabel) jiraLabel.textContent = 'Jira Ticket (optional)';
+        if (manualJiraLabel) manualJiraLabel.textContent = 'Jira Ticket (optional)';
+        if (billableWrap) billableWrap.style.display = '';
+        if (manualBillableWrap) manualBillableWrap.style.display = '';
+      } else if (jiraOn) {
+        if (projWrap) projWrap.style.display = 'none';
+        if (manualProjWrap) manualProjWrap.style.display = 'none';
+        if (descWrap) descWrap.style.display = 'none';
+        if (manualDescWrap) manualDescWrap.style.display = 'none';
+        if (descPreview) { descPreview.style.display = ''; renderTicketPreview('timer-description-preview', (jiraInput ? jiraInput.value.trim().toUpperCase() : ''), timerJiraSummary); }
+        if (manualDescPreview) { manualDescPreview.style.display = ''; renderTicketPreview('manual-description-preview', (manualJiraInput ? manualJiraInput.value.trim().toUpperCase() : ''), manualJiraSummary); }
+        if (jiraWrap) jiraWrap.style.display = '';
+        if (manualJiraWrap) manualJiraWrap.style.display = '';
+        if (jiraInput) jiraInput.required = true;
+        if (manualJiraInput) manualJiraInput.required = true;
+        if (jiraLabel) jiraLabel.textContent = 'Jira Ticket';
+        if (manualJiraLabel) manualJiraLabel.textContent = 'Jira Ticket';
+        if (billableWrap) billableWrap.style.display = 'none';
+        if (manualBillableWrap) manualBillableWrap.style.display = 'none';
+        onTimerJiraInput();
+        onManualJiraInput();
+      } else {
+        // Local-only: description only
+        if (projWrap) projWrap.style.display = 'none';
+        if (manualProjWrap) manualProjWrap.style.display = 'none';
+        if (descWrap) descWrap.style.display = '';
+        if (manualDescWrap) manualDescWrap.style.display = '';
+        if (descPreview) descPreview.style.display = 'none';
+        if (manualDescPreview) manualDescPreview.style.display = 'none';
+        if (jiraWrap) jiraWrap.style.display = 'none';
+        if (manualJiraWrap) manualJiraWrap.style.display = 'none';
+        if (jiraInput) jiraInput.required = false;
+        if (manualJiraInput) manualJiraInput.required = false;
+        if (billableWrap) billableWrap.style.display = 'none';
+        if (manualBillableWrap) manualBillableWrap.style.display = 'none';
+      }
+
+      // Projects tab: hide "Pull from Clockify" button
+      const pullBtn = document.getElementById('fetch-projects-btn');
+      if (pullBtn) pullBtn.style.display = clockifyOn ? '' : 'none';
+
+      // Projects nav: hide entire tab when Clockify off
+      const projectsNav = document.getElementById('nav-projects');
+      if (projectsNav) projectsNav.style.display = clockifyOn ? '' : 'none';
+
+      // Calendar nav: hide entire tab when Clockify off
+      const calNav = document.getElementById('nav-calendar');
+      if (calNav) calNav.style.display = clockifyOn ? '' : 'none';
+
+      // Settings: Google Connect button — disable when Clockify off
+      const gBtn = document.getElementById('google-connect-btn');
+      const gNote = document.getElementById('google-connect-note');
+      if (gBtn) gBtn.disabled = !clockifyOn;
+      if (gNote) {
+        if (clockifyOn) {
+          gNote.textContent = '';
+          gNote.style.display = 'none';
+        } else {
+          gNote.textContent = 'Calendar sync requires Clockify. Connect Clockify first.';
+          gNote.style.display = '';
+        }
+      }
+    }
+
     async function fetchStatus() {
       try {
         const res = await fetch('/api/status');
@@ -1111,8 +1401,28 @@ export function indexPage() {
         if (data.clockifyKeyHint) {
           document.getElementById('clockify-key').placeholder = data.clockifyKeyHint;
         }
+        const toggle = document.getElementById('clockify-enabled-toggle');
+        const toggleLabel = document.getElementById('clockify-enabled-label');
+        const keyInput = document.getElementById('clockify-key');
+        const saveBtn = document.querySelector('button[onclick="saveClockify()"]');
+        const enabled = !data.clockifyDisabled;
+        if (toggle) toggle.checked = enabled;
+        if (toggleLabel) toggleLabel.textContent = enabled ? 'Enabled' : 'Disabled';
+        if (keyInput) keyInput.disabled = !enabled;
+        if (saveBtn) saveBtn.disabled = !enabled;
+
+        const jToggle = document.getElementById('jira-enabled-toggle');
+        const jToggleLabel = document.getElementById('jira-enabled-label');
+        const jConnectBtn = document.getElementById('jira-connect-btn');
+        const jToggleWrap = jToggle ? jToggle.closest('label').parentElement : null;
+        const jiraEnabled = !data.jiraDisabled;
+        if (jToggle) jToggle.checked = jiraEnabled;
+        if (jToggleLabel) jToggleLabel.textContent = jiraEnabled ? 'Enabled' : 'Disabled';
+        if (jToggleWrap) jToggleWrap.style.display = data.jiraConfigured ? '' : 'none';
+        if (jConnectBtn) jConnectBtn.disabled = data.jiraConfigured && !jiraEnabled;
         setGoogleConnected(data.google, data.googleEmail);
         setJiraConnected(data.jira, data.jiraOAuth, data.jiraSiteUrl);
+        applyMode(data);
       } catch {}
     }
 

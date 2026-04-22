@@ -9,3 +9,27 @@ export function resolveCredential(key: string): string | undefined {
 export function saveCredential(key: string, value: string) {
   setCredential(key, value);
 }
+
+export function isClockifyKeyValid(value: string | undefined): boolean {
+  return typeof value === 'string' && value.length > 0;
+}
+
+export function isClockifyDisabled(): boolean {
+  return resolveCredential('CLOCKIFY_DISABLED') === '1';
+}
+
+export function setClockifyDisabled(disabled: boolean) {
+  setCredential('CLOCKIFY_DISABLED', disabled ? '1' : '0');
+}
+
+export function isClockifyEnabled(): boolean {
+  return isClockifyKeyValid(resolveCredential('CLOCKIFY_API_KEY')) && !isClockifyDisabled();
+}
+
+export function isJiraDisabled(): boolean {
+  return resolveCredential('JIRA_DISABLED') === '1';
+}
+
+export function setJiraDisabled(disabled: boolean) {
+  setCredential('JIRA_DISABLED', disabled ? '1' : '0');
+}

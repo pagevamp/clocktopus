@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import axios from 'axios';
-import { resolveCredential } from '../../lib/credentials.js';
+import { isClockifyDisabled, isJiraDisabled, resolveCredential } from '../../lib/credentials.js';
 import { getLatestToken, getAtlassianToken } from '../../lib/db.js';
 import { getValidAccessToken } from '../../lib/atlassian.js';
 
@@ -9,16 +9,22 @@ const statusRoutes = new Hono();
 statusRoutes.get('/status', async (c) => {
   const results: {
     clockify: boolean;
+    clockifyDisabled: boolean;
     google: boolean;
     googleEmail?: string;
     jira: boolean;
+    jiraDisabled: boolean;
+    jiraConfigured: boolean;
     jiraOAuth: boolean;
     jiraSiteUrl?: string;
     clockifyKeyHint?: string;
   } = {
     clockify: false,
+    clockifyDisabled: isClockifyDisabled(),
     google: false,
     jira: false,
+    jiraDisabled: isJiraDisabled(),
+    jiraConfigured: false,
     jiraOAuth: false,
   };
 
@@ -26,13 +32,15 @@ statusRoutes.get('/status', async (c) => {
   const clockifyKey = resolveCredential('CLOCKIFY_API_KEY');
   if (clockifyKey) {
     results.clockifyKeyHint = '***' + clockifyKey.slice(-4);
-    try {
-      const res = await axios.get('https://api.clockify.me/api/v1/user', {
-        headers: { 'X-Api-Key': clockifyKey },
-        timeout: 5000,
-      });
-      results.clockify = res.status === 200;
-    } catch {}
+    if (!results.clockifyDisabled) {
+      try {
+        const res = await axios.get('https://api.clockify.me/api/v1/user', {
+          headers: { 'X-Api-Key': clockifyKey },
+          timeout: 5000,
+        });
+        results.clockify = res.status === 200;
+      } catch {}
+    }
   }
 
   // Check Google — token exists in DB
@@ -47,42 +55,48 @@ statusRoutes.get('/status', async (c) => {
   const storedAtlassianToken = getAtlassianToken();
   if (storedAtlassianToken) {
     results.jiraOAuth = true;
+    results.jiraConfigured = true;
     if (storedAtlassianToken.site_url) results.jiraSiteUrl = storedAtlassianToken.site_url;
-    try {
-      const validToken = await getValidAccessToken();
-      if (validToken) {
-        const res = await axios.get(`https://api.atlassian.com/ex/jira/${validToken.cloud_id}/rest/api/3/myself`, {
-          headers: {
-            Authorization: `Bearer ${validToken.access_token}`,
-            Accept: 'application/json',
-          },
-          timeout: 5000,
-        });
-        results.jira = res.status === 200;
+    if (!results.jiraDisabled) {
+      try {
+        const validToken = await getValidAccessToken();
+        if (validToken) {
+          const res = await axios.get(`https://api.atlassian.com/ex/jira/${validToken.cloud_id}/rest/api/3/myself`, {
+            headers: {
+              Authorization: `Bearer ${validToken.access_token}`,
+              Accept: 'application/json',
+            },
+            timeout: 5000,
+          });
+          results.jira = res.status === 200;
+        }
+      } catch (error) {
+        if (axios.isAxiosError(error)) {
+          console.error('Jira OAuth status check failed:', error.response?.status, error.response?.data);
+        } else {
+          console.error('Jira OAuth status check failed:', error);
+        }
+        results.jira = false;
       }
-    } catch (error) {
-      if (axios.isAxiosError(error)) {
-        console.error('Jira OAuth status check failed:', error.response?.status, error.response?.data);
-      } else {
-        console.error('Jira OAuth status check failed:', error);
-      }
-      results.jira = false;
     }
   } else {
     const jiraUrl = resolveCredential('ATLASSIAN_URL');
     const jiraToken = resolveCredential('ATLASSIAN_API_TOKEN');
     const jiraEmail = resolveCredential('ATLASSIAN_EMAIL');
     if (jiraUrl && jiraToken && jiraEmail) {
-      try {
-        const res = await axios.get(`${jiraUrl}/myself`, {
-          headers: {
-            Authorization: `Basic ${Buffer.from(`${jiraEmail}:${jiraToken}`).toString('base64')}`,
-            Accept: 'application/json',
-          },
-          timeout: 5000,
-        });
-        results.jira = res.status === 200;
-      } catch {}
+      results.jiraConfigured = true;
+      if (!results.jiraDisabled) {
+        try {
+          const res = await axios.get(`${jiraUrl}/myself`, {
+            headers: {
+              Authorization: `Basic ${Buffer.from(`${jiraEmail}:${jiraToken}`).toString('base64')}`,
+              Accept: 'application/json',
+            },
+            timeout: 5000,
+          });
+          results.jira = res.status === 200;
+        } catch {}
+      }
     }
   }
 

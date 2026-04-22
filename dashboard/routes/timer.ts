@@ -10,29 +10,54 @@ import {
   logSessionStart,
   setSessionJiraWorklogId,
 } from '../../lib/db.js';
-import { deleteJiraWorklog, stopJiraTimer } from '../../lib/jira.js';
+import { deleteJiraWorklog, getJiraTicket, stopJiraTimer } from '../../lib/jira.js';
+import { isClockifyEnabled, isJiraDisabled } from '../../lib/credentials.js';
 
 function extractJiraTicket(description: string): string | undefined {
   const match = description.match(/\b([A-Z][A-Z0-9]+-\d+)\b/);
   return match?.[1];
 }
 
+async function buildJiraDescription(ticket: string, typed: string): Promise<string> {
+  if (typed && typed !== ticket) return typed;
+  if (isJiraDisabled()) return ticket;
+  try {
+    const issue = (await getJiraTicket(ticket)) as { fields?: { summary?: string } } | null;
+    const summary = issue?.fields?.summary?.trim();
+    if (summary) return ticket + ' ' + summary;
+  } catch (err) {
+    console.warn('Jira summary lookup failed for', ticket, err);
+  }
+  return ticket;
+}
+
 const timerRoutes = new Hono();
 
 timerRoutes.get('/timer/active', async (c) => {
   try {
+    if (!isClockifyEnabled()) {
+      const openSession = getOpenSession();
+      if (!openSession) return c.json({ active: false });
+      return c.json({
+        active: true,
+        description: openSession.description,
+        projectId: openSession.projectId,
+        start: openSession.startedAt,
+        ...(openSession.jiraTicket ? { jiraTicket: openSession.jiraTicket } : {}),
+      });
+    }
+
     const clockify = new Clockify();
     const user = await clockify.getUser();
     if (!user) return c.json({ active: false });
 
     const timer = await clockify.getActiveTimer(user.defaultWorkspace, user.id);
     if (!timer) {
-      // Timer stopped externally (e.g. in Clockify app) — close any lingering open session
       const openSession = getOpenSession();
       if (openSession) {
         const completedAt = new Date().toISOString();
         completeLatestSession(completedAt, false);
-        if (openSession.jiraTicket) {
+        if (openSession.jiraTicket && !isJiraDisabled()) {
           const timeSpentSeconds = Math.round(
             (new Date(completedAt).getTime() - new Date(openSession.startedAt).getTime()) / 1000,
           );
@@ -49,7 +74,6 @@ timerRoutes.get('/timer/active', async (c) => {
       return c.json({ active: false });
     }
 
-    // Sync externally-started timers (e.g. from Clockify app or Jira plugin) to DB
     const timerStart = timer.timeInterval.start as string;
     const jiraTicket = extractJiraTicket(timer.description ?? '');
     const openSession = getOpenSession();
@@ -72,50 +96,85 @@ timerRoutes.get('/timer/active', async (c) => {
 
 timerRoutes.post('/timer/start', async (c) => {
   const { projectId, description, jiraTicket, billable } = await c.req.json<{
-    projectId: string;
+    projectId?: string | null;
     description: string;
     jiraTicket?: string;
     billable?: boolean;
   }>();
 
-  if (!projectId || !description) {
-    return c.json({ ok: false, error: 'Project and description are required.' }, 400);
+  const cleanDescription = (description ?? '').trim();
+  const cleanJira = jiraTicket?.trim() || undefined;
+  const clockifyOn = isClockifyEnabled();
+
+  if (clockifyOn) {
+    if (!projectId || !cleanDescription) {
+      return c.json({ ok: false, error: 'Project and description are required.' }, 400);
+    }
+    let clockifyStarted = false;
+    try {
+      const clockify = new Clockify();
+      const user = await clockify.getUser();
+      if (user) {
+        const result = await clockify.startTimer(
+          user.defaultWorkspace,
+          projectId,
+          cleanDescription,
+          cleanJira,
+          billable ?? true,
+        );
+        if (result) clockifyStarted = true;
+        else console.warn('Clockify startTimer returned null; falling through to Jira-only path.');
+      } else {
+        console.warn('Clockify enabled but getUser failed; falling through to Jira-only path.');
+      }
+    } catch (err) {
+      console.warn('Clockify start threw; falling through to Jira-only path:', err);
+    }
+    if (clockifyStarted) return c.json({ ok: true });
   }
 
+  // Jira-only or local-only path (also used as fallback when Clockify is unreachable)
+  if (!cleanJira && !cleanDescription) {
+    return c.json({ ok: false, error: 'Description or Jira ticket is required.' }, 400);
+  }
+  const finalDescription = cleanJira ? await buildJiraDescription(cleanJira, cleanDescription) : cleanDescription;
+  const sessionId = uuidv4();
+  const startedAt = new Date().toISOString();
   try {
-    const clockify = new Clockify();
-    const user = await clockify.getUser();
-    if (!user) return c.json({ ok: false, error: 'Could not connect to Clockify.' }, 500);
-
-    const result = await clockify.startTimer(
-      user.defaultWorkspace,
-      projectId,
-      description,
-      jiraTicket,
-      billable ?? true,
-    );
-    if (!result) return c.json({ ok: false, error: 'Failed to start timer.' }, 500);
-
+    logSessionStart(sessionId, projectId ?? null, finalDescription, startedAt, cleanJira);
     return c.json({ ok: true });
-  } catch {
+  } catch (err) {
+    console.error('Error starting session:', err);
     return c.json({ ok: false, error: 'Failed to start timer.' }, 500);
   }
 });
 
 timerRoutes.post('/timer/stop', async (c) => {
   try {
-    const clockify = new Clockify();
-    const user = await clockify.getUser();
-    if (!user) return c.json({ ok: false, error: 'Could not connect to Clockify.' }, 500);
-
     const openSession = getOpenSession();
-    const result = await clockify.stopTimer(user.defaultWorkspace, user.id);
-    if (!result) return c.json({ ok: false, error: 'Failed to stop timer.' }, 500);
+
+    if (isClockifyEnabled()) {
+      try {
+        const clockify = new Clockify();
+        const user = await clockify.getUser();
+        if (user) {
+          const result = await clockify.stopTimer(user.defaultWorkspace, user.id);
+          if (!result) console.warn('Clockify stopTimer returned null; proceeding with DB + worklog.');
+        } else {
+          console.warn('Clockify enabled but getUser failed; proceeding with DB + worklog.');
+        }
+      } catch (err) {
+        console.warn('Clockify stop threw; proceeding with DB + worklog:', err);
+      }
+      if (!openSession) return c.json({ ok: false, error: 'No active timer.' }, 404);
+    } else if (!openSession) {
+      return c.json({ ok: false, error: 'No active timer.' }, 404);
+    }
 
     const completedAt = new Date().toISOString();
     completeLatestSession(completedAt, false);
 
-    if (openSession?.jiraTicket) {
+    if (openSession?.jiraTicket && !isJiraDisabled()) {
       const timeSpentSeconds = Math.round(
         (new Date(completedAt).getTime() - new Date(openSession.startedAt).getTime()) / 1000,
       );
@@ -137,7 +196,7 @@ timerRoutes.post('/timer/stop', async (c) => {
 
 timerRoutes.post('/timer/log', async (c) => {
   const { projectId, description, start, end, jiraTicket, billable } = await c.req.json<{
-    projectId: string;
+    projectId?: string | null;
     description: string;
     start: string;
     end: string;
@@ -145,9 +204,6 @@ timerRoutes.post('/timer/log', async (c) => {
     billable?: boolean;
   }>();
 
-  if (!projectId) {
-    return c.json({ ok: false, error: 'Project is required.' }, 400);
-  }
   if (!start || !end) {
     return c.json({ ok: false, error: 'Start and end are required.' }, 400);
   }
@@ -163,33 +219,62 @@ timerRoutes.post('/timer/log', async (c) => {
 
   const cleanDescription = (description ?? '').trim();
   const cleanJira = jiraTicket?.trim() || undefined;
+  const clockifyOn = isClockifyEnabled();
+
+  if (clockifyOn && !projectId) {
+    return c.json({ ok: false, error: 'Project is required.' }, 400);
+  }
   if (!cleanDescription && !cleanJira) {
     return c.json({ ok: false, error: 'Description or Jira ticket is required.' }, 400);
   }
 
+  const startIso = new Date(startMs).toISOString();
+  const endIso = new Date(endMs).toISOString();
+  const clockifyDescription = cleanDescription || cleanJira || '';
+  let entryId: string | undefined;
+  let clockifySucceeded = false;
+
   try {
-    const clockify = new Clockify();
-    const user = await clockify.getUser();
-    if (!user) return c.json({ ok: false, error: 'Could not connect to Clockify.' }, 500);
+    if (clockifyOn) {
+      try {
+        const clockify = new Clockify();
+        const user = await clockify.getUser();
+        if (user) {
+          const entry = await clockify.logTime(
+            user.defaultWorkspace,
+            projectId!,
+            startIso,
+            endIso,
+            clockifyDescription,
+            billable ?? true,
+          );
+          if (entry) {
+            entryId = (entry as { id?: string }).id ?? uuidv4();
+            clockifySucceeded = true;
+          } else {
+            console.warn('Clockify logTime returned null; falling through to Jira-only path.');
+          }
+        } else {
+          console.warn('Clockify enabled but getUser failed; falling through to Jira-only path.');
+        }
+      } catch (err) {
+        console.warn('Clockify log threw; falling through to Jira-only path:', err);
+      }
+    }
 
-    const startIso = new Date(startMs).toISOString();
-    const endIso = new Date(endMs).toISOString();
-    const finalDescription = cleanDescription || cleanJira!;
+    if (!entryId) {
+      entryId = uuidv4();
+    }
 
-    const entry = await clockify.logTime(
-      user.defaultWorkspace,
-      projectId,
-      startIso,
-      endIso,
-      finalDescription,
-      billable ?? true,
-    );
-    if (!entry) return c.json({ ok: false, error: 'Failed to log time in Clockify.' }, 500);
+    const finalDescription = clockifySucceeded
+      ? clockifyDescription
+      : cleanJira
+        ? await buildJiraDescription(cleanJira, cleanDescription)
+        : cleanDescription;
 
-    const entryId = (entry as { id?: string }).id ?? uuidv4();
-    logCompletedSession(entryId, projectId, finalDescription, startIso, endIso, cleanJira);
+    logCompletedSession(entryId, projectId ?? null, finalDescription, startIso, endIso, cleanJira);
 
-    if (cleanJira) {
+    if (cleanJira && !isJiraDisabled()) {
       const timeSpentSeconds = Math.round((endMs - startMs) / 1000);
       if (timeSpentSeconds >= 60) {
         try {
@@ -216,15 +301,18 @@ timerRoutes.delete('/timer/:id', async (c) => {
   if (!session) return c.json({ ok: false, error: 'Session not found.' }, 404);
 
   try {
-    const clockify = new Clockify();
-    const user = await clockify.getUser();
-    if (!user) return c.json({ ok: false, error: 'Could not connect to Clockify.' }, 500);
+    if (isClockifyEnabled()) {
+      const clockify = new Clockify();
+      const user = await clockify.getUser();
+      if (user) {
+        const clockifyOk = await clockify.deleteTimeEntry(user.defaultWorkspace, id);
+        if (!clockifyOk) console.warn(`Clockify delete returned failure for ${id}; removing local record anyway.`);
+      } else {
+        console.warn('Clockify enabled but getUser failed; skipping remote delete.');
+      }
+    }
 
-    const clockifyOk = await clockify.deleteTimeEntry(user.defaultWorkspace, id);
-    // Continue even if Clockify delete fails — the entry may already be gone remotely.
-    if (!clockifyOk) console.warn(`Clockify delete returned failure for ${id}; removing local record anyway.`);
-
-    if (session.jiraTicket && session.jiraWorklogId) {
+    if (session.jiraTicket && session.jiraWorklogId && !isJiraDisabled()) {
       try {
         await deleteJiraWorklog(session.jiraTicket, session.jiraWorklogId);
       } catch (err) {

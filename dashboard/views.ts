@@ -1331,12 +1331,8 @@ export function indexPage() {
         }
         const toggle = document.getElementById('clockify-enabled-toggle');
         const toggleLabel = document.getElementById('clockify-enabled-label');
-        const hasKey = !!data.clockifyKeyHint;
-        const enabled = hasKey && !data.clockifyDisabled;
-        if (toggle) {
-          toggle.checked = enabled;
-          toggle.disabled = !hasKey;
-        }
+        const enabled = !data.clockifyDisabled;
+        if (toggle) toggle.checked = enabled;
         if (toggleLabel) toggleLabel.textContent = enabled ? 'Enabled' : 'Disabled';
         setGoogleConnected(data.google, data.googleEmail);
         setJiraConnected(data.jira, data.jiraOAuth, data.jiraSiteUrl);

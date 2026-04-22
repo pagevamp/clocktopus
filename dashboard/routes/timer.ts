@@ -11,7 +11,7 @@ import {
   setSessionJiraWorklogId,
 } from '../../lib/db.js';
 import { deleteJiraWorklog, getJiraTicket, stopJiraTimer } from '../../lib/jira.js';
-import { isClockifyEnabled } from '../../lib/credentials.js';
+import { isClockifyEnabled, isJiraDisabled } from '../../lib/credentials.js';
 
 function extractJiraTicket(description: string): string | undefined {
   const match = description.match(/\b([A-Z][A-Z0-9]+-\d+)\b/);
@@ -20,6 +20,7 @@ function extractJiraTicket(description: string): string | undefined {
 
 async function buildJiraDescription(ticket: string, typed: string): Promise<string> {
   if (typed && typed !== ticket) return typed;
+  if (isJiraDisabled()) return ticket;
   try {
     const issue = (await getJiraTicket(ticket)) as { fields?: { summary?: string } } | null;
     const summary = issue?.fields?.summary?.trim();
@@ -56,7 +57,7 @@ timerRoutes.get('/timer/active', async (c) => {
       if (openSession) {
         const completedAt = new Date().toISOString();
         completeLatestSession(completedAt, false);
-        if (openSession.jiraTicket) {
+        if (openSession.jiraTicket && !isJiraDisabled()) {
           const timeSpentSeconds = Math.round(
             (new Date(completedAt).getTime() - new Date(openSession.startedAt).getTime()) / 1000,
           );
@@ -173,7 +174,7 @@ timerRoutes.post('/timer/stop', async (c) => {
     const completedAt = new Date().toISOString();
     completeLatestSession(completedAt, false);
 
-    if (openSession?.jiraTicket) {
+    if (openSession?.jiraTicket && !isJiraDisabled()) {
       const timeSpentSeconds = Math.round(
         (new Date(completedAt).getTime() - new Date(openSession.startedAt).getTime()) / 1000,
       );
@@ -273,7 +274,7 @@ timerRoutes.post('/timer/log', async (c) => {
 
     logCompletedSession(entryId, projectId ?? null, finalDescription, startIso, endIso, cleanJira);
 
-    if (cleanJira) {
+    if (cleanJira && !isJiraDisabled()) {
       const timeSpentSeconds = Math.round((endMs - startMs) / 1000);
       if (timeSpentSeconds >= 60) {
         try {
@@ -311,7 +312,7 @@ timerRoutes.delete('/timer/:id', async (c) => {
       }
     }
 
-    if (session.jiraTicket && session.jiraWorklogId) {
+    if (session.jiraTicket && session.jiraWorklogId && !isJiraDisabled()) {
       try {
         await deleteJiraWorklog(session.jiraTicket, session.jiraWorklogId);
       } catch (err) {

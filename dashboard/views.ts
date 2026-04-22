@@ -134,7 +134,7 @@ export function indexPage() {
     .local-hint a { color: #58a6ff; }
 
     #ctx-menu { position: fixed; display: none; z-index: 9999; background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 0.25rem; min-width: 140px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
-    #ctx-menu button { display: block; width: 100%; text-align: left; background: transparent; border: none; color: #e1e4e8; padding: 0.4rem 0.7rem; border-radius: 4px; font-size: 0.85rem; cursor: pointer; }
+    #ctx-menu button { display: block; width: 100%; margin: 0; text-align: left; background: transparent; border: none; color: #e1e4e8; padding: 0.4rem 0.7rem; border-radius: 4px; font-size: 0.85rem; cursor: pointer; }
     #ctx-menu button:hover { background: #21262d; }
 
   </style>
@@ -347,6 +347,13 @@ export function indexPage() {
         </div>
         <p id="jira-desc" style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Connect your Atlassian account to log time on Jira tickets.</p>
         <button class="connect" id="jira-connect-btn" onclick="connectJira()">Connect Atlassian</button>
+        <div style="display:flex; align-items:center; gap:0.6rem; margin-top:0.75rem;">
+          <label class="toggle">
+            <input type="checkbox" id="jira-enabled-toggle" onchange="toggleJiraEnabled()" />
+            <span class="slider"></span>
+          </label>
+          <span id="jira-enabled-label" style="font-size:0.9rem; color:#8b949e;">Enabled</span>
+        </div>
         <div class="msg" id="jira-msg"></div>
         <div style="margin-top:1rem;">
           <a href="#" id="jira-toggle" onclick="toggleJiraForm(event)" style="font-size:0.8rem;color:#8b949e;text-decoration:none;">or use API token &darr;</a>
@@ -1171,6 +1178,27 @@ export function indexPage() {
       }
     }
 
+    async function toggleJiraEnabled() {
+      const enabled = document.getElementById('jira-enabled-toggle').checked;
+      document.getElementById('jira-enabled-label').textContent = enabled ? 'Enabled' : 'Disabled';
+      try {
+        const res = await fetch('/api/jira/enabled', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          setMsg('jira-msg', enabled ? 'Jira enabled.' : 'Jira disabled.', true);
+          fetchStatus();
+        } else {
+          setMsg('jira-msg', data.error || 'Failed to update.', false);
+        }
+      } catch {
+        setMsg('jira-msg', 'Request failed.', false);
+      }
+    }
+
     async function saveJira() {
       const url = document.getElementById('jira-url').value.trim();
       const email = document.getElementById('jira-email').value.trim();
@@ -1295,8 +1323,8 @@ export function indexPage() {
         if (manualDescWrap) manualDescWrap.style.display = '';
         if (descPreview) descPreview.style.display = 'none';
         if (manualDescPreview) manualDescPreview.style.display = 'none';
-        if (jiraWrap) jiraWrap.style.display = '';
-        if (manualJiraWrap) manualJiraWrap.style.display = '';
+        if (jiraWrap) jiraWrap.style.display = jiraOn ? '' : 'none';
+        if (manualJiraWrap) manualJiraWrap.style.display = jiraOn ? '' : 'none';
         if (jiraInput) jiraInput.required = false;
         if (manualJiraInput) manualJiraInput.required = false;
         if (jiraLabel) jiraLabel.textContent = 'Jira Ticket (optional)';
@@ -1382,6 +1410,16 @@ export function indexPage() {
         if (toggleLabel) toggleLabel.textContent = enabled ? 'Enabled' : 'Disabled';
         if (keyInput) keyInput.disabled = !enabled;
         if (saveBtn) saveBtn.disabled = !enabled;
+
+        const jToggle = document.getElementById('jira-enabled-toggle');
+        const jToggleLabel = document.getElementById('jira-enabled-label');
+        const jConnectBtn = document.getElementById('jira-connect-btn');
+        const jToggleWrap = jToggle ? jToggle.closest('label').parentElement : null;
+        const jiraEnabled = !data.jiraDisabled;
+        if (jToggle) jToggle.checked = jiraEnabled;
+        if (jToggleLabel) jToggleLabel.textContent = jiraEnabled ? 'Enabled' : 'Disabled';
+        if (jToggleWrap) jToggleWrap.style.display = data.jiraConfigured ? '' : 'none';
+        if (jConnectBtn) jConnectBtn.disabled = data.jiraConfigured && !jiraEnabled;
         setGoogleConnected(data.google, data.googleEmail);
         setJiraConnected(data.jira, data.jiraOAuth, data.jiraSiteUrl);
         applyMode(data);

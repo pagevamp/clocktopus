@@ -1,10 +1,16 @@
 import { Hono } from 'hono';
 import axios from 'axios';
-import { saveCredential } from '../../lib/credentials.js';
+import { saveCredential, setJiraDisabled } from '../../lib/credentials.js';
 import { storeAtlassianToken } from '../../lib/db.js';
 import { getAtlassianAuthUrl, exchangeCodeForTokens, getAccessibleResources } from '../../lib/atlassian.js';
 
 const jiraRoutes = new Hono();
+
+jiraRoutes.post('/jira/enabled', async (c) => {
+  const { enabled } = await c.req.json<{ enabled: boolean }>();
+  setJiraDisabled(!enabled);
+  return c.json({ ok: true });
+});
 
 // OAuth: redirect to Atlassian authorization (browser fallback)
 jiraRoutes.get('/jira/connect', async (c) => {

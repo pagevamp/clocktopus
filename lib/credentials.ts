@@ -25,3 +25,11 @@ export function setClockifyDisabled(disabled: boolean) {
 export function isClockifyEnabled(): boolean {
   return isClockifyKeyValid(resolveCredential('CLOCKIFY_API_KEY')) && !isClockifyDisabled();
 }
+
+export function isJiraDisabled(): boolean {
+  return resolveCredential('JIRA_DISABLED') === '1';
+}
+
+export function setJiraDisabled(disabled: boolean) {
+  setCredential('JIRA_DISABLED', disabled ? '1' : '0');
+}

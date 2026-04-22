@@ -8,7 +8,7 @@ import {
   toggleProjectActive,
 } from '../../lib/db.js';
 import { Clockify } from '../../clockify.js';
-import { isClockifyEnabled } from '../../lib/credentials.js';
+import { isClockifyEnabled, isJiraDisabled } from '../../lib/credentials.js';
 import { getJiraTicket } from '../../lib/jira.js';
 
 const dataRoutes = new Hono();
@@ -84,6 +84,7 @@ dataRoutes.get('/jira/ticket-summary', async (c) => {
   if (!ticket || !/^[A-Z][A-Z0-9]+-\d+$/.test(ticket)) {
     return c.json({ ok: false, error: 'Invalid ticket.' }, 400);
   }
+  if (isJiraDisabled()) return c.json({ ok: true, description: null });
   try {
     const issue = (await getJiraTicket(ticket)) as { fields?: { summary?: string } } | null;
     const summary = issue?.fields?.summary?.trim();

@@ -1149,9 +1149,11 @@ export function indexPage() {
       var el = document.getElementById(previewId);
       if (!el) return;
       if (!ticket) {
-        el.innerHTML = '<span class="ticket-hint">Enter a Jira ticket above to preview the description.</span>';
+        el.style.display = 'none';
+        el.innerHTML = '';
         return;
       }
+      el.style.display = '';
       if (description) {
         el.innerHTML = '<span class="ticket-id">' + escapeHtml(ticket) + '</span>' + escapeHtml(description);
       } else {

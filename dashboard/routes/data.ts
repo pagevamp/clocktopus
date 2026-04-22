@@ -65,7 +65,7 @@ dataRoutes.get('/sessions', (c) => {
 
   const enriched = (sessions as Array<Record<string, unknown>>).map((s) => ({
     ...s,
-    projectName: projectMap.get(s.projectId as string) ?? 'Unknown',
+    projectName: s.projectId ? (projectMap.get(s.projectId as string) ?? 'Unknown') : null,
   }));
 
   return c.json({

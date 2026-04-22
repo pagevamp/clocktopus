@@ -125,11 +125,16 @@ export function indexPage() {
     .toggle input:checked + .slider { background: #238636; }
     .toggle input:checked + .slider::before { transform: translateX(16px); background: #fff; }
 
+    .is-disabled { opacity: 0.45; pointer-events: none; }
+    .mode-chip { display: inline-block; padding: 0.15rem 0.5rem; margin-left: 0.5rem; border-radius: 999px; font-size: 0.75rem; background: #1f6feb22; color: #58a6ff; }
+    .mode-pill { display: inline-block; padding: 0.15rem 0.6rem; margin-left: 0.5rem; border-radius: 999px; font-size: 0.7rem; background: #1f6feb22; color: #58a6ff; vertical-align: middle; }
+    .empty-state-card { padding: 1.5rem; text-align: center; color: #8b949e; font-size: 0.9rem; }
+
   </style>
 </head>
 <body oncontextmenu="return false;">
   <div class="header">
-    <h1>Clocktopus</h1>
+    <h1>Clocktopus<span id="mode-pill" class="mode-pill" style="display:none;">Jira-only</span></h1>
     <div class="nav">
       <button class="nav-btn active" onclick="switchTab('home')" id="nav-home">Home</button>
       <button class="nav-btn" onclick="switchTab('projects')" id="nav-projects">Projects</button>
@@ -152,18 +157,21 @@ export function indexPage() {
 
     <div class="cards home-cards">
       <!-- Track Time -->
-      <div class="card">
-        <div class="track-tabs">
+      <div class="card" id="track-card">
+        <div class="track-tabs" id="track-tabs">
           <button class="track-tab-btn active" data-mode="auto" onclick="switchTrackMode('auto')">Auto Track</button>
           <button class="track-tab-btn" data-mode="manual" onclick="switchTrackMode('manual')">Manual Log</button>
+          <span id="track-mode-chip" class="mode-chip" style="display:none;">Jira-only mode</span>
         </div>
 
         <div id="track-auto">
           <div id="start-timer-form">
-            <label for="project-select">Project</label>
-            <select id="project-select">
-              <option value="">Loading projects...</option>
-            </select>
+            <div id="timer-project-wrap">
+              <label for="project-select">Project</label>
+              <select id="project-select">
+                <option value="">Loading projects...</option>
+              </select>
+            </div>
             <div class="form-row">
               <div>
                 <label for="timer-description">Description</label>
@@ -174,7 +182,7 @@ export function indexPage() {
                 <input type="text" id="timer-jira" placeholder="e.g. PROJ-123" />
               </div>
             </div>
-            <label style="display:flex; align-items:center; gap:0.5rem; font-weight:normal; cursor:pointer;">
+            <label id="timer-billable-wrap" style="display:flex; align-items:center; gap:0.5rem; font-weight:normal; cursor:pointer;">
               <input type="checkbox" id="timer-billable" checked style="width:auto; margin:0;" />
               Billable
             </label>
@@ -185,10 +193,12 @@ export function indexPage() {
         </div>
 
         <div id="track-manual" style="display:none;">
-          <label for="manual-project">Project</label>
-          <select id="manual-project">
-            <option value="">Loading projects...</option>
-          </select>
+          <div id="manual-project-wrap">
+            <label for="manual-project">Project</label>
+            <select id="manual-project">
+              <option value="">Loading projects...</option>
+            </select>
+          </div>
           <div class="form-row">
             <div>
               <label for="manual-start">Start</label>
@@ -209,13 +219,18 @@ export function indexPage() {
               <input type="text" id="manual-jira" placeholder="e.g. PROJ-123" />
             </div>
           </div>
-          <label style="display:flex; align-items:center; gap:0.5rem; font-weight:normal; cursor:pointer;">
+          <label id="manual-billable-wrap" style="display:flex; align-items:center; gap:0.5rem; font-weight:normal; cursor:pointer;">
             <input type="checkbox" id="manual-billable" checked style="width:auto; margin:0;" />
             Billable
           </label>
           <button id="manual-log-btn" onclick="logManualTime()">Log Time</button>
           <div class="msg" id="manual-msg"></div>
         </div>
+      </div>
+
+      <!-- No provider configured -->
+      <div class="card empty-state-card" id="no-provider-card" style="display:none;">
+        Configure Clockify or Jira in <a href="#" onclick="switchTab('settings');return false;" style="color:#58a6ff;">Settings</a> to start tracking.
       </div>
 
       <!-- Monitor Control -->
@@ -304,6 +319,7 @@ export function indexPage() {
         </div>
         <p id="google-desc" style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Authorize access to your Google Calendar.</p>
         <button class="connect" id="google-connect-btn" onclick="connectGoogle()">Connect Google Account</button>
+        <p id="google-connect-note" style="font-size:0.75rem;color:#8b949e;margin-top:0.5rem;display:none;"></p>
         <div class="msg" id="google-msg"></div>
       </div>
 
@@ -395,10 +411,12 @@ export function indexPage() {
 
     // --- Tab switching ---
     function switchTab(tab) {
+      const nav = document.getElementById('nav-' + tab);
+      if (nav && nav.getAttribute('aria-disabled') === 'true') return;
       document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
       document.getElementById('tab-' + tab).classList.add('active');
-      document.getElementById('nav-' + tab).classList.add('active');
+      if (nav) nav.classList.add('active');
     }
 
     function switchTrackMode(mode) {
@@ -893,7 +911,7 @@ export function indexPage() {
             : '';
           return '<tr>' +
             '<td>' + escapeHtml(s.description) + '</td>' +
-            '<td>' + escapeHtml(s.projectName) + '</td>' +
+            '<td>' + (s.projectName ? escapeHtml(s.projectName) : '—') + '</td>' +
             '<td>' + started + '</td>' +
             '<td>' + duration + '</td>' +
             '<td>' + escapeHtml(jira) + '</td>' +
@@ -1101,6 +1119,84 @@ export function indexPage() {
     }
 
     // --- Status ---
+    function applyMode(data) {
+      const clockifyOn = !!data.clockify;
+      const jiraOn = !!data.jira;
+      const noProvider = !clockifyOn && !jiraOn;
+
+      // Header mode pill
+      const pill = document.getElementById('mode-pill');
+      if (pill) pill.style.display = (!clockifyOn && jiraOn) ? 'inline-block' : 'none';
+
+      // Timer form: hide project + mark Jira required in Jira-only; hide entire form when no provider
+      const trackCard = document.getElementById('track-card');
+      const noProviderCard = document.getElementById('no-provider-card');
+      const projWrap = document.getElementById('timer-project-wrap');
+      const manualProjWrap = document.getElementById('manual-project-wrap');
+      const chip = document.getElementById('track-mode-chip');
+      const jiraInput = document.getElementById('timer-jira');
+      const manualJiraInput = document.getElementById('manual-jira');
+      const billableWrap = document.getElementById('timer-billable-wrap');
+      const manualBillableWrap = document.getElementById('manual-billable-wrap');
+
+      if (noProvider) {
+        if (trackCard) trackCard.style.display = 'none';
+        if (noProviderCard) noProviderCard.style.display = '';
+      } else {
+        if (trackCard) trackCard.style.display = '';
+        if (noProviderCard) noProviderCard.style.display = 'none';
+        if (clockifyOn) {
+          if (projWrap) projWrap.style.display = '';
+          if (manualProjWrap) manualProjWrap.style.display = '';
+          if (chip) chip.style.display = 'none';
+          if (jiraInput) jiraInput.required = false;
+          if (manualJiraInput) manualJiraInput.required = false;
+          if (billableWrap) billableWrap.style.display = '';
+          if (manualBillableWrap) manualBillableWrap.style.display = '';
+        } else {
+          if (projWrap) projWrap.style.display = 'none';
+          if (manualProjWrap) manualProjWrap.style.display = 'none';
+          if (chip) chip.style.display = 'inline-block';
+          if (jiraInput) jiraInput.required = true;
+          if (manualJiraInput) manualJiraInput.required = true;
+          if (billableWrap) billableWrap.style.display = 'none';
+          if (manualBillableWrap) manualBillableWrap.style.display = 'none';
+        }
+      }
+
+      // Projects tab: hide "Pull from Clockify" button
+      const pullBtn = document.getElementById('fetch-projects-btn');
+      if (pullBtn) pullBtn.style.display = clockifyOn ? '' : 'none';
+
+      // Calendar tab: disable nav when Clockify off
+      const calNav = document.getElementById('nav-calendar');
+      if (calNav) {
+        if (clockifyOn) {
+          calNav.removeAttribute('aria-disabled');
+          calNav.classList.remove('is-disabled');
+          calNav.title = '';
+        } else {
+          calNav.setAttribute('aria-disabled', 'true');
+          calNav.classList.add('is-disabled');
+          calNav.title = 'Calendar sync requires Clockify.';
+        }
+      }
+
+      // Settings: Google Connect button — disable when Clockify off
+      const gBtn = document.getElementById('google-connect-btn');
+      const gNote = document.getElementById('google-connect-note');
+      if (gBtn) gBtn.disabled = !clockifyOn;
+      if (gNote) {
+        if (clockifyOn) {
+          gNote.textContent = '';
+          gNote.style.display = 'none';
+        } else {
+          gNote.textContent = 'Calendar sync requires Clockify. Connect Clockify first.';
+          gNote.style.display = '';
+        }
+      }
+    }
+
     async function fetchStatus() {
       try {
         const res = await fetch('/api/status');
@@ -1113,6 +1209,7 @@ export function indexPage() {
         }
         setGoogleConnected(data.google, data.googleEmail);
         setJiraConnected(data.jira, data.jiraOAuth, data.jiraSiteUrl);
+        applyMode(data);
       } catch {}
     }
 

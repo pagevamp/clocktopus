@@ -517,7 +517,7 @@ export function indexPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             projectId: projectId || undefined,
-            description: description || 'Working on a task...',
+            description: currentMode.clockifyOn ? (description || 'Working on a task...') : '',
             jiraTicket: jiraTicket || undefined,
             billable,
           }),

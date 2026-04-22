@@ -161,7 +161,9 @@ export function indexPage() {
         <div class="track-tabs" id="track-tabs">
           <button class="track-tab-btn active" data-mode="auto" onclick="switchTrackMode('auto')">Auto Track</button>
           <button class="track-tab-btn" data-mode="manual" onclick="switchTrackMode('manual')">Manual Log</button>
-          <span id="track-mode-chip" class="mode-chip" style="display:none;">Jira-only mode</span>
+        </div>
+        <div id="track-mode-chip-row" style="display:none; margin-bottom:0.75rem;">
+          <span id="track-mode-chip" class="mode-chip">Jira-only mode</span>
         </div>
 
         <div id="track-auto">
@@ -178,7 +180,7 @@ export function indexPage() {
                 <input type="text" id="timer-description" placeholder="What are you working on?" />
               </div>
               <div>
-                <label for="timer-jira">Jira Ticket (optional)</label>
+                <label for="timer-jira" id="timer-jira-label">Jira Ticket (optional)</label>
                 <input type="text" id="timer-jira" placeholder="e.g. PROJ-123" />
               </div>
             </div>
@@ -215,7 +217,7 @@ export function indexPage() {
               <input type="text" id="manual-description" placeholder="What did you work on?" />
             </div>
             <div>
-              <label for="manual-jira">Jira Ticket (optional)</label>
+              <label for="manual-jira" id="manual-jira-label">Jira Ticket (optional)</label>
               <input type="text" id="manual-jira" placeholder="e.g. PROJ-123" />
             </div>
           </div>
@@ -1133,9 +1135,11 @@ export function indexPage() {
       const noProviderCard = document.getElementById('no-provider-card');
       const projWrap = document.getElementById('timer-project-wrap');
       const manualProjWrap = document.getElementById('manual-project-wrap');
-      const chip = document.getElementById('track-mode-chip');
+      const chipRow = document.getElementById('track-mode-chip-row');
       const jiraInput = document.getElementById('timer-jira');
       const manualJiraInput = document.getElementById('manual-jira');
+      const jiraLabel = document.getElementById('timer-jira-label');
+      const manualJiraLabel = document.getElementById('manual-jira-label');
       const billableWrap = document.getElementById('timer-billable-wrap');
       const manualBillableWrap = document.getElementById('manual-billable-wrap');
 
@@ -1148,17 +1152,21 @@ export function indexPage() {
         if (clockifyOn) {
           if (projWrap) projWrap.style.display = '';
           if (manualProjWrap) manualProjWrap.style.display = '';
-          if (chip) chip.style.display = 'none';
+          if (chipRow) chipRow.style.display = 'none';
           if (jiraInput) jiraInput.required = false;
           if (manualJiraInput) manualJiraInput.required = false;
+          if (jiraLabel) jiraLabel.textContent = 'Jira Ticket (optional)';
+          if (manualJiraLabel) manualJiraLabel.textContent = 'Jira Ticket (optional)';
           if (billableWrap) billableWrap.style.display = '';
           if (manualBillableWrap) manualBillableWrap.style.display = '';
         } else {
           if (projWrap) projWrap.style.display = 'none';
           if (manualProjWrap) manualProjWrap.style.display = 'none';
-          if (chip) chip.style.display = 'inline-block';
+          if (chipRow) chipRow.style.display = '';
           if (jiraInput) jiraInput.required = true;
           if (manualJiraInput) manualJiraInput.required = true;
+          if (jiraLabel) jiraLabel.textContent = 'Jira Ticket';
+          if (manualJiraLabel) manualJiraLabel.textContent = 'Jira Ticket';
           if (billableWrap) billableWrap.style.display = 'none';
           if (manualBillableWrap) manualBillableWrap.style.display = 'none';
         }
@@ -1168,19 +1176,13 @@ export function indexPage() {
       const pullBtn = document.getElementById('fetch-projects-btn');
       if (pullBtn) pullBtn.style.display = clockifyOn ? '' : 'none';
 
-      // Calendar tab: disable nav when Clockify off
+      // Projects nav: hide entire tab when Clockify off
+      const projectsNav = document.getElementById('nav-projects');
+      if (projectsNav) projectsNav.style.display = clockifyOn ? '' : 'none';
+
+      // Calendar nav: hide entire tab when Clockify off
       const calNav = document.getElementById('nav-calendar');
-      if (calNav) {
-        if (clockifyOn) {
-          calNav.removeAttribute('aria-disabled');
-          calNav.classList.remove('is-disabled');
-          calNav.title = '';
-        } else {
-          calNav.setAttribute('aria-disabled', 'true');
-          calNav.classList.add('is-disabled');
-          calNav.title = 'Calendar sync requires Clockify.';
-        }
-      }
+      if (calNav) calNav.style.display = clockifyOn ? '' : 'none';
 
       // Settings: Google Connect button — disable when Clockify off
       const gBtn = document.getElementById('google-connect-btn');

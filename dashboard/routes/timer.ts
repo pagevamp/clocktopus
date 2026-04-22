@@ -132,18 +132,18 @@ timerRoutes.post('/timer/start', async (c) => {
     if (clockifyStarted) return c.json({ ok: true });
   }
 
-  // Jira-only path (also used as fallback when Clockify is unreachable)
-  if (!cleanJira) {
-    return c.json({ ok: false, error: 'Jira ticket required in Jira-only mode.' }, 400);
+  // Jira-only or local-only path (also used as fallback when Clockify is unreachable)
+  if (!cleanJira && !cleanDescription) {
+    return c.json({ ok: false, error: 'Description or Jira ticket is required.' }, 400);
   }
-  const finalDescription = await buildJiraDescription(cleanJira, cleanDescription);
+  const finalDescription = cleanJira ? await buildJiraDescription(cleanJira, cleanDescription) : cleanDescription;
   const sessionId = uuidv4();
   const startedAt = new Date().toISOString();
   try {
     logSessionStart(sessionId, projectId ?? null, finalDescription, startedAt, cleanJira);
     return c.json({ ok: true });
   } catch (err) {
-    console.error('Error starting Jira-only session:', err);
+    console.error('Error starting session:', err);
     return c.json({ ok: false, error: 'Failed to start timer.' }, 500);
   }
 });
@@ -220,17 +220,11 @@ timerRoutes.post('/timer/log', async (c) => {
   const cleanJira = jiraTicket?.trim() || undefined;
   const clockifyOn = isClockifyEnabled();
 
-  if (clockifyOn) {
-    if (!projectId) {
-      return c.json({ ok: false, error: 'Project is required.' }, 400);
-    }
-    if (!cleanDescription && !cleanJira) {
-      return c.json({ ok: false, error: 'Description or Jira ticket is required.' }, 400);
-    }
-  } else {
-    if (!cleanJira) {
-      return c.json({ ok: false, error: 'Jira ticket required in Jira-only mode.' }, 400);
-    }
+  if (clockifyOn && !projectId) {
+    return c.json({ ok: false, error: 'Project is required.' }, 400);
+  }
+  if (!cleanDescription && !cleanJira) {
+    return c.json({ ok: false, error: 'Description or Jira ticket is required.' }, 400);
   }
 
   const startIso = new Date(startMs).toISOString();
@@ -268,15 +262,14 @@ timerRoutes.post('/timer/log', async (c) => {
     }
 
     if (!entryId) {
-      if (!cleanJira) {
-        return c.json({ ok: false, error: 'Jira ticket required in Jira-only mode.' }, 400);
-      }
       entryId = uuidv4();
     }
 
     const finalDescription = clockifySucceeded
       ? clockifyDescription
-      : await buildJiraDescription(cleanJira!, cleanDescription);
+      : cleanJira
+        ? await buildJiraDescription(cleanJira, cleanDescription)
+        : cleanDescription;
 
     logCompletedSession(entryId, projectId ?? null, finalDescription, startIso, endIso, cleanJira);
 

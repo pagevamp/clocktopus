@@ -230,9 +230,9 @@ export function indexPage() {
         </div>
       </div>
 
-      <!-- No provider configured -->
-      <div class="card empty-state-card" id="no-provider-card" style="display:none;">
-        Configure Clockify or Jira in <a href="#" onclick="switchTab('settings');return false;" style="color:#58a6ff;">Settings</a> to start tracking.
+      <!-- Local-only banner when no provider is configured -->
+      <div class="card empty-state-card" id="local-only-banner" style="display:none;">
+        Time will be logged locally only. Configure Clockify or Jira in <a href="#" onclick="switchTab('settings');return false;" style="color:#58a6ff;">Settings</a> to sync.
       </div>
 
       <!-- Monitor Control -->
@@ -505,13 +505,15 @@ export function indexPage() {
       const jiraTicket = document.getElementById('timer-jira').value.trim();
       const billable = document.getElementById('timer-billable').checked;
       const typedDescription = document.getElementById('timer-description').value.trim();
-      const description = currentMode.clockifyOn ? typedDescription : '';
+      const description = typedDescription;
 
       if (currentMode.clockifyOn) {
         if (!projectId) return setMsg('timer-msg', 'Please select a project.', false);
         if (!typedDescription && !jiraTicket) return setMsg('timer-msg', 'Please enter a description or Jira ticket.', false);
-      } else {
+      } else if (currentMode.jiraOn) {
         if (!jiraTicket) return setMsg('timer-msg', 'Please enter a Jira ticket.', false);
+      } else {
+        if (!typedDescription) return setMsg('timer-msg', 'Please enter a description.', false);
       }
 
       const btn = document.getElementById('start-btn');
@@ -524,7 +526,7 @@ export function indexPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             projectId: projectId || undefined,
-            description: currentMode.clockifyOn ? (description || 'Working on a task...') : '',
+            description: currentMode.clockifyOn ? (description || 'Working on a task...') : description,
             jiraTicket: jiraTicket || undefined,
             billable,
           }),
@@ -590,7 +592,7 @@ export function indexPage() {
       const typedDescription = document.getElementById('manual-description').value.trim();
       const jiraTicket = document.getElementById('manual-jira').value.trim();
       const billable = document.getElementById('manual-billable').checked;
-      const description = currentMode.clockifyOn ? typedDescription : '';
+      const description = typedDescription;
 
       if (!startVal || !endVal) return setMsg('manual-msg', 'Please set start and end.', false);
 
@@ -602,8 +604,10 @@ export function indexPage() {
       if (currentMode.clockifyOn) {
         if (!projectId) return setMsg('manual-msg', 'Please select a project.', false);
         if (!typedDescription && !jiraTicket) return setMsg('manual-msg', 'Please enter a description or Jira ticket.', false);
-      } else {
+      } else if (currentMode.jiraOn) {
         if (!jiraTicket) return setMsg('manual-msg', 'Please enter a Jira ticket.', false);
+      } else {
+        if (!typedDescription) return setMsg('manual-msg', 'Please enter a description.', false);
       }
 
       const btn = document.getElementById('manual-log-btn');
@@ -1235,13 +1239,12 @@ export function indexPage() {
     function applyMode(data) {
       const clockifyOn = !!data.clockify;
       const jiraOn = !!data.jira;
-      const noProvider = !clockifyOn && !jiraOn;
+      const localOnly = !clockifyOn && !jiraOn;
       currentMode.clockifyOn = clockifyOn;
       currentMode.jiraOn = jiraOn;
 
-      // Timer form: hide project + mark Jira required in Jira-only; hide entire form when no provider
       const trackCard = document.getElementById('track-card');
-      const noProviderCard = document.getElementById('no-provider-card');
+      const localBanner = document.getElementById('local-only-banner');
       const projWrap = document.getElementById('timer-project-wrap');
       const manualProjWrap = document.getElementById('manual-project-wrap');
       const descWrap = document.getElementById('timer-description-wrap');
@@ -1252,44 +1255,60 @@ export function indexPage() {
       const manualJiraInput = document.getElementById('manual-jira');
       const jiraLabel = document.getElementById('timer-jira-label');
       const manualJiraLabel = document.getElementById('manual-jira-label');
+      const jiraWrap = jiraInput ? jiraInput.closest('.row') || jiraInput.parentElement : null;
+      const manualJiraWrap = manualJiraInput ? manualJiraInput.closest('.row') || manualJiraInput.parentElement : null;
       const billableWrap = document.getElementById('timer-billable-wrap');
       const manualBillableWrap = document.getElementById('manual-billable-wrap');
 
-      if (noProvider) {
-        if (trackCard) trackCard.style.display = 'none';
-        if (noProviderCard) noProviderCard.style.display = '';
+      if (trackCard) trackCard.style.display = '';
+      if (localBanner) localBanner.style.display = localOnly ? '' : 'none';
+
+      if (clockifyOn) {
+        if (projWrap) projWrap.style.display = '';
+        if (manualProjWrap) manualProjWrap.style.display = '';
+        if (descWrap) descWrap.style.display = '';
+        if (manualDescWrap) manualDescWrap.style.display = '';
+        if (descPreview) descPreview.style.display = 'none';
+        if (manualDescPreview) manualDescPreview.style.display = 'none';
+        if (jiraWrap) jiraWrap.style.display = '';
+        if (manualJiraWrap) manualJiraWrap.style.display = '';
+        if (jiraInput) jiraInput.required = false;
+        if (manualJiraInput) manualJiraInput.required = false;
+        if (jiraLabel) jiraLabel.textContent = 'Jira Ticket (optional)';
+        if (manualJiraLabel) manualJiraLabel.textContent = 'Jira Ticket (optional)';
+        if (billableWrap) billableWrap.style.display = '';
+        if (manualBillableWrap) manualBillableWrap.style.display = '';
+      } else if (jiraOn) {
+        if (projWrap) projWrap.style.display = 'none';
+        if (manualProjWrap) manualProjWrap.style.display = 'none';
+        if (descWrap) descWrap.style.display = 'none';
+        if (manualDescWrap) manualDescWrap.style.display = 'none';
+        if (descPreview) { descPreview.style.display = ''; renderTicketPreview('timer-description-preview', (jiraInput ? jiraInput.value.trim().toUpperCase() : ''), timerJiraSummary); }
+        if (manualDescPreview) { manualDescPreview.style.display = ''; renderTicketPreview('manual-description-preview', (manualJiraInput ? manualJiraInput.value.trim().toUpperCase() : ''), manualJiraSummary); }
+        if (jiraWrap) jiraWrap.style.display = '';
+        if (manualJiraWrap) manualJiraWrap.style.display = '';
+        if (jiraInput) jiraInput.required = true;
+        if (manualJiraInput) manualJiraInput.required = true;
+        if (jiraLabel) jiraLabel.textContent = 'Jira Ticket';
+        if (manualJiraLabel) manualJiraLabel.textContent = 'Jira Ticket';
+        if (billableWrap) billableWrap.style.display = 'none';
+        if (manualBillableWrap) manualBillableWrap.style.display = 'none';
+        onTimerJiraInput();
+        onManualJiraInput();
       } else {
-        if (trackCard) trackCard.style.display = '';
-        if (noProviderCard) noProviderCard.style.display = 'none';
-        if (clockifyOn) {
-          if (projWrap) projWrap.style.display = '';
-          if (manualProjWrap) manualProjWrap.style.display = '';
-          if (descWrap) descWrap.style.display = '';
-          if (manualDescWrap) manualDescWrap.style.display = '';
-          if (descPreview) descPreview.style.display = 'none';
-          if (manualDescPreview) manualDescPreview.style.display = 'none';
-          if (jiraInput) jiraInput.required = false;
-          if (manualJiraInput) manualJiraInput.required = false;
-          if (jiraLabel) jiraLabel.textContent = 'Jira Ticket (optional)';
-          if (manualJiraLabel) manualJiraLabel.textContent = 'Jira Ticket (optional)';
-          if (billableWrap) billableWrap.style.display = '';
-          if (manualBillableWrap) manualBillableWrap.style.display = '';
-        } else {
-          if (projWrap) projWrap.style.display = 'none';
-          if (manualProjWrap) manualProjWrap.style.display = 'none';
-          if (descWrap) descWrap.style.display = 'none';
-          if (manualDescWrap) manualDescWrap.style.display = 'none';
-          if (descPreview) { descPreview.style.display = ''; renderTicketPreview('timer-description-preview', (jiraInput ? jiraInput.value.trim().toUpperCase() : ''), timerJiraSummary); }
-          if (manualDescPreview) { manualDescPreview.style.display = ''; renderTicketPreview('manual-description-preview', (manualJiraInput ? manualJiraInput.value.trim().toUpperCase() : ''), manualJiraSummary); }
-          if (jiraInput) jiraInput.required = true;
-          if (manualJiraInput) manualJiraInput.required = true;
-          if (jiraLabel) jiraLabel.textContent = 'Jira Ticket';
-          if (manualJiraLabel) manualJiraLabel.textContent = 'Jira Ticket';
-          if (billableWrap) billableWrap.style.display = 'none';
-          if (manualBillableWrap) manualBillableWrap.style.display = 'none';
-          onTimerJiraInput();
-          onManualJiraInput();
-        }
+        // Local-only: description only
+        if (projWrap) projWrap.style.display = 'none';
+        if (manualProjWrap) manualProjWrap.style.display = 'none';
+        if (descWrap) descWrap.style.display = '';
+        if (manualDescWrap) manualDescWrap.style.display = '';
+        if (descPreview) descPreview.style.display = 'none';
+        if (manualDescPreview) manualDescPreview.style.display = 'none';
+        if (jiraWrap) jiraWrap.style.display = 'none';
+        if (manualJiraWrap) manualJiraWrap.style.display = 'none';
+        if (jiraInput) jiraInput.required = false;
+        if (manualJiraInput) manualJiraInput.required = false;
+        if (billableWrap) billableWrap.style.display = 'none';
+        if (manualBillableWrap) manualBillableWrap.style.display = 'none';
       }
 
       // Projects tab: hide "Pull from Clockify" button

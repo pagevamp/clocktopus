@@ -97,26 +97,30 @@ timerRoutes.post('/timer/start', async (c) => {
     if (!projectId || !cleanDescription) {
       return c.json({ ok: false, error: 'Project and description are required.' }, 400);
     }
+    let clockifyStarted = false;
     try {
       const clockify = new Clockify();
       const user = await clockify.getUser();
-      if (!user) return c.json({ ok: false, error: 'Could not connect to Clockify.' }, 500);
-
-      const result = await clockify.startTimer(
-        user.defaultWorkspace,
-        projectId,
-        cleanDescription,
-        cleanJira,
-        billable ?? true,
-      );
-      if (!result) return c.json({ ok: false, error: 'Failed to start timer.' }, 500);
-      return c.json({ ok: true });
-    } catch {
-      return c.json({ ok: false, error: 'Failed to start timer.' }, 500);
+      if (user) {
+        const result = await clockify.startTimer(
+          user.defaultWorkspace,
+          projectId,
+          cleanDescription,
+          cleanJira,
+          billable ?? true,
+        );
+        if (result) clockifyStarted = true;
+        else console.warn('Clockify startTimer returned null; falling through to Jira-only path.');
+      } else {
+        console.warn('Clockify enabled but getUser failed; falling through to Jira-only path.');
+      }
+    } catch (err) {
+      console.warn('Clockify start threw; falling through to Jira-only path:', err);
     }
+    if (clockifyStarted) return c.json({ ok: true });
   }
 
-  // Jira-only mode
+  // Jira-only path (also used as fallback when Clockify is unreachable)
   if (!cleanJira) {
     return c.json({ ok: false, error: 'Jira ticket required in Jira-only mode.' }, 400);
   }
@@ -137,11 +141,19 @@ timerRoutes.post('/timer/stop', async (c) => {
     const openSession = getOpenSession();
 
     if (isClockifyEnabled()) {
-      const clockify = new Clockify();
-      const user = await clockify.getUser();
-      if (!user) return c.json({ ok: false, error: 'Could not connect to Clockify.' }, 500);
-      const result = await clockify.stopTimer(user.defaultWorkspace, user.id);
-      if (!result) return c.json({ ok: false, error: 'Failed to stop timer.' }, 500);
+      try {
+        const clockify = new Clockify();
+        const user = await clockify.getUser();
+        if (user) {
+          const result = await clockify.stopTimer(user.defaultWorkspace, user.id);
+          if (!result) console.warn('Clockify stopTimer returned null; proceeding with DB + worklog.');
+        } else {
+          console.warn('Clockify enabled but getUser failed; proceeding with DB + worklog.');
+        }
+      } catch (err) {
+        console.warn('Clockify stop threw; proceeding with DB + worklog:', err);
+      }
+      if (!openSession) return c.json({ ok: false, error: 'No active timer.' }, 404);
     } else if (!openSession) {
       return c.json({ ok: false, error: 'No active timer.' }, 404);
     }
@@ -212,25 +224,36 @@ timerRoutes.post('/timer/log', async (c) => {
   const startIso = new Date(startMs).toISOString();
   const endIso = new Date(endMs).toISOString();
   const finalDescription = cleanDescription || cleanJira!;
-  let entryId: string;
+  let entryId: string | undefined;
 
   try {
     if (clockifyOn) {
-      const clockify = new Clockify();
-      const user = await clockify.getUser();
-      if (!user) return c.json({ ok: false, error: 'Could not connect to Clockify.' }, 500);
+      try {
+        const clockify = new Clockify();
+        const user = await clockify.getUser();
+        if (user) {
+          const entry = await clockify.logTime(
+            user.defaultWorkspace,
+            projectId!,
+            startIso,
+            endIso,
+            finalDescription,
+            billable ?? true,
+          );
+          if (entry) entryId = (entry as { id?: string }).id ?? uuidv4();
+          else console.warn('Clockify logTime returned null; falling through to Jira-only path.');
+        } else {
+          console.warn('Clockify enabled but getUser failed; falling through to Jira-only path.');
+        }
+      } catch (err) {
+        console.warn('Clockify log threw; falling through to Jira-only path:', err);
+      }
+    }
 
-      const entry = await clockify.logTime(
-        user.defaultWorkspace,
-        projectId!,
-        startIso,
-        endIso,
-        finalDescription,
-        billable ?? true,
-      );
-      if (!entry) return c.json({ ok: false, error: 'Failed to log time in Clockify.' }, 500);
-      entryId = (entry as { id?: string }).id ?? uuidv4();
-    } else {
+    if (!entryId) {
+      if (!cleanJira) {
+        return c.json({ ok: false, error: 'Jira ticket required in Jira-only mode.' }, 400);
+      }
       entryId = uuidv4();
     }
 

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import axios from 'axios';
-import { resolveCredential } from '../../lib/credentials.js';
+import { isClockifyDisabled, resolveCredential } from '../../lib/credentials.js';
 import { getLatestToken, getAtlassianToken } from '../../lib/db.js';
 import { getValidAccessToken } from '../../lib/atlassian.js';
 
@@ -9,6 +9,7 @@ const statusRoutes = new Hono();
 statusRoutes.get('/status', async (c) => {
   const results: {
     clockify: boolean;
+    clockifyDisabled: boolean;
     google: boolean;
     googleEmail?: string;
     jira: boolean;
@@ -17,6 +18,7 @@ statusRoutes.get('/status', async (c) => {
     clockifyKeyHint?: string;
   } = {
     clockify: false,
+    clockifyDisabled: isClockifyDisabled(),
     google: false,
     jira: false,
     jiraOAuth: false,
@@ -26,13 +28,15 @@ statusRoutes.get('/status', async (c) => {
   const clockifyKey = resolveCredential('CLOCKIFY_API_KEY');
   if (clockifyKey) {
     results.clockifyKeyHint = '***' + clockifyKey.slice(-4);
-    try {
-      const res = await axios.get('https://api.clockify.me/api/v1/user', {
-        headers: { 'X-Api-Key': clockifyKey },
-        timeout: 5000,
-      });
-      results.clockify = res.status === 200;
-    } catch {}
+    if (!results.clockifyDisabled) {
+      try {
+        const res = await axios.get('https://api.clockify.me/api/v1/user', {
+          headers: { 'X-Api-Key': clockifyKey },
+          timeout: 5000,
+        });
+        results.clockify = res.status === 200;
+      } catch {}
+    }
   }
 
   // Check Google — token exists in DB

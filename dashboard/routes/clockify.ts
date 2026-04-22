@@ -1,8 +1,14 @@
 import { Hono } from 'hono';
 import axios from 'axios';
-import { saveCredential } from '../../lib/credentials.js';
+import { saveCredential, setClockifyDisabled } from '../../lib/credentials.js';
 
 const clockifyRoutes = new Hono();
+
+clockifyRoutes.post('/clockify/enabled', async (c) => {
+  const { enabled } = await c.req.json<{ enabled: boolean }>();
+  setClockifyDisabled(!enabled);
+  return c.json({ ok: true });
+});
 
 clockifyRoutes.post('/clockify', async (c) => {
   const { apiKey } = await c.req.json<{ apiKey: string }>();

@@ -310,6 +310,11 @@ export function indexPage() {
         <label for="clockify-key">API Key</label>
         <input type="password" id="clockify-key" placeholder="Enter your Clockify API key" />
         <button onclick="saveClockify()">Save &amp; Validate</button>
+        <label class="toggle" style="margin-top:0.75rem;">
+          <input type="checkbox" id="clockify-enabled-toggle" onchange="toggleClockifyEnabled()" />
+          <span class="slider"></span>
+          <span id="clockify-enabled-label">Enabled</span>
+        </label>
         <div class="msg" id="clockify-msg"></div>
       </div>
 
@@ -1041,6 +1046,27 @@ export function indexPage() {
       }
     }
 
+    async function toggleClockifyEnabled() {
+      const enabled = document.getElementById('clockify-enabled-toggle').checked;
+      document.getElementById('clockify-enabled-label').textContent = enabled ? 'Enabled' : 'Disabled';
+      try {
+        const res = await fetch('/api/clockify/enabled', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          setMsg('clockify-msg', enabled ? 'Clockify enabled.' : 'Clockify disabled.', true);
+          fetchStatus();
+        } else {
+          setMsg('clockify-msg', data.error || 'Failed to update.', false);
+        }
+      } catch {
+        setMsg('clockify-msg', 'Request failed.', false);
+      }
+    }
+
     // --- Settings: Google ---
     function setGoogleConnected(connected, email) {
       const btn = document.getElementById('google-connect-btn');
@@ -1301,6 +1327,15 @@ export function indexPage() {
         if (data.clockifyKeyHint) {
           document.getElementById('clockify-key').placeholder = data.clockifyKeyHint;
         }
+        const toggle = document.getElementById('clockify-enabled-toggle');
+        const toggleLabel = document.getElementById('clockify-enabled-label');
+        const hasKey = !!data.clockifyKeyHint;
+        const enabled = hasKey && !data.clockifyDisabled;
+        if (toggle) {
+          toggle.checked = enabled;
+          toggle.disabled = !hasKey;
+        }
+        if (toggleLabel) toggleLabel.textContent = enabled ? 'Enabled' : 'Disabled';
         setGoogleConnected(data.google, data.googleEmail);
         setJiraConnected(data.jira, data.jiraOAuth, data.jiraSiteUrl);
         applyMode(data);

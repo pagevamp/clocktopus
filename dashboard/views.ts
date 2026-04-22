@@ -133,9 +133,16 @@ export function indexPage() {
     .local-hint { margin-top: 0.4rem; color: #8b949e; font-size: 0.8rem; font-style: italic; }
     .local-hint a { color: #58a6ff; }
 
+    #ctx-menu { position: fixed; display: none; z-index: 9999; background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 0.25rem; min-width: 140px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+    #ctx-menu button { display: block; width: 100%; text-align: left; background: transparent; border: none; color: #e1e4e8; padding: 0.4rem 0.7rem; border-radius: 4px; font-size: 0.85rem; cursor: pointer; }
+    #ctx-menu button:hover { background: #21262d; }
+
   </style>
 </head>
-<body oncontextmenu="return false;">
+<body>
+  <div id="ctx-menu">
+    <button type="button" onclick="location.reload()">Reload</button>
+  </div>
   <div class="header">
     <h1>Clocktopus</h1>
     <div class="nav">
@@ -409,10 +416,26 @@ export function indexPage() {
   </div>
 
   <script>
-    // Disable WebKit's Back/Forward/Reload context menu. Capture-phase and
-    // attached on window so it runs before any app handler and wins the race
-    // with the native WKWebView menu.
-    window.addEventListener('contextmenu', e => e.preventDefault(), { capture: true });
+    // Suppress WebKit's Back/Forward menu. Capture-phase wins the race with
+    // the native WKWebView menu. Our custom menu offers Reload only.
+    (function wireContextMenu() {
+      const menu = document.getElementById('ctx-menu');
+      if (!menu) return;
+      const hide = () => { menu.style.display = 'none'; };
+      window.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const pad = 4;
+        const x = Math.min(e.clientX, window.innerWidth - menu.offsetWidth - pad);
+        const y = Math.min(e.clientY, window.innerHeight - menu.offsetHeight - pad);
+        menu.style.left = x + 'px';
+        menu.style.top = y + 'px';
+        menu.style.display = 'block';
+      }, { capture: true });
+      window.addEventListener('click', hide);
+      window.addEventListener('scroll', hide, { capture: true });
+      window.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
+      window.addEventListener('blur', hide);
+    })();
 
     let elapsedInterval = null;
     let currentPage = 1;

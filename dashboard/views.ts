@@ -212,12 +212,18 @@ export function indexPage() {
           </div>
           <div class="form-row">
             <div>
-              <label for="manual-start">Start</label>
-              <input type="datetime-local" id="manual-start" />
+              <label for="manual-start-date">Start</label>
+              <div style="display:flex; gap:0.4rem;">
+                <input type="date" id="manual-start-date" style="flex:1;" />
+                <input type="time" id="manual-start-time" style="flex:1;" />
+              </div>
             </div>
             <div>
-              <label for="manual-end">End</label>
-              <input type="datetime-local" id="manual-end" />
+              <label for="manual-end-date">End</label>
+              <div style="display:flex; gap:0.4rem;">
+                <input type="date" id="manual-end-date" style="flex:1;" />
+                <input type="time" id="manual-end-time" style="flex:1;" />
+              </div>
             </div>
           </div>
           <div class="form-row">
@@ -345,8 +351,20 @@ export function indexPage() {
           <div class="dot gray" id="jira-dot"></div>
           <h2>Jira</h2>
         </div>
-        <p id="jira-desc" style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Connect your Atlassian account to log time on Jira tickets.</p>
-        <button class="connect" id="jira-connect-btn" onclick="connectJira()">Connect Atlassian</button>
+        <p id="jira-desc" style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Connect Jira with an API token to log time on tickets.</p>
+        <div class="guide">
+          <ol>
+            <li>Go to <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank">Atlassian API Tokens</a></li>
+            <li>Click <strong>Create API token</strong> and copy it</li>
+          </ol>
+        </div>
+        <label for="jira-url">Atlassian URL</label>
+        <input type="text" id="jira-url" value="https://outsidetech.atlassian.net/rest/api/3" placeholder="https://your-org.atlassian.net/rest/api/3" />
+        <label for="jira-email">Email</label>
+        <input type="email" id="jira-email" placeholder="you@example.com" />
+        <label for="jira-token">API Token</label>
+        <input type="password" id="jira-token" placeholder="Atlassian API token" />
+        <button onclick="saveJira()">Save &amp; Validate</button>
         <div style="display:flex; align-items:center; gap:0.6rem; margin-top:0.75rem;">
           <label class="toggle">
             <input type="checkbox" id="jira-enabled-toggle" onchange="toggleJiraEnabled()" />
@@ -355,25 +373,6 @@ export function indexPage() {
           <span id="jira-enabled-label" style="font-size:0.9rem; color:#8b949e;">Enabled</span>
         </div>
         <div class="msg" id="jira-msg"></div>
-        <div style="margin-top:1rem;">
-          <a href="#" id="jira-toggle" onclick="toggleJiraForm(event)" style="font-size:0.8rem;color:#8b949e;text-decoration:none;">or use API token &darr;</a>
-          <div id="jira-form" style="display:none;margin-top:0.5rem;">
-            <div class="guide">
-              <ol>
-                <li>Go to <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank">Atlassian API Tokens</a></li>
-                <li>Click <strong>Create API token</strong> and copy it</li>
-                <li>Your URL is <code>https://&lt;your-org&gt;.atlassian.net/rest/api/3</code></li>
-              </ol>
-            </div>
-            <label for="jira-url">Atlassian URL</label>
-            <input type="text" id="jira-url" placeholder="https://your-org.atlassian.net/rest/api/3" />
-            <label for="jira-email">Email</label>
-            <input type="email" id="jira-email" placeholder="you@example.com" />
-            <label for="jira-token">API Token</label>
-            <input type="password" id="jira-token" placeholder="Atlassian API token" />
-            <button onclick="saveJira()">Save &amp; Validate</button>
-          </div>
-        </div>
       </div>
 
     </div>
@@ -600,34 +599,44 @@ export function indexPage() {
       }
     }
 
-    function toLocalInputValue(date) {
+    function toDateInputValue(date) {
       const pad = function(n) { return String(n).padStart(2, '0'); };
-      return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) +
-        'T' + pad(date.getHours()) + ':' + pad(date.getMinutes());
+      return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate());
+    }
+
+    function toTimeInputValue(date) {
+      const pad = function(n) { return String(n).padStart(2, '0'); };
+      return pad(date.getHours()) + ':' + pad(date.getMinutes());
     }
 
     function setManualDefaults() {
       const now = new Date();
       const hourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-      const startEl = document.getElementById('manual-start');
-      const endEl = document.getElementById('manual-end');
-      if (startEl) startEl.value = toLocalInputValue(hourAgo);
-      if (endEl) endEl.value = toLocalInputValue(now);
+      const sd = document.getElementById('manual-start-date');
+      const st = document.getElementById('manual-start-time');
+      const ed = document.getElementById('manual-end-date');
+      const et = document.getElementById('manual-end-time');
+      if (sd) sd.value = toDateInputValue(hourAgo);
+      if (st) st.value = toTimeInputValue(hourAgo);
+      if (ed) ed.value = toDateInputValue(now);
+      if (et) et.value = toTimeInputValue(now);
     }
 
     async function logManualTime() {
       const projectId = document.getElementById('manual-project').value;
-      const startVal = document.getElementById('manual-start').value;
-      const endVal = document.getElementById('manual-end').value;
+      const startDate = document.getElementById('manual-start-date').value;
+      const startTime = document.getElementById('manual-start-time').value;
+      const endDate = document.getElementById('manual-end-date').value;
+      const endTime = document.getElementById('manual-end-time').value;
       const typedDescription = document.getElementById('manual-description').value.trim();
       const jiraTicket = document.getElementById('manual-jira').value.trim();
       const billable = document.getElementById('manual-billable').checked;
       const description = typedDescription;
 
-      if (!startVal || !endVal) return setMsg('manual-msg', 'Please set start and end.', false);
+      if (!startDate || !startTime || !endDate || !endTime) return setMsg('manual-msg', 'Please set start and end.', false);
 
-      const startMs = new Date(startVal).getTime();
-      const endMs = new Date(endVal).getTime();
+      const startMs = new Date(startDate + 'T' + startTime).getTime();
+      const endMs = new Date(endDate + 'T' + endTime).getTime();
       if (isNaN(startMs) || isNaN(endMs)) return setMsg('manual-msg', 'Invalid date.', false);
       if (endMs <= startMs) return setMsg('manual-msg', 'End must be after start.', false);
 
@@ -1073,6 +1082,7 @@ export function indexPage() {
         if (data.ok) {
           setMsg('clockify-msg', 'Saved and validated successfully.', true);
           setDot('clockify-dot', 'green');
+          fetchStatus();
         } else {
           setMsg('clockify-msg', data.error || 'Validation failed.', false);
           setDot('clockify-dot', 'red');
@@ -1133,48 +1143,14 @@ export function indexPage() {
     }
 
     // --- Settings: Jira ---
-    function setJiraConnected(connected, isOAuth, siteUrl) {
-      const btn = document.getElementById('jira-connect-btn');
+    function setJiraConnected(connected) {
       const desc = document.getElementById('jira-desc');
-      if (connected && isOAuth) {
-        btn.textContent = 'Reconnect';
-        desc.textContent = 'Connected via OAuth' + (siteUrl ? ' (' + siteUrl.replace('https://', '') + ')' : '');
-        desc.style.color = '#3fb950';
-      } else if (connected) {
-        btn.textContent = 'Reconnect';
+      if (connected) {
         desc.textContent = 'Connected via API token';
         desc.style.color = '#3fb950';
       } else {
-        btn.textContent = 'Connect Atlassian';
-        desc.textContent = 'Connect your Atlassian account to log time on Jira tickets.';
+        desc.textContent = 'Connect Jira with an API token to log time on tickets.';
         desc.style.color = '#8b949e';
-      }
-    }
-
-    async function connectJira() {
-      try {
-        const res = await fetch('/api/jira/auth-url');
-        const data = await res.json();
-        if (data.url) {
-          if (window.__TAURI__) {
-            window.__TAURI__.opener.openUrl(data.url);
-          } else {
-            window.location.href = '/api/jira/connect';
-          }
-        }
-      } catch (e) { console.error('Connect Jira error:', e); }
-    }
-
-    function toggleJiraForm(e) {
-      e.preventDefault();
-      const form = document.getElementById('jira-form');
-      const toggle = document.getElementById('jira-toggle');
-      if (form.style.display === 'none') {
-        form.style.display = 'block';
-        toggle.innerHTML = 'hide API token form &uarr;';
-      } else {
-        form.style.display = 'none';
-        toggle.innerHTML = 'or use API token &darr;';
       }
     }
 
@@ -1214,6 +1190,7 @@ export function indexPage() {
         if (data.ok) {
           setMsg('jira-msg', 'Saved and validated successfully.', true);
           setDot('jira-dot', 'green');
+          fetchStatus();
         } else {
           setMsg('jira-msg', data.error || 'Validation failed.', false);
           setDot('jira-dot', 'red');
@@ -1231,17 +1208,13 @@ export function indexPage() {
     function renderTicketPreview(previewId, ticket, description) {
       var el = document.getElementById(previewId);
       if (!el) return;
-      if (!ticket) {
+      if (!ticket || !description) {
         el.style.display = 'none';
         el.innerHTML = '';
         return;
       }
       el.style.display = '';
-      if (description) {
-        el.innerHTML = '<span class="ticket-id">' + escapeHtml(ticket) + '</span>' + escapeHtml(description);
-      } else {
-        el.innerHTML = '<span class="ticket-id">' + escapeHtml(ticket) + '</span><span class="ticket-hint">Could not fetch title from Jira. We will log with the ticket id.</span>';
-      }
+      el.innerHTML = '<span class="ticket-id">' + escapeHtml(ticket) + '</span>' + escapeHtml(description);
     }
 
     async function fetchTicketSummary(ticket) {
@@ -1413,15 +1386,21 @@ export function indexPage() {
 
         const jToggle = document.getElementById('jira-enabled-toggle');
         const jToggleLabel = document.getElementById('jira-enabled-label');
-        const jConnectBtn = document.getElementById('jira-connect-btn');
         const jToggleWrap = jToggle ? jToggle.closest('label').parentElement : null;
+        const jUrl = document.getElementById('jira-url');
+        const jEmail = document.getElementById('jira-email');
+        const jTokenInput = document.getElementById('jira-token');
+        const jSaveBtn = document.querySelector('button[onclick="saveJira()"]');
         const jiraEnabled = !data.jiraDisabled;
         if (jToggle) jToggle.checked = jiraEnabled;
         if (jToggleLabel) jToggleLabel.textContent = jiraEnabled ? 'Enabled' : 'Disabled';
         if (jToggleWrap) jToggleWrap.style.display = data.jiraConfigured ? '' : 'none';
-        if (jConnectBtn) jConnectBtn.disabled = data.jiraConfigured && !jiraEnabled;
+        if (jUrl) jUrl.disabled = data.jiraConfigured && !jiraEnabled;
+        if (jEmail) jEmail.disabled = data.jiraConfigured && !jiraEnabled;
+        if (jTokenInput) jTokenInput.disabled = data.jiraConfigured && !jiraEnabled;
+        if (jSaveBtn) jSaveBtn.disabled = data.jiraConfigured && !jiraEnabled;
         setGoogleConnected(data.google, data.googleEmail);
-        setJiraConnected(data.jira, data.jiraOAuth, data.jiraSiteUrl);
+        setJiraConnected(data.jira);
         applyMode(data);
       } catch {}
     }

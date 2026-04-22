@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import axios from 'axios';
 import { saveCredential, setJiraDisabled } from '../../lib/credentials.js';
-import { storeAtlassianToken } from '../../lib/db.js';
+import { clearAtlassianToken, storeAtlassianToken } from '../../lib/db.js';
 import { getAtlassianAuthUrl, exchangeCodeForTokens, getAccessibleResources } from '../../lib/atlassian.js';
 
 const jiraRoutes = new Hono();
@@ -86,6 +86,7 @@ jiraRoutes.post('/jira', async (c) => {
       saveCredential('ATLASSIAN_URL', url);
       saveCredential('ATLASSIAN_EMAIL', email);
       saveCredential('ATLASSIAN_API_TOKEN', token);
+      clearAtlassianToken();
       return c.json({ ok: true, user: res.data.displayName });
     }
 

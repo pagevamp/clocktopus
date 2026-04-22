@@ -315,6 +315,11 @@ export function updateAtlassianAccessToken(access_token: string, expires_at: str
   stmt.run(access_token, expires_at);
 }
 
+export function clearAtlassianToken() {
+  const db = getDb();
+  db.prepare('DELETE FROM atlassian_tokens WHERE id = 1').run();
+}
+
 // --- Projects ---
 
 export interface Project {

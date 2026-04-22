@@ -310,11 +310,13 @@ export function indexPage() {
         <label for="clockify-key">API Key</label>
         <input type="password" id="clockify-key" placeholder="Enter your Clockify API key" />
         <button onclick="saveClockify()">Save &amp; Validate</button>
-        <label class="toggle" style="margin-top:0.75rem;">
-          <input type="checkbox" id="clockify-enabled-toggle" onchange="toggleClockifyEnabled()" />
-          <span class="slider"></span>
-          <span id="clockify-enabled-label">Enabled</span>
-        </label>
+        <div style="display:flex; align-items:center; gap:0.6rem; margin-top:0.75rem;">
+          <label class="toggle">
+            <input type="checkbox" id="clockify-enabled-toggle" onchange="toggleClockifyEnabled()" />
+            <span class="slider"></span>
+          </label>
+          <span id="clockify-enabled-label" style="font-size:0.9rem; color:#8b949e;">Enabled</span>
+        </div>
         <div class="msg" id="clockify-msg"></div>
       </div>
 

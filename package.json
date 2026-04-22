@@ -1,6 +1,6 @@
 {
   "name": "clocktopus",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Time-tracking automation for Clockify with idle monitoring, Jira integration, Google Calendar sync, CLI, web dashboard, and desktop app.",
   "type": "module",
   "main": "dist/index.js",

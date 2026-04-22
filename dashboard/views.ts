@@ -1331,9 +1331,13 @@ export function indexPage() {
         }
         const toggle = document.getElementById('clockify-enabled-toggle');
         const toggleLabel = document.getElementById('clockify-enabled-label');
+        const keyInput = document.getElementById('clockify-key');
+        const saveBtn = document.querySelector('button[onclick="saveClockify()"]');
         const enabled = !data.clockifyDisabled;
         if (toggle) toggle.checked = enabled;
         if (toggleLabel) toggleLabel.textContent = enabled ? 'Enabled' : 'Disabled';
+        if (keyInput) keyInput.disabled = !enabled;
+        if (saveBtn) saveBtn.disabled = !enabled;
         setGoogleConnected(data.google, data.googleEmail);
         setJiraConnected(data.jira, data.jiraOAuth, data.jiraSiteUrl);
         applyMode(data);

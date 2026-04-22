@@ -125,16 +125,13 @@ export function indexPage() {
     .toggle input:checked + .slider { background: #238636; }
     .toggle input:checked + .slider::before { transform: translateX(16px); background: #fff; }
 
-    .is-disabled { opacity: 0.45; pointer-events: none; }
-    .mode-chip { display: inline-block; padding: 0.15rem 0.5rem; margin-left: 0.5rem; border-radius: 999px; font-size: 0.75rem; background: #1f6feb22; color: #58a6ff; }
-    .mode-pill { display: inline-block; padding: 0.15rem 0.6rem; margin-left: 0.5rem; border-radius: 999px; font-size: 0.7rem; background: #1f6feb22; color: #58a6ff; vertical-align: middle; }
     .empty-state-card { padding: 1.5rem; text-align: center; color: #8b949e; font-size: 0.9rem; }
 
   </style>
 </head>
 <body oncontextmenu="return false;">
   <div class="header">
-    <h1>Clocktopus<span id="mode-pill" class="mode-pill" style="display:none;">Jira-only</span></h1>
+    <h1>Clocktopus</h1>
     <div class="nav">
       <button class="nav-btn active" onclick="switchTab('home')" id="nav-home">Home</button>
       <button class="nav-btn" onclick="switchTab('projects')" id="nav-projects">Projects</button>
@@ -161,9 +158,6 @@ export function indexPage() {
         <div class="track-tabs" id="track-tabs">
           <button class="track-tab-btn active" data-mode="auto" onclick="switchTrackMode('auto')">Auto Track</button>
           <button class="track-tab-btn" data-mode="manual" onclick="switchTrackMode('manual')">Manual Log</button>
-        </div>
-        <div id="track-mode-chip-row" style="display:none; margin-bottom:0.75rem;">
-          <span id="track-mode-chip" class="mode-chip">Jira-only mode</span>
         </div>
 
         <div id="track-auto">
@@ -1126,16 +1120,11 @@ export function indexPage() {
       const jiraOn = !!data.jira;
       const noProvider = !clockifyOn && !jiraOn;
 
-      // Header mode pill
-      const pill = document.getElementById('mode-pill');
-      if (pill) pill.style.display = (!clockifyOn && jiraOn) ? 'inline-block' : 'none';
-
       // Timer form: hide project + mark Jira required in Jira-only; hide entire form when no provider
       const trackCard = document.getElementById('track-card');
       const noProviderCard = document.getElementById('no-provider-card');
       const projWrap = document.getElementById('timer-project-wrap');
       const manualProjWrap = document.getElementById('manual-project-wrap');
-      const chipRow = document.getElementById('track-mode-chip-row');
       const jiraInput = document.getElementById('timer-jira');
       const manualJiraInput = document.getElementById('manual-jira');
       const jiraLabel = document.getElementById('timer-jira-label');
@@ -1152,7 +1141,6 @@ export function indexPage() {
         if (clockifyOn) {
           if (projWrap) projWrap.style.display = '';
           if (manualProjWrap) manualProjWrap.style.display = '';
-          if (chipRow) chipRow.style.display = 'none';
           if (jiraInput) jiraInput.required = false;
           if (manualJiraInput) manualJiraInput.required = false;
           if (jiraLabel) jiraLabel.textContent = 'Jira Ticket (optional)';
@@ -1162,7 +1150,6 @@ export function indexPage() {
         } else {
           if (projWrap) projWrap.style.display = 'none';
           if (manualProjWrap) manualProjWrap.style.display = 'none';
-          if (chipRow) chipRow.style.display = '';
           if (jiraInput) jiraInput.required = true;
           if (manualJiraInput) manualJiraInput.required = true;
           if (jiraLabel) jiraLabel.textContent = 'Jira Ticket';

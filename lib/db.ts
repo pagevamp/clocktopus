@@ -231,9 +231,9 @@ export function getLastDescriptionByJiraTicket(jiraTicket: string): string | nul
   const db = getDb();
   const row = db
     .prepare(
-      "SELECT description FROM sessions WHERE jiraTicket = ? AND description IS NOT NULL AND description != '' ORDER BY startedAt DESC LIMIT 1",
+      "SELECT description FROM sessions WHERE jiraTicket = ? AND description IS NOT NULL AND description != '' AND description != ? ORDER BY startedAt DESC LIMIT 1",
     )
-    .get(jiraTicket) as { description: string } | undefined;
+    .get(jiraTicket, jiraTicket) as { description: string } | undefined;
   return row ? row.description : null;
 }
 

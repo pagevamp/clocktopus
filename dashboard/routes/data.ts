@@ -10,6 +10,7 @@ import {
 } from '../../lib/db.js';
 import { Clockify } from '../../clockify.js';
 import { isClockifyEnabled } from '../../lib/credentials.js';
+import { getJiraTicket } from '../../lib/jira.js';
 
 const dataRoutes = new Hono();
 
@@ -78,14 +79,22 @@ dataRoutes.get('/sessions', (c) => {
   });
 });
 
-// Lookup last saved description for a Jira ticket (Jira-only preview)
-dataRoutes.get('/sessions/last-description', (c) => {
-  const ticket = (c.req.query('jira') || '').trim();
+// Lookup description for a Jira ticket: last saved from DB, fall back to Jira summary
+dataRoutes.get('/sessions/last-description', async (c) => {
+  const ticket = (c.req.query('jira') || '').trim().toUpperCase();
   if (!ticket || !/^[A-Z][A-Z0-9]+-\d+$/.test(ticket)) {
     return c.json({ ok: false, error: 'Invalid ticket.' }, 400);
   }
-  const description = getLastDescriptionByJiraTicket(ticket);
-  return c.json({ ok: true, description });
+  const fromDb = getLastDescriptionByJiraTicket(ticket);
+  if (fromDb) return c.json({ ok: true, description: fromDb, source: 'db' });
+  try {
+    const issue = (await getJiraTicket(ticket)) as { fields?: { summary?: string } } | null;
+    const summary = issue?.fields?.summary?.trim();
+    if (summary) return c.json({ ok: true, description: summary, source: 'jira' });
+  } catch (err) {
+    console.warn('Jira summary lookup failed for', ticket, err);
+  }
+  return c.json({ ok: true, description: null });
 });
 
 export default dataRoutes;

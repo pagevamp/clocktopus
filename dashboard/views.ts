@@ -1159,14 +1159,14 @@ export function indexPage() {
       if (description) {
         el.innerHTML = '<span class="ticket-id">' + escapeHtml(ticket) + '</span>' + escapeHtml(description);
       } else {
-        el.innerHTML = '<span class="ticket-id">' + escapeHtml(ticket) + '</span><span class="ticket-hint">No prior description on file. We will log with the ticket id.</span>';
+        el.innerHTML = '<span class="ticket-id">' + escapeHtml(ticket) + '</span><span class="ticket-hint">Could not fetch title from Jira. We will log with the ticket id.</span>';
       }
     }
 
-    async function fetchLastDescription(ticket) {
+    async function fetchTicketSummary(ticket) {
       if (!/^[A-Z][A-Z0-9]+-\d+$/.test(ticket)) return null;
       try {
-        const res = await fetch('/api/sessions/last-description?jira=' + encodeURIComponent(ticket));
+        const res = await fetch('/api/jira/ticket-summary?jira=' + encodeURIComponent(ticket));
         const data = await res.json();
         if (data.ok) return data.description || '';
       } catch {}
@@ -1185,7 +1185,7 @@ export function indexPage() {
     async function onTimerJiraInput() {
       var ticket = document.getElementById('timer-jira').value.trim().toUpperCase();
       if (!currentMode.clockifyOn) {
-        var desc = await fetchLastDescription(ticket);
+        var desc = await fetchTicketSummary(ticket);
         timerJiraSummary = desc || '';
         renderTicketPreview('timer-description-preview', ticket, timerJiraSummary);
       }
@@ -1193,7 +1193,7 @@ export function indexPage() {
     async function onManualJiraInput() {
       var ticket = document.getElementById('manual-jira').value.trim().toUpperCase();
       if (!currentMode.clockifyOn) {
-        var desc = await fetchLastDescription(ticket);
+        var desc = await fetchTicketSummary(ticket);
         manualJiraSummary = desc || '';
         renderTicketPreview('manual-description-preview', ticket, manualJiraSummary);
       }

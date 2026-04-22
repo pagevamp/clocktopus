@@ -130,6 +130,8 @@ export function indexPage() {
     .ticket-preview .ticket-id { color: #58a6ff; font-weight: 600; margin-right: 0.4rem; }
     .ticket-preview .ticket-hint { color: #8b949e; font-style: italic; }
     .ticket-preview .ticket-error { color: #f85149; }
+    .local-hint { margin-top: 0.4rem; color: #8b949e; font-size: 0.8rem; font-style: italic; }
+    .local-hint a { color: #58a6ff; }
 
   </style>
 </head>
@@ -176,6 +178,7 @@ export function indexPage() {
               <div id="timer-description-wrap">
                 <label for="timer-description">Description</label>
                 <input type="text" id="timer-description" placeholder="What are you working on?" />
+                <div id="timer-local-hint" class="local-hint" style="display:none;">Time will be logged locally only. Configure Clockify or Jira in <a href="#" onclick="switchTab('settings');return false;">Settings</a> to sync.</div>
               </div>
               <div>
                 <label for="timer-jira" id="timer-jira-label">Jira Ticket (optional)</label>
@@ -214,6 +217,7 @@ export function indexPage() {
             <div id="manual-description-wrap">
               <label for="manual-description">Description</label>
               <input type="text" id="manual-description" placeholder="What did you work on?" />
+              <div id="manual-local-hint" class="local-hint" style="display:none;">Time will be logged locally only. Configure Clockify or Jira in <a href="#" onclick="switchTab('settings');return false;">Settings</a> to sync.</div>
             </div>
             <div>
               <label for="manual-jira" id="manual-jira-label">Jira Ticket (optional)</label>
@@ -230,10 +234,6 @@ export function indexPage() {
         </div>
       </div>
 
-      <!-- Local-only banner when no provider is configured -->
-      <div class="card empty-state-card" id="local-only-banner" style="display:none;">
-        Time will be logged locally only. Configure Clockify or Jira in <a href="#" onclick="switchTab('settings');return false;" style="color:#58a6ff;">Settings</a> to sync.
-      </div>
 
       <!-- Monitor Control -->
       <div class="card">
@@ -1244,7 +1244,8 @@ export function indexPage() {
       currentMode.jiraOn = jiraOn;
 
       const trackCard = document.getElementById('track-card');
-      const localBanner = document.getElementById('local-only-banner');
+      const timerLocalHint = document.getElementById('timer-local-hint');
+      const manualLocalHint = document.getElementById('manual-local-hint');
       const projWrap = document.getElementById('timer-project-wrap');
       const manualProjWrap = document.getElementById('manual-project-wrap');
       const descWrap = document.getElementById('timer-description-wrap');
@@ -1261,7 +1262,8 @@ export function indexPage() {
       const manualBillableWrap = document.getElementById('manual-billable-wrap');
 
       if (trackCard) trackCard.style.display = '';
-      if (localBanner) localBanner.style.display = localOnly ? '' : 'none';
+      if (timerLocalHint) timerLocalHint.style.display = localOnly ? '' : 'none';
+      if (manualLocalHint) manualLocalHint.style.display = localOnly ? '' : 'none';
 
       if (clockifyOn) {
         if (projWrap) projWrap.style.display = '';

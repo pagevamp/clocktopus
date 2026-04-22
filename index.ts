@@ -220,18 +220,27 @@ program
   .command('monitor:run', { hidden: true })
   .description('Run monitor in foreground (used by PM2).')
   .action(async () => {
-    const { workspaceId, userId } = await getWorkspaceAndUser();
+    const creds = isClockifyEnabled() ? await getWorkspaceAndUser() : { workspaceId: '', userId: '' };
+    const { workspaceId, userId } = creds;
 
     async function stopTimerAndLog(reason: string) {
-      const activeEntry = await clockify.getActiveTimer(workspaceId, userId);
-      if (!activeEntry) return false;
+      const clockifyOn = isClockifyEnabled();
+      const latestSession = getLatestSession();
+
+      if (clockifyOn) {
+        const activeEntry = await clockify.getActiveTimer(workspaceId, userId);
+        if (!activeEntry) return false;
+      } else {
+        if (!latestSession || latestSession.completedAt) return false;
+      }
 
       console.log(chalk.yellow(reason));
       const completedAt = new Date().toISOString();
-      const latestSession = getLatestSession();
 
-      const stoppedEntry = await clockify.stopTimer(workspaceId, userId);
-      if (!stoppedEntry) return false;
+      if (clockifyOn) {
+        const stoppedEntry = await clockify.stopTimer(workspaceId, userId);
+        if (!stoppedEntry) return false;
+      }
 
       completeLatestSession(completedAt, true);
 
@@ -267,23 +276,42 @@ program
       const latestSession = getLatestSession();
       if (!latestSession) return;
 
-      const activeEntry = await clockify.getActiveTimer(workspaceId, userId);
-      if (activeEntry) return;
-
       const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
-      const completedAt = latestSession.completedAt ? new Date(latestSession.completedAt).getTime() : 0;
+      const completedMs = latestSession.completedAt ? new Date(latestSession.completedAt).getTime() : 0;
 
-      const eligible = latestSession.isAutoCompleted && completedAt > twoHoursAgo && !!latestSession.projectId;
+      if (!latestSession.isAutoCompleted || completedMs <= twoHoursAgo) return;
 
-      if (!eligible) return;
+      if (isClockifyEnabled()) {
+        if (!latestSession.projectId) return;
 
-      await clockify.startTimer(
-        workspaceId,
-        latestSession.projectId!,
+        const activeEntry = await clockify.getActiveTimer(workspaceId, userId);
+        if (activeEntry) return;
+
+        await clockify.startTimer(
+          workspaceId,
+          latestSession.projectId,
+          latestSession.description,
+          latestSession.jiraTicket ?? undefined,
+        );
+        console.log(chalk.green('Timer restarted for the last used project.'));
+        lastResumeAt = Date.now();
+        return;
+      }
+
+      // Jira-only resume: new DB session with a fresh uuid, same ticket
+      if (!latestSession.jiraTicket) return;
+      const { v4: uuidv4 } = await import('uuid');
+      const { logSessionStart } = await import('./lib/db.js');
+      const sessionId = uuidv4();
+      const startedAt = new Date().toISOString();
+      logSessionStart(
+        sessionId,
+        latestSession.projectId ?? null,
         latestSession.description,
-        latestSession.jiraTicket ?? undefined,
+        startedAt,
+        latestSession.jiraTicket,
       );
-      console.log(chalk.green('Timer restarted for the last used project.'));
+      console.log(chalk.green(`Resumed Jira timer for ${latestSession.jiraTicket}.`));
       lastResumeAt = Date.now();
     }
 

@@ -1,4 +1,5 @@
-import { describe, it, expect, mock } from 'bun:test';
+import { describe, it, expect, mock, afterAll } from 'bun:test';
+import * as realJira from './jira.js';
 
 describe('getJiraSummary', () => {
   it('returns summary string when Jira returns issue', async () => {
@@ -33,5 +34,9 @@ describe('getJiraSummary', () => {
     }));
     const { getJiraSummary } = await import('./jira-summary.js');
     expect(await getJiraSummary('RST-100')).toBeNull();
+  });
+
+  afterAll(() => {
+    mock.module('./jira.js', () => realJira);
   });
 });

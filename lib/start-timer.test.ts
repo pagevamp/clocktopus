@@ -1,4 +1,7 @@
-import { describe, it, expect, mock, beforeEach } from 'bun:test';
+import { describe, it, expect, mock, beforeEach, afterAll } from 'bun:test';
+import * as realCredentials from './credentials.js';
+import * as realDb from './db.js';
+import * as realClockify from '../clockify.js';
 
 describe('startTimer', () => {
   beforeEach(() => {
@@ -50,5 +53,11 @@ describe('startTimer', () => {
     });
     expect(result.mode).toBe('clockify');
     expect(startTimerMock).toHaveBeenCalledWith('ws-1', 'proj-1', 'Fix login', 'RST-100', true);
+  });
+
+  afterAll(() => {
+    mock.module('./credentials.js', () => realCredentials);
+    mock.module('./db.js', () => realDb);
+    mock.module('../clockify.js', () => realClockify);
   });
 });

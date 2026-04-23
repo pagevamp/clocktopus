@@ -4,8 +4,9 @@ import { getHookPaths } from './hook-paths.js';
 
 export interface HuskyInstallResult {
   installed: boolean;
-  reason?: 'no-husky-dir' | 'already-exists';
+  reason?: 'no-husky-dir';
   path?: string;
+  overwritten?: boolean;
 }
 
 export function huskyHookBody(): string {
@@ -21,9 +22,7 @@ export function installHuskyHook(cwd: string): HuskyInstallResult {
     return { installed: false, reason: 'no-husky-dir' };
   }
   const target = path.join(huskyDir, 'post-checkout');
-  if (fs.existsSync(target)) {
-    return { installed: false, reason: 'already-exists', path: target };
-  }
+  const overwritten = fs.existsSync(target);
   fs.writeFileSync(target, huskyHookBody(), { mode: 0o755 });
-  return { installed: true, path: target };
+  return { installed: true, path: target, overwritten };
 }

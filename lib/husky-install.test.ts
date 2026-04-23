@@ -25,6 +25,7 @@ describe('installHuskyHook', () => {
     fs.mkdirSync(path.join(tmp, '.husky'));
     const result = installHuskyHook(tmp);
     expect(result.installed).toBe(true);
+    expect(result.overwritten).toBe(false);
     expect(result.path).toBe(path.join(tmp, '.husky', 'post-checkout'));
     expect(fs.existsSync(result.path!)).toBe(true);
     const stat = fs.statSync(result.path!);
@@ -34,14 +35,14 @@ describe('installHuskyHook', () => {
     expect(body).toContain('.clocktopus/hooks/post-checkout');
   });
 
-  it('returns already-exists without overwriting existing post-checkout', () => {
+  it('overwrites existing post-checkout and flags overwritten=true', () => {
     fs.mkdirSync(path.join(tmp, '.husky'));
     const target = path.join(tmp, '.husky', 'post-checkout');
     fs.writeFileSync(target, 'existing content');
     const result = installHuskyHook(tmp);
-    expect(result.installed).toBe(false);
-    expect(result.reason).toBe('already-exists');
-    expect(fs.readFileSync(target, 'utf8')).toBe('existing content');
+    expect(result.installed).toBe(true);
+    expect(result.overwritten).toBe(true);
+    expect(fs.readFileSync(target, 'utf8')).toContain('.clocktopus/hooks/post-checkout');
   });
 });
 

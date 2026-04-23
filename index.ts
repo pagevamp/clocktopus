@@ -554,17 +554,14 @@ program
     const { installHuskyHook } = await import('./lib/husky-install.js');
     const result = installHuskyHook(process.cwd());
     if (result.installed) {
-      console.log(chalk.green(`Husky post-checkout installed at ${result.path}.`));
+      const verb = result.overwritten ? 'Overwrote' : 'Installed';
+      console.log(chalk.green(`${verb} husky post-checkout at ${result.path}.`));
       console.log(chalk.gray('  Commit it so teammates using husky get it too.'));
       return;
     }
     if (result.reason === 'no-husky-dir') {
       console.error(chalk.red('No .husky/ directory found. Run from the root of a husky-enabled repo.'));
       process.exit(1);
-    }
-    if (result.reason === 'already-exists') {
-      console.log(chalk.yellow(`Existing ${result.path} left alone.`));
-      console.log(chalk.gray('  Add this line manually: exec ~/.clocktopus/hooks/post-checkout "$@"'));
     }
   });
 

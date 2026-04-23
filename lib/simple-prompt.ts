@@ -40,21 +40,22 @@ export async function simplePrompt(qs: ReadonlyArray<Record<string, unknown>>): 
   const tty = openTty();
   const input = tty ? tty.input : process.stdin;
   const output = tty ? tty.output : process.stdout;
-  const rl = readline.createInterface({ input, output, terminal: true });
+  const rl = readline.createInterface({ input, output, terminal: false });
   const out: Record<string, unknown> = {};
   try {
     for (const raw of qs) {
       const q = raw as Question;
+      const label = q.message.replace(/:\s*$/, '');
       if (q.type === 'confirm') {
         const def = q.default !== false;
-        const answer = (await ask(rl, `${q.message} ${def ? '[Y/n]' : '[y/N]'}: `)).trim().toLowerCase();
+        const answer = (await ask(rl, `${label} ${def ? '[Y/n]' : '[y/N]'}: `)).trim().toLowerCase();
         out[q.name] = answer === '' ? def : answer === 'y' || answer === 'yes';
       } else if (q.type === 'input') {
         const def = typeof q.default === 'string' ? q.default : '';
-        const answer = (await ask(rl, def ? `${q.message} [${def}]: ` : `${q.message}: `)).trim();
+        const answer = (await ask(rl, def ? `${label} [${def}]: ` : `${label}: `)).trim();
         out[q.name] = answer || def;
       } else if (q.type === 'list') {
-        output.write(`${q.message}\n`);
+        output.write(`${label}\n`);
         const choices = q.choices ?? [];
         choices.forEach((c, i) => output.write(`  ${i + 1}) ${c.name}\n`));
         while (true) {

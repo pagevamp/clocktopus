@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /Users/szn/.clocktopus/hooks/post-checkout "$@"

@@ -533,6 +533,9 @@ program
     console.log(chalk.gray('  Disable per-repo: touch .clocktopus-ignore'));
     console.log(chalk.gray('  Disable per-session: export CLOCKTOPUS_HOOK_DISABLE=1'));
     console.log(chalk.gray('  Uninstall: clocktopus hook:uninstall'));
+    console.log();
+    console.log(chalk.yellow('Husky users: local core.hooksPath overrides global.'));
+    console.log(chalk.gray('  Inside each husky repo, run: clocktopus hook:install-husky'));
   });
 
 program
@@ -542,6 +545,27 @@ program
     const { uninstallHook } = await import('./lib/hook-install.js');
     await uninstallHook();
     console.log(chalk.green('Clocktopus post-checkout hook removed.'));
+  });
+
+program
+  .command('hook:install-husky')
+  .description('Write a .husky/post-checkout in the current repo that chains to the global hook.')
+  .action(async () => {
+    const { installHuskyHook } = await import('./lib/husky-install.js');
+    const result = installHuskyHook(process.cwd());
+    if (result.installed) {
+      console.log(chalk.green(`Husky post-checkout installed at ${result.path}.`));
+      console.log(chalk.gray('  Commit it so teammates using husky get it too.'));
+      return;
+    }
+    if (result.reason === 'no-husky-dir') {
+      console.error(chalk.red('No .husky/ directory found. Run from the root of a husky-enabled repo.'));
+      process.exit(1);
+    }
+    if (result.reason === 'already-exists') {
+      console.log(chalk.yellow(`Existing ${result.path} left alone.`));
+      console.log(chalk.gray('  Add this line manually: exec ~/.clocktopus/hooks/post-checkout "$@"'));
+    }
   });
 
 program

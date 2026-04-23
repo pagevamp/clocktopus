@@ -1,4 +1,3 @@
-import inquirer from 'inquirer';
 import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -9,6 +8,7 @@ import { isClockifyEnabled as realIsClockifyEnabled } from './credentials.js';
 import { getJiraSummary as realGetJiraSummary } from './jira-summary.js';
 import { getOpenSession as realGetOpenSession } from './db.js';
 import { matchProjectByTicket, LocalProject } from './project-matcher.js';
+import { simplePrompt } from './simple-prompt.js';
 import { startTimer as realStartTimer, StartTimerInput, StartTimerResult } from './start-timer.js';
 
 export interface HookPromptResult {
@@ -52,7 +52,7 @@ export async function runHookPrompt(branch: string, opts: Options): Promise<Hook
   const getJiraSummary = d.getJiraSummary ?? realGetJiraSummary;
   const getOpenSession = d.getOpenSession ?? realGetOpenSession;
   const readProjects = d.readProjects ?? defaultReadProjects;
-  const prompt = d.prompt ?? ((qs) => inquirer.prompt(qs as never));
+  const prompt = d.prompt ?? simplePrompt;
   const startTimer = d.startTimer ?? realStartTimer;
 
   if (isRepoIgnored(opts.cwd)) {

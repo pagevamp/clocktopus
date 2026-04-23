@@ -1,4 +1,5 @@
 import * as readline from 'readline';
+import * as fs from 'fs';
 
 type Question = {
   type: 'confirm' | 'input' | 'list';
@@ -12,8 +13,34 @@ function ask(rl: readline.Interface, prompt: string): Promise<string> {
   return new Promise((resolve) => rl.question(prompt, (answer) => resolve(answer)));
 }
 
+function openTty(): { input: NodeJS.ReadableStream; output: NodeJS.WritableStream; close: () => void } | null {
+  try {
+    const inFd = fs.openSync('/dev/tty', 'r');
+    const outFd = fs.openSync('/dev/tty', 'w');
+    const input = fs.createReadStream('', { fd: inFd, autoClose: false }) as unknown as NodeJS.ReadableStream;
+    const output = fs.createWriteStream('', { fd: outFd, autoClose: false }) as unknown as NodeJS.WritableStream;
+    return {
+      input,
+      output,
+      close: () => {
+        try {
+          fs.closeSync(inFd);
+        } catch {}
+        try {
+          fs.closeSync(outFd);
+        } catch {}
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function simplePrompt(qs: ReadonlyArray<Record<string, unknown>>): Promise<Record<string, unknown>> {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+  const tty = openTty();
+  const input = tty ? tty.input : process.stdin;
+  const output = tty ? tty.output : process.stdout;
+  const rl = readline.createInterface({ input, output, terminal: true });
   const out: Record<string, unknown> = {};
   try {
     for (const raw of qs) {
@@ -27,9 +54,9 @@ export async function simplePrompt(qs: ReadonlyArray<Record<string, unknown>>): 
         const answer = (await ask(rl, def ? `${q.message} [${def}]: ` : `${q.message}: `)).trim();
         out[q.name] = answer || def;
       } else if (q.type === 'list') {
-        console.log(q.message);
+        output.write(`${q.message}\n`);
         const choices = q.choices ?? [];
-        choices.forEach((c, i) => console.log(`  ${i + 1}) ${c.name}`));
+        choices.forEach((c, i) => output.write(`  ${i + 1}) ${c.name}\n`));
         while (true) {
           const answer = (await ask(rl, `Pick 1-${choices.length}: `)).trim();
           const n = Number.parseInt(answer, 10);
@@ -42,6 +69,7 @@ export async function simplePrompt(qs: ReadonlyArray<Record<string, unknown>>): 
     }
   } finally {
     rl.close();
+    if (tty) tty.close();
   }
   return out;
 }

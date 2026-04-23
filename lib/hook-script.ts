@@ -6,8 +6,9 @@ if [ "$3" != "1" ]; then
   exit 0
 fi
 
-# Require an attached tty; otherwise the prompt has nowhere to render.
-if ! [ -t 0 ] || ! [ -t 1 ]; then
+# Require a tty on stdout; otherwise the prompt has nowhere to render.
+# Git commonly redirects hook stdin, so we only check stdout here.
+if ! [ -t 1 ]; then
   exit 0
 fi
 

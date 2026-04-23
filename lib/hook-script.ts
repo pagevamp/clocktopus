@@ -25,22 +25,6 @@ if ! command -v clocktopus >/dev/null 2>&1; then
   exit 0
 fi
 
-# Bun has a tty WriteStream bug on macOS when invoked from git hooks.
-# Prefer node when available; fall back to bun/clocktopus.
-bin=$(command -v clocktopus)
-resolved="$bin"
-link=$(readlink "$bin" 2>/dev/null || true)
-if [ -n "$link" ]; then
-  case "$link" in
-    /*) resolved="$link" ;;
-    *) resolved="$(cd "$(dirname "$bin")" && cd "$(dirname "$link")" && pwd)/$(basename "$link")" ;;
-  esac
-fi
-
-if command -v node >/dev/null 2>&1; then
-  NO_COLOR=1 FORCE_COLOR=0 node "$resolved" hook:prompt "$branch" </dev/tty || true
-else
-  NO_COLOR=1 FORCE_COLOR=0 clocktopus hook:prompt "$branch" </dev/tty || true
-fi
+NO_COLOR=1 FORCE_COLOR=0 clocktopus hook:prompt "$branch" </dev/tty || true
 exit 0
 `;

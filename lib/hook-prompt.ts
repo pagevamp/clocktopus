@@ -4,12 +4,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { extractTicket } from './branch-parser.js';
-import { isRepoIgnored } from './hook-ignore.js';
-import { isClockifyEnabled } from './credentials.js';
-import { getJiraSummary } from './jira-summary.js';
-import { getOpenSession } from './db.js';
+import { isRepoIgnored as realIsRepoIgnored } from './hook-ignore.js';
+import { isClockifyEnabled as realIsClockifyEnabled } from './credentials.js';
+import { getJiraSummary as realGetJiraSummary } from './jira-summary.js';
+import { getOpenSession as realGetOpenSession } from './db.js';
 import { matchProjectByTicket, LocalProject } from './project-matcher.js';
-import { startTimer } from './start-timer.js';
+import { startTimer as realStartTimer, StartTimerInput, StartTimerResult } from './start-timer.js';
 
 export interface HookPromptResult {
   started: boolean;
@@ -19,11 +19,22 @@ export interface HookPromptResult {
   reason?: 'ignored' | 'declined' | 'no-ticket';
 }
 
-interface Options {
-  cwd: string;
+export interface HookPromptDeps {
+  isRepoIgnored?: (cwd: string) => boolean;
+  isClockifyEnabled?: () => boolean;
+  getJiraSummary?: (ticket: string) => Promise<string | null>;
+  getOpenSession?: () => unknown;
+  readProjects?: () => LocalProject[];
+  prompt?: (qs: ReadonlyArray<Record<string, unknown>>) => Promise<Record<string, unknown>>;
+  startTimer?: (input: StartTimerInput) => Promise<StartTimerResult>;
 }
 
-function readLocalProjects(): LocalProject[] {
+interface Options {
+  cwd: string;
+  deps?: HookPromptDeps;
+}
+
+function defaultReadProjects(): LocalProject[] {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
   const p = path.join(__dirname, '../data/local-projects.json');
@@ -35,6 +46,15 @@ function readLocalProjects(): LocalProject[] {
 }
 
 export async function runHookPrompt(branch: string, opts: Options): Promise<HookPromptResult> {
+  const d = opts.deps ?? {};
+  const isRepoIgnored = d.isRepoIgnored ?? realIsRepoIgnored;
+  const isClockifyEnabled = d.isClockifyEnabled ?? realIsClockifyEnabled;
+  const getJiraSummary = d.getJiraSummary ?? realGetJiraSummary;
+  const getOpenSession = d.getOpenSession ?? realGetOpenSession;
+  const readProjects = d.readProjects ?? defaultReadProjects;
+  const prompt = d.prompt ?? ((qs) => inquirer.prompt(qs as never));
+  const startTimer = d.startTimer ?? realStartTimer;
+
   if (isRepoIgnored(opts.cwd)) {
     return { started: false, ticket: null, projectId: null, description: null, reason: 'ignored' };
   }
@@ -43,7 +63,7 @@ export async function runHookPrompt(branch: string, opts: Options): Promise<Hook
 
   const openSession = getOpenSession();
   if (openSession) {
-    const { continueAnyway } = await inquirer.prompt([
+    const answer = await prompt([
       {
         type: 'confirm',
         name: 'continueAnyway',
@@ -51,7 +71,7 @@ export async function runHookPrompt(branch: string, opts: Options): Promise<Hook
         default: false,
       },
     ]);
-    if (!continueAnyway) {
+    if (!answer.continueAnyway) {
       return { started: false, ticket, projectId: null, description: null, reason: 'declined' };
     }
   }
@@ -59,18 +79,15 @@ export async function runHookPrompt(branch: string, opts: Options): Promise<Hook
   const promptMsg = ticket
     ? `Start timer for ${chalk.bold(ticket)} (branch: ${branch})?`
     : `Start timer for branch ${chalk.bold(branch)}?`;
-  const { confirmStart } = await inquirer.prompt([
-    { type: 'confirm', name: 'confirmStart', message: promptMsg, default: true },
-  ]);
-  if (!confirmStart) {
+  const confirmAnswer = await prompt([{ type: 'confirm', name: 'confirmStart', message: promptMsg, default: true }]);
+  if (!confirmAnswer.confirmStart) {
     return { started: false, ticket, projectId: null, description: null, reason: 'declined' };
   }
 
   if (!ticket) {
-    const { ticket: entered } = await inquirer.prompt([
-      { type: 'input', name: 'ticket', message: 'Enter ticket (empty to skip):' },
-    ]);
-    ticket = entered && entered.trim() ? entered.trim().toUpperCase() : null;
+    const ticketAnswer = await prompt([{ type: 'input', name: 'ticket', message: 'Enter ticket (empty to skip):' }]);
+    const entered = typeof ticketAnswer.ticket === 'string' ? ticketAnswer.ticket : '';
+    ticket = entered.trim() ? entered.trim().toUpperCase() : null;
   }
 
   let defaultDescription = branch;
@@ -80,19 +97,20 @@ export async function runHookPrompt(branch: string, opts: Options): Promise<Hook
     else defaultDescription = ticket;
   }
 
-  const { description } = await inquirer.prompt([
+  const descAnswer = await prompt([
     { type: 'input', name: 'description', message: 'Description:', default: defaultDescription },
   ]);
+  const description = String(descAnswer.description);
 
   let projectId: string | null = null;
   if (isClockifyEnabled()) {
-    const projects = readLocalProjects();
+    const projects = readProjects();
     const matched = matchProjectByTicket(ticket, projects);
     if (matched) {
       projectId = matched.id;
       console.log(chalk.gray(`  Auto-selected project: ${matched.name}`));
     } else if (projects.length > 0) {
-      const { projectId: picked } = await inquirer.prompt([
+      const picked = await prompt([
         {
           type: 'list',
           name: 'projectId',
@@ -100,7 +118,7 @@ export async function runHookPrompt(branch: string, opts: Options): Promise<Hook
           choices: projects.map((p) => ({ name: p.name, value: p.id })),
         },
       ]);
-      projectId = picked;
+      projectId = String(picked.projectId);
     } else {
       console.log(chalk.yellow('No local projects configured. Run `clocktopus start` once to populate.'));
       return { started: false, ticket, projectId: null, description, reason: 'no-ticket' };

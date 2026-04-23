@@ -73,7 +73,7 @@ export async function runHookPrompt(branch: string, opts: Options): Promise<Hook
   const promptMsg = ticket
     ? `Start timer for ${chalk.bold(ticket)} (branch: ${branch})?`
     : `Start timer for branch ${chalk.bold(branch)}?`;
-  const confirmAnswer = await prompt([{ type: 'confirm', name: 'confirmStart', message: promptMsg, default: true }]);
+  const confirmAnswer = await prompt([{ type: 'confirm', name: 'confirmStart', message: promptMsg, default: false }]);
   if (!confirmAnswer.confirmStart) {
     return { started: false, ticket, projectId: null, description: null, reason: 'declined' };
   }

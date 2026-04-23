@@ -590,8 +590,9 @@ program
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error(chalk.red(`Hook prompt failed: ${msg}`));
-      process.exit(0); // never block git checkout
     }
+    // Force exit — /dev/tty fs streams and the sqlite handle keep the event loop alive.
+    process.exit(0);
   });
 
 program.parse(process.argv);

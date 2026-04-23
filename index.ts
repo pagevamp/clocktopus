@@ -2,7 +2,6 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { Clockify } from './clockify.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
@@ -10,9 +9,9 @@ import { createRequire } from 'module';
 import { execSync } from 'child_process';
 import { completeLatestSession, getLatestSession, setSessionJiraWorklogId } from './lib/db.js';
 import { isClockifyEnabled } from './lib/credentials.js';
-import { stopJiraTimer } from './lib/jira.js';
 import { ensureNativeAddons } from './lib/ensure-native-addons.js';
 import { DASHBOARD_PORT, DASHBOARD_URL } from './lib/constants.js';
+import type { Clockify as ClockifyType } from './clockify.js';
 
 interface Project {
   id: string;
@@ -23,7 +22,21 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const program = new Command();
-const clockify = new Clockify();
+
+// Clockify + Jira pull in axios (via follow-redirects), which in Bun triggers
+// a tty WriteStream crash when loaded from a git hook context. Defer.
+let _clockify: ClockifyType | null = null;
+async function clockify(): Promise<ClockifyType> {
+  if (!_clockify) {
+    const { Clockify } = await import('./clockify.js');
+    _clockify = new Clockify();
+  }
+  return _clockify;
+}
+async function stopJiraTimer(...args: Parameters<typeof import('./lib/jira.js').stopJiraTimer>) {
+  const { stopJiraTimer: fn } = await import('./lib/jira.js');
+  return fn(...args);
+}
 
 async function getLocalProjects(): Promise<Project[]> {
   const dataDir = path.join(__dirname, '../data');
@@ -45,7 +58,7 @@ async function getLocalProjects(): Promise<Project[]> {
 }
 
 async function getWorkspaceAndUser() {
-  const user = await clockify.getUser();
+  const user = await (await clockify()).getUser();
 
   if (!user) {
     console.log(chalk.red('[index] Could not connect to Clockify. Please check your API key.'));
@@ -86,7 +99,7 @@ program
     }
 
     const { workspaceId } = await getWorkspaceAndUser();
-    let projects: Project[] = await clockify.getProjects(workspaceId);
+    let projects: Project[] = await (await clockify()).getProjects(workspaceId);
     let localProjects = await getLocalProjects();
 
     if (localProjects.length === 0) {
@@ -139,7 +152,7 @@ program
 
     if (isClockifyEnabled()) {
       const { workspaceId, userId } = await getWorkspaceAndUser();
-      const stoppedEntry = await clockify.stopTimer(workspaceId, userId);
+      const stoppedEntry = await (await clockify()).stopTimer(workspaceId, userId);
       if (!stoppedEntry) {
         console.log(chalk.yellow('No timer was running.'));
         return;
@@ -176,7 +189,7 @@ program
   .action(async () => {
     if (isClockifyEnabled()) {
       const { workspaceId, userId } = await getWorkspaceAndUser();
-      const activeEntry = await clockify.getActiveTimer(workspaceId, userId);
+      const activeEntry = await (await clockify()).getActiveTimer(workspaceId, userId);
 
       if (activeEntry) {
         const startTime = new Date(activeEntry.timeInterval.start);
@@ -226,7 +239,7 @@ program
       const latestSession = getLatestSession();
 
       if (clockifyOn) {
-        const activeEntry = await clockify.getActiveTimer(workspaceId, userId);
+        const activeEntry = await (await clockify()).getActiveTimer(workspaceId, userId);
         if (!activeEntry) return false;
       } else {
         if (!latestSession || latestSession.completedAt) return false;
@@ -236,7 +249,7 @@ program
       const completedAt = new Date().toISOString();
 
       if (clockifyOn) {
-        const stoppedEntry = await clockify.stopTimer(workspaceId, userId);
+        const stoppedEntry = await (await clockify()).stopTimer(workspaceId, userId);
         if (!stoppedEntry) return false;
       }
 
@@ -282,10 +295,12 @@ program
       if (isClockifyEnabled()) {
         if (!latestSession.projectId) return;
 
-        const activeEntry = await clockify.getActiveTimer(workspaceId, userId);
+        const activeEntry = await (await clockify()).getActiveTimer(workspaceId, userId);
         if (activeEntry) return;
 
-        await clockify.startTimer(
+        await (
+          await clockify()
+        ).startTimer(
           workspaceId,
           latestSession.projectId,
           latestSession.description,

@@ -74,27 +74,24 @@ program
   .option('-j, --jira <ticket>', 'Jira ticket number')
   .option('--no-billable', 'Mark the time entry as non-billable')
   .action(async (message, options) => {
+    const { startTimer } = await import('./lib/start-timer.js');
+
     if (!isClockifyEnabled()) {
       if (!options.jira) {
         console.error(chalk.red('Jira-only mode requires --jira <ticket>.'));
         process.exit(1);
       }
-      const { v4: uuidv4 } = await import('uuid');
-      const { logSessionStart } = await import('./lib/db.js');
-      const sessionId = uuidv4();
-      const startedAt = new Date().toISOString();
       const description = (message && String(message).trim()) || options.jira;
-      logSessionStart(sessionId, null, description, startedAt, options.jira);
+      await startTimer({ description, ticket: options.jira, projectId: null, billable: options.billable });
       console.log(chalk.green(`Timer started for ${chalk.bold(options.jira)} (Jira-only mode).`));
       return;
     }
-    const { workspaceId } = await getWorkspaceAndUser();
 
+    const { workspaceId } = await getWorkspaceAndUser();
     let projects: Project[] = await clockify.getProjects(workspaceId);
     let localProjects = await getLocalProjects();
 
     if (localProjects.length === 0) {
-      // If local-projects.json is empty or doesn't exist, populate it with all project IDs and names
       const allProjects = projects.map((p) => ({ id: p.id, name: p.name }));
       const localProjectsPath = path.join(__dirname, '../data/local-projects.json');
       fs.writeFileSync(localProjectsPath, JSON.stringify(allProjects, null, 2), 'utf8');
@@ -113,7 +110,6 @@ program
 
     if (!projects || projects.length === 0) {
       console.log(chalk.yellow('No projects found in your workspace.'));
-
       return;
     }
 
@@ -126,11 +122,14 @@ program
       },
     ]);
 
-    const entry = await clockify.startTimer(workspaceId, selectedProjectId, message, options.jira, options.billable);
-    if (entry) {
-      const projectName = projects.find((p: { name: string; id: string }) => p.id === selectedProjectId)?.name;
-      console.log(chalk.green(`Timer started for project: ${chalk.bold(projectName)}`));
-    }
+    await startTimer({
+      description: message || options.jira || '',
+      ticket: options.jira ?? null,
+      projectId: selectedProjectId,
+      billable: options.billable,
+    });
+    const projectName = projects.find((p) => p.id === selectedProjectId)?.name;
+    console.log(chalk.green(`Timer started for project: ${chalk.bold(projectName)}`));
   });
 
 program

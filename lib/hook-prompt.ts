@@ -1,12 +1,9 @@
 import chalk from 'chalk';
-import * as fs from 'fs';
-import * as path from 'path';
-import { fileURLToPath } from 'url';
 import { extractTicket } from './branch-parser.js';
 import { isRepoIgnored as realIsRepoIgnored } from './hook-ignore.js';
 import { isClockifyEnabled as realIsClockifyEnabled } from './credentials.js';
 import { getJiraSummary as realGetJiraSummary } from './jira-summary.js';
-import { getOpenSession as realGetOpenSession } from './db.js';
+import { getOpenSession as realGetOpenSession, getActiveProjects } from './db.js';
 import { matchProjectByTicket, LocalProject } from './project-matcher.js';
 import { simplePrompt } from './simple-prompt.js';
 import { startTimer as realStartTimer, StartTimerInput, StartTimerResult } from './start-timer.js';
@@ -35,11 +32,8 @@ interface Options {
 }
 
 function defaultReadProjects(): LocalProject[] {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-  const p = path.join(__dirname, '../data/local-projects.json');
   try {
-    return JSON.parse(fs.readFileSync(p, 'utf8')) as LocalProject[];
+    return getActiveProjects().map((p) => ({ id: p.id, name: p.name }));
   } catch {
     return [];
   }

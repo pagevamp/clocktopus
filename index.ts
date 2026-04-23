@@ -545,4 +545,18 @@ program
     console.log(chalk.green('Clocktopus post-checkout hook removed.'));
   });
 
+program
+  .command('hook:prompt <branch>')
+  .description('(internal) Prompt to start a timer after git checkout.')
+  .action(async (branch: string) => {
+    const { runHookPrompt } = await import('./lib/hook-prompt.js');
+    try {
+      await runHookPrompt(branch, { cwd: process.cwd() });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(chalk.red(`Hook prompt failed: ${msg}`));
+      process.exit(0); // never block git checkout
+    }
+  });
+
 program.parse(process.argv);

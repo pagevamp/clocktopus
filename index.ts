@@ -12,7 +12,6 @@ import { execSync } from 'child_process';
 import { completeLatestSession, getLatestSession, setSessionJiraWorklogId } from './lib/db.js';
 import { isClockifyEnabled } from './lib/credentials.js';
 import { stopJiraTimer } from './lib/jira.js';
-import { startDashboard } from './dashboard/server.js';
 import { ensureNativeAddons } from './lib/ensure-native-addons.js';
 import { DASHBOARD_PORT, DASHBOARD_URL } from './lib/constants.js';
 
@@ -408,7 +407,8 @@ program
 program
   .command('dash')
   .description(`Start the Clocktopus web dashboard on localhost:${DASHBOARD_PORT}.`)
-  .action(() => {
+  .action(async () => {
+    const { startDashboard } = await import('./dashboard/server.js');
     startDashboard();
   });
 

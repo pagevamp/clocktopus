@@ -24,6 +24,6 @@ if ! command -v clocktopus >/dev/null 2>&1; then
   exit 0
 fi
 
-clocktopus hook:prompt "$branch" </dev/tty >/dev/tty 2>&1 || true
+NO_COLOR=1 FORCE_COLOR=0 clocktopus hook:prompt "$branch" </dev/tty >/dev/tty 2>&1 || true
 exit 0
 `;

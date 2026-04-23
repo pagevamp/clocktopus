@@ -524,4 +524,25 @@ program
     }
   });
 
+program
+  .command('hook:install')
+  .description('Install global git post-checkout hook (prompts to start timer on branch switch).')
+  .action(async () => {
+    const { installHook } = await import('./lib/hook-install.js');
+    await installHook();
+    console.log(chalk.green('Clocktopus post-checkout hook installed globally.'));
+    console.log(chalk.gray('  Disable per-repo: touch .clocktopus-ignore'));
+    console.log(chalk.gray('  Disable per-session: export CLOCKTOPUS_HOOK_DISABLE=1'));
+    console.log(chalk.gray('  Uninstall: clocktopus hook:uninstall'));
+  });
+
+program
+  .command('hook:uninstall')
+  .description('Remove the global git post-checkout hook.')
+  .action(async () => {
+    const { uninstallHook } = await import('./lib/hook-install.js');
+    await uninstallHook();
+    console.log(chalk.green('Clocktopus post-checkout hook removed.'));
+  });
+
 program.parse(process.argv);

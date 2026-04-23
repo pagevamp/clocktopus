@@ -49,18 +49,44 @@ That's it. Start/stop timers from the Home tab.
 
 ### Commands
 
-| Command                   | Description                             |
-| ------------------------- | --------------------------------------- |
-| `clocktopus dash`         | Start dashboard (foreground)            |
-| `clocktopus serve`        | Start dashboard as background daemon    |
-| `clocktopus serve:stop`   | Stop the dashboard daemon               |
-| `clocktopus serve:logs`   | View dashboard daemon logs              |
-| `clocktopus start`        | Start a timer (interactive)             |
-| `clocktopus stop`         | Stop the current timer                  |
-| `clocktopus status`       | Check timer status                      |
-| `clocktopus monitor`      | Start idle monitor as background daemon |
-| `clocktopus monitor:stop` | Stop the idle monitor                   |
-| `clocktopus monitor:logs` | View idle monitor logs                  |
+| Command                         | Description                                |
+| ------------------------------- | ------------------------------------------ |
+| `clocktopus dash`               | Start dashboard (foreground)               |
+| `clocktopus serve`              | Start dashboard as background daemon       |
+| `clocktopus serve:stop`         | Stop the dashboard daemon                  |
+| `clocktopus serve:logs`         | View dashboard daemon logs                 |
+| `clocktopus start`              | Start a timer (interactive)                |
+| `clocktopus stop`               | Stop the current timer                     |
+| `clocktopus status`             | Check timer status                         |
+| `clocktopus monitor`            | Start idle monitor as background daemon    |
+| `clocktopus monitor:stop`       | Stop the idle monitor                      |
+| `clocktopus monitor:logs`       | View idle monitor logs                     |
+| `clocktopus hook:install`       | Install global git post-checkout hook      |
+| `clocktopus hook:uninstall`     | Remove the global git post-checkout hook   |
+| `clocktopus hook:install-husky` | Add `.husky/post-checkout` in current repo |
+
+### Git post-checkout hook
+
+Auto-prompt to start a timer when you `git checkout` a branch. Extracts Jira tickets from branch names (e.g. `feature/RST-100-login` → `RST-100`), fetches the ticket summary from Jira as the default description, and maps to a Clockify project.
+
+```bash
+clocktopus hook:install
+```
+
+Installs a global hook at `~/.clocktopus/hooks/post-checkout` and sets `git config --global core.hooksPath` + `init.templateDir`.
+
+**Opt out per repo:** `touch .clocktopus-ignore` at the repo root.
+**Opt out per session:** `export CLOCKTOPUS_HOOK_DISABLE=1`.
+
+#### Husky users
+
+Husky sets a **local** `core.hooksPath`, which overrides the global one — so the hook won't fire in husky repos by default. Inside each husky-enabled repo, run:
+
+```bash
+clocktopus hook:install-husky
+```
+
+This writes `.husky/post-checkout` that chains to the global hook. Commit it so teammates get it too.
 
 ### Desktop App (macOS)
 

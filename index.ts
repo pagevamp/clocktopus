@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
 
 import { Command } from 'commander';
-import inquirer from 'inquirer';
 import chalk from 'chalk';
 import { Clockify } from './clockify.js';
 import * as fs from 'fs';
@@ -112,6 +111,7 @@ program
       return;
     }
 
+    const inquirer = (await import('inquirer')).default;
     const { selectedProjectId } = await inquirer.prompt([
       {
         type: 'list',

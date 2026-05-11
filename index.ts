@@ -312,62 +312,89 @@ program
 
     // Safer restart w/ cooldown; only resume a recent auto-completed session
     let lastResumeAt = 0;
+    let resuming = false;
     const RESUME_COOLDOWN_MS = 10_000;
+
+    // Shared between lock-state and idle-time watchers so a resume triggered
+    // by one path disarms the other (otherwise both fire and we get two starts).
+    let isLocked = false;
+    let lastIdle = false;
 
     async function safeRestartTimerIfNeeded() {
       const now = Date.now();
-      if (now - lastResumeAt < RESUME_COOLDOWN_MS) return;
+      if (resuming || now - lastResumeAt < RESUME_COOLDOWN_MS) return;
+      resuming = true;
+      // Gate concurrent callers immediately; refine on success/failure below.
+      lastResumeAt = now;
 
-      // Small delay lets services settle after wake/activity
-      await sleep(800);
+      try {
+        // Small delay lets services settle after wake/activity
+        await sleep(800);
 
-      const latestSession = getLatestSession();
-      if (!latestSession) return;
+        const latestSession = getLatestSession();
+        if (!latestSession) return;
 
-      const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
-      const completedMs = latestSession.completedAt ? new Date(latestSession.completedAt).getTime() : 0;
+        const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
+        const completedMs = latestSession.completedAt ? new Date(latestSession.completedAt).getTime() : 0;
 
-      if (!latestSession.isAutoCompleted || completedMs <= twoHoursAgo) return;
+        if (!latestSession.isAutoCompleted || completedMs <= twoHoursAgo) return;
 
-      if (isClockifyEnabled()) {
-        if (!latestSession.projectId) return;
+        if (isClockifyEnabled()) {
+          if (!latestSession.projectId) return;
 
-        const activeEntry = await (await clockify()).getActiveTimer(workspaceId, userId);
-        if (activeEntry) return;
+          const activeEntry = await (await clockify()).getActiveTimer(workspaceId, userId);
+          if (activeEntry) {
+            isLocked = false;
+            lastIdle = false;
+            return;
+          }
 
-        await (
-          await clockify()
-        ).startTimer(
-          workspaceId,
-          latestSession.projectId,
+          await (
+            await clockify()
+          ).startTimer(
+            workspaceId,
+            latestSession.projectId,
+            latestSession.description,
+            latestSession.jiraTicket ?? undefined,
+          );
+          console.log(chalk.green('Timer restarted for the last used project.'));
+          lastResumeAt = Date.now();
+          isLocked = false;
+          lastIdle = false;
+          return;
+        }
+
+        // Jira-only resume: new DB session with a fresh uuid, same ticket.
+        // Re-read latest to guard against a concurrent insert from another path.
+        if (!latestSession.jiraTicket) return;
+        const fresh = getLatestSession();
+        if (fresh && !fresh.completedAt) {
+          isLocked = false;
+          lastIdle = false;
+          return;
+        }
+        const { v4: uuidv4 } = await import('uuid');
+        const { logSessionStart } = await import('./lib/db.js');
+        const sessionId = uuidv4();
+        const startedAt = new Date().toISOString();
+        logSessionStart(
+          sessionId,
+          latestSession.projectId ?? null,
           latestSession.description,
-          latestSession.jiraTicket ?? undefined,
+          startedAt,
+          latestSession.jiraTicket,
         );
-        console.log(chalk.green('Timer restarted for the last used project.'));
+        console.log(chalk.green(`Resumed Jira timer for ${latestSession.jiraTicket}.`));
         lastResumeAt = Date.now();
-        return;
+        isLocked = false;
+        lastIdle = false;
+      } finally {
+        resuming = false;
       }
-
-      // Jira-only resume: new DB session with a fresh uuid, same ticket
-      if (!latestSession.jiraTicket) return;
-      const { v4: uuidv4 } = await import('uuid');
-      const { logSessionStart } = await import('./lib/db.js');
-      const sessionId = uuidv4();
-      const startedAt = new Date().toISOString();
-      logSessionStart(
-        sessionId,
-        latestSession.projectId ?? null,
-        latestSession.description,
-        startedAt,
-        latestSession.jiraTicket,
-      );
-      console.log(chalk.green(`Resumed Jira timer for ${latestSession.jiraTicket}.`));
-      lastResumeAt = Date.now();
     }
 
     console.log(chalk.blue('Monitoring display events (Unified Log) and idle time...'));
 
-    let isLocked = false;
     let pollInterval: NodeJS.Timeout | null = null;
 
     console.log(chalk.blue('Monitoring display/lock state (macos-notification-state) and idle time...'));
@@ -416,7 +443,6 @@ program
     }
 
     const IDLE_THRESHOLD_SECONDS = 300; // 5 minutes
-    let lastIdle = false;
 
     const idleInterval = setInterval(async () => {
       try {

@@ -13,14 +13,16 @@ export function indexPage() {
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html.browser { background: #0d1117; }
+    html, body { border-radius: 12px; }
+    html { overflow: hidden; background: transparent; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: transparent; color: #e1e4e8; padding: 2rem; }
     h1 { font-size: 1.8rem; margin-bottom: 0; color: #fff; }
     h2 { font-size: 1.1rem; color: #fff; margin-bottom: 1rem; }
 
     /* Nav */
     .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
-    .nav { display: flex; gap: 0.25rem; background: #1c1f26; border-radius: 10px; padding: 0.3rem; }
-    .nav-btn { margin-top: 0; padding: 0.5rem 1.25rem; border: none; border-radius: 6px; background: transparent; color: #8b949e; font-size: 0.9rem; cursor: pointer; }
+    .nav { display: flex; gap: 0.25rem; background: #1c1f26; border-radius: 10px; padding: 0.3rem; flex-wrap: nowrap; }
+    .nav-btn { margin-top: 0; padding: 0.5rem 0.85rem; border: none; border-radius: 6px; background: transparent; color: #8b949e; font-size: 0.9rem; cursor: pointer; white-space: nowrap; }
     .nav-btn:hover { color: #e1e4e8; }
     .nav-btn.active { background: #30363d; color: #fff; }
     .tab-content { display: none; }
@@ -112,7 +114,7 @@ export function indexPage() {
       .header { flex-direction: column; gap: 0; align-items: stretch; margin-bottom: 1rem; }
       .header h1 { display: none; }
       .nav { justify-content: center; flex-wrap: wrap; }
-      .nav-btn { padding: 0.5rem 1rem; font-size: 0.8rem; }
+      .nav-btn { padding: 0.4rem 0.7rem; font-size: 0.8rem; }
     }
     /* Project toggles */
     .project-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.4rem 0; border-bottom: 1px solid #21262d; }
@@ -147,6 +149,7 @@ export function indexPage() {
     <h1>Clocktopus</h1>
     <div class="nav">
       <button class="nav-btn active" onclick="switchTab('home')" id="nav-home">Home</button>
+      <button class="nav-btn" onclick="switchTab('sessions')" id="nav-sessions">Sessions</button>
       <button class="nav-btn" onclick="switchTab('projects')" id="nav-projects">Projects</button>
       <button class="nav-btn" onclick="switchTab('calendar')" id="nav-calendar">Calendar</button>
       <button class="nav-btn" onclick="switchTab('settings')" id="nav-settings">Settings</button>
@@ -262,30 +265,33 @@ export function indexPage() {
         </div>
       </div>
 
-      <!-- Session History -->
-      <div class="card card-full">
-        <h2>Recent Sessions</h2>
-        <div id="sessions-container" class="table-wrap">
-          <table class="sessions-table">
-            <thead>
-              <tr>
-                <th>Description</th>
-                <th>Project</th>
-                <th>Started</th>
-                <th>Duration</th>
-                <th>Jira</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="sessions-body">
-              <tr><td colspan="6" class="empty-state">Loading...</td></tr>
-            </tbody>
-          </table>
-          <div id="pagination" style="display:none; margin-top:1rem; align-items:center; justify-content:center; gap:0.75rem; flex-wrap:wrap;">
-            <button id="prev-btn" onclick="changePage(-1)" style="background:#30363d; margin-top:0; padding:0.3rem 0.75rem;" disabled>&lt;</button>
-            <span id="page-info" style="font-size:0.85rem; color:#8b949e;"></span>
-            <button id="next-btn" onclick="changePage(1)" style="background:#30363d; margin-top:0; padding:0.3rem 0.75rem;">&gt;</button>
-          </div>
+    </div>
+  </div>
+
+  <!-- SESSIONS TAB -->
+  <div id="tab-sessions" class="tab-content">
+    <div class="card card-full">
+      <h2>Recent Sessions</h2>
+      <div id="sessions-container" class="table-wrap">
+        <table class="sessions-table">
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th>Project</th>
+              <th>Started</th>
+              <th>Duration</th>
+              <th>Jira</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="sessions-body">
+            <tr><td colspan="6" class="empty-state">Loading...</td></tr>
+          </tbody>
+        </table>
+        <div id="pagination" style="display:none; margin-top:1rem; align-items:center; justify-content:center; gap:0.75rem; flex-wrap:wrap;">
+          <button id="prev-btn" onclick="changePage(-1)" style="background:#30363d; margin-top:0; padding:0.3rem 0.75rem;" disabled>&lt;</button>
+          <span id="page-info" style="font-size:0.85rem; color:#8b949e;"></span>
+          <button id="next-btn" onclick="changePage(1)" style="background:#30363d; margin-top:0; padding:0.3rem 0.75rem;">&gt;</button>
         </div>
       </div>
     </div>

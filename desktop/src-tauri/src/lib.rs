@@ -254,7 +254,10 @@ pub fn run() {
                 // Accessory policy: no dock icon, no Cmd+Tab entry, no app activation on show
                 app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
-                apply_vibrancy(&window, NSVisualEffectMaterial::Popover, None, None)
+                // 4th arg = corner radius for the vibrancy backdrop. Matches
+                // the macOS popover/sheet look since window is transparent +
+                // decorations: false.
+                apply_vibrancy(&window, NSVisualEffectMaterial::Popover, None, Some(12.0))
                     .map_err(|e| e.to_string())?;
 
                 // Swizzle NSWindow -> NSPanel to enable non-activating show (no Space switch)

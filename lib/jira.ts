@@ -63,7 +63,23 @@ async function jiraApiRequest(endpoint: string, method: 'POST' | 'GET' | 'DELETE
   }
 }
 
+// Hard cap so a corrupted duration (orphaned session, missed idle, etc.)
+// cannot post a multi-day worklog to Jira.
+export const MAX_WORKLOG_SECONDS = 12 * 60 * 60; // 12h
+
 export async function stopJiraTimer(ticketId: string, timeSpentSeconds: number): Promise<{ id: string } | null> {
+  if (!Number.isFinite(timeSpentSeconds) || timeSpentSeconds <= 0) {
+    console.warn(`[jira] stopJiraTimer: refusing non-positive duration (${timeSpentSeconds}s) for ${ticketId}.`);
+    return null;
+  }
+  if (timeSpentSeconds > MAX_WORKLOG_SECONDS) {
+    const hours = (timeSpentSeconds / 3600).toFixed(1);
+    console.warn(
+      `[jira] stopJiraTimer: refusing oversized worklog (${timeSpentSeconds}s ≈ ${hours}h) for ${ticketId}. ` +
+        `Cap is ${MAX_WORKLOG_SECONDS}s (${MAX_WORKLOG_SECONDS / 3600}h). Log manually via the dashboard if needed.`,
+    );
+    return null;
+  }
   const body = {
     timeSpentSeconds,
     comment: {

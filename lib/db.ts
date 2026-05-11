@@ -244,6 +244,35 @@ export function getLatestSession() {
   return SessionSchema.parse(stmt.get());
 }
 
+// Close any session that has been open longer than maxAgeMs.
+// completedAt is set to min(startedAt + maxAgeMs, now - maxAgeMs) so the
+// row's duration stays bounded AND completedAt is always at least maxAgeMs
+// in the past — that guarantees safeRestartTimerIfNeeded's 2h-recency
+// check rejects these rows and they don't get auto-resumed.
+// Does NOT post to Jira; caller controls that.
+// Returns the closed rows so the caller can warn or audit.
+export function closeStaleOpenSessions(
+  maxAgeMs: number,
+): Array<{ id: string; jiraTicket: string | null; startedAt: string; completedAt: string }> {
+  const db = getDb();
+  const cutoffMs = Date.now() - maxAgeMs;
+  const cutoffIso = new Date(cutoffMs).toISOString();
+  const rows = db
+    .prepare('SELECT id, jiraTicket, startedAt FROM sessions WHERE completedAt IS NULL AND startedAt < ?')
+    .all(cutoffIso) as Array<{ id: string; jiraTicket: string | null; startedAt: string }>;
+  if (rows.length === 0) return [];
+  const stmt = db.prepare('UPDATE sessions SET completedAt = ?, isAutoCompleted = 1 WHERE id = ?');
+  const closed: Array<{ id: string; jiraTicket: string | null; startedAt: string; completedAt: string }> = [];
+  for (const r of rows) {
+    const startedMs = new Date(r.startedAt).getTime();
+    const completedMs = Math.min(startedMs + maxAgeMs, cutoffMs);
+    const completedAt = new Date(completedMs).toISOString();
+    stmt.run(completedAt, r.id);
+    closed.push({ ...r, completedAt });
+  }
+  return closed;
+}
+
 export function deleteOldSessions(days: number) {
   const db = getDb();
   const date = new Date();

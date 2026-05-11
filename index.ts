@@ -7,7 +7,7 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { execSync } from 'child_process';
-import { completeLatestSession, getLatestSession, setSessionJiraWorklogId } from './lib/db.js';
+import { closeStaleOpenSessions, completeLatestSession, getLatestSession, setSessionJiraWorklogId } from './lib/db.js';
 import { isClockifyEnabled } from './lib/credentials.js';
 import { ensureNativeAddons } from './lib/ensure-native-addons.js';
 import { DASHBOARD_PORT, DASHBOARD_URL } from './lib/constants.js';
@@ -234,6 +234,29 @@ program
     const creds = isClockifyEnabled() ? await getWorkspaceAndUser() : { workspaceId: '', userId: '' };
     const { workspaceId, userId } = creds;
 
+    // Auto-close any session left open longer than this on monitor startup,
+    // so a PM2 restart after a long sleep doesn't accidentally bill the
+    // entire gap to Jira when the next idle/lock event fires.
+    const MAX_OPEN_SESSION_MS = 12 * 60 * 60 * 1000; // 12h
+    try {
+      const stale = closeStaleOpenSessions(MAX_OPEN_SESSION_MS);
+      if (stale.length > 0) {
+        console.log(
+          chalk.yellow(
+            `Auto-closed ${stale.length} stale open session(s) older than ${MAX_OPEN_SESSION_MS / 3600_000}h. ` +
+              `No Jira worklog was posted for these; review and log manually if needed.`,
+          ),
+        );
+        for (const s of stale) {
+          console.log(
+            chalk.gray(`  - id=${s.id} jira=${s.jiraTicket ?? '-'} startedAt=${s.startedAt} closedAt=${s.completedAt}`),
+          );
+        }
+      }
+    } catch (err) {
+      console.error(chalk.red('Failed to scan for stale open sessions:'), err);
+    }
+
     async function stopTimerAndLog(reason: string) {
       const clockifyOn = isClockifyEnabled();
       const latestSession = getLatestSession();
@@ -246,7 +269,21 @@ program
       }
 
       console.log(chalk.yellow(reason));
-      const completedAt = new Date().toISOString();
+
+      // Use idleTime to rewind end-of-work to the moment user actually went idle,
+      // so a weekend gap or long sleep doesn't get billed to Jira.
+      let idleSec = 0;
+      try {
+        const idleModule = await import('desktop-idle');
+        idleSec = Math.max(0, Math.floor(idleModule.default.getIdleTime() || 0));
+      } catch {}
+      let completedMs = Date.now() - idleSec * 1000;
+      if (latestSession) {
+        const startedMs = new Date(latestSession.startedAt).getTime();
+        // Don't let the adjusted end fall before start; floor at start+1s.
+        if (completedMs < startedMs) completedMs = startedMs + 1000;
+      }
+      const completedAt = new Date(completedMs).toISOString();
 
       if (clockifyOn) {
         const stoppedEntry = await (await clockify()).stopTimer(workspaceId, userId);

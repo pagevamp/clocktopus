@@ -4,10 +4,17 @@ import { Database } from 'bun:sqlite';
 import { z } from 'zod';
 
 function getDataDir(): string {
+  // Explicit override always wins (useful for tests, CI, or per-shell isolation).
+  const override = process.env.CLOCKTOPUS_DATA_DIR;
+  if (override && override.trim()) return path.resolve(override);
+
   const scriptDir = path.dirname(new URL(import.meta.url).pathname);
   const isDev = scriptDir.includes('/Projects/') || scriptDir.includes('/src/');
   if (isDev) {
-    return path.join(process.cwd(), 'data/db');
+    // Anchor to the repo (scriptDir is <repo>/dist/lib), NOT process.cwd().
+    // Otherwise the git post-checkout hook, which runs in the target project's
+    // cwd, would spawn a stray data/ directory there.
+    return path.resolve(scriptDir, '..', '..', 'data', 'db');
   }
   return path.join(process.env.HOME || '~', '.clocktopus', 'data');
 }

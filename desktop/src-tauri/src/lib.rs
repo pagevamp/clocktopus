@@ -295,12 +295,21 @@ pub fn run() {
             let idle_rgba = recolor(&raw, 0, 0, 0);
             let icon = Image::new_owned(idle_rgba.clone(), w, h);
 
+            // Pull productName from config so dev builds show "Clocktopus Dev"
+            // in the tray tooltip without needing two binaries.
+            let product_name = app
+                .config()
+                .product_name
+                .clone()
+                .unwrap_or_else(|| "Clocktopus".to_string());
+            let product_name_active = format!("{} - Timer running", product_name);
+
             let tray = TrayIconBuilder::with_id(TrayIconId::new("main-tray"))
                 .icon(icon)
                 .icon_as_template(true)
                 .menu(&menu)
                 .show_menu_on_left_click(false)
-                .tooltip("Clocktopus")
+                .tooltip(product_name.clone())
                 .on_menu_event(move |app, event| match event.id.as_ref() {
                     "show" => {
                         if let Some(win) = app.get_webview_window("main") {
@@ -476,9 +485,9 @@ pub fn run() {
                                 let _ = tray.set_icon_as_template(true);
 
                                 let _ = tray.set_tooltip(Some(if new_active {
-                                    "Clocktopus - Timer running"
+                                    product_name_active.as_str()
                                 } else {
-                                    "Clocktopus"
+                                    product_name.as_str()
                                 }));
 
                                 let _ = stop_timer_for_thread.set_enabled(new_active);

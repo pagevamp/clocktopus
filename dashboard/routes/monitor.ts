@@ -3,12 +3,12 @@ import { execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
+import { IS_DEV } from '../../lib/constants.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const SCRIPT_PATH = path.resolve(__dirname, '../../index.js');
-const isDev = SCRIPT_PATH.includes('/Projects/') || SCRIPT_PATH.includes('/src/');
-const PM2_NAME = isDev ? 'clocktopus-monitor-dev' : 'clocktopus-monitor';
+const PM2_NAME = IS_DEV ? 'clocktopus-monitor-dev' : 'clocktopus-monitor';
 const pm2Bin = path.join(path.dirname(createRequire(import.meta.url).resolve('pm2')), 'bin', 'pm2');
 const bunBin = (() => {
   try {

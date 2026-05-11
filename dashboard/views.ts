@@ -13,9 +13,8 @@ export function indexPage() {
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html.browser { background: #0d1117; }
-    html, body { border-radius: 12px; }
-    html { overflow: hidden; background: transparent; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: transparent; color: #e1e4e8; padding: 2rem; }
+    html { border-radius: 12px; overflow: hidden; height: 100vh; background: transparent; }
+    body { border-radius: 12px; height: 100vh; overflow-y: auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: transparent; color: #e1e4e8; padding: 2rem; }
     h1 { font-size: 1.8rem; margin-bottom: 0; color: #fff; }
     h2 { font-size: 1.1rem; color: #fff; margin-bottom: 1rem; }
 

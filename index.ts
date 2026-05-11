@@ -10,7 +10,7 @@ import { execSync } from 'child_process';
 import { closeStaleOpenSessions, completeLatestSession, getLatestSession, setSessionJiraWorklogId } from './lib/db.js';
 import { isClockifyEnabled } from './lib/credentials.js';
 import { ensureNativeAddons } from './lib/ensure-native-addons.js';
-import { DASHBOARD_PORT, DASHBOARD_URL } from './lib/constants.js';
+import { DASHBOARD_PORT, DASHBOARD_URL, IS_DEV } from './lib/constants.js';
 import type { Clockify as ClockifyType } from './clockify.js';
 
 interface Project {
@@ -464,9 +464,8 @@ program
     startDashboard();
   });
 
-const isDev = __dirname.includes('/Projects/') || __dirname.includes('/src/');
-const MONITOR_PM2_NAME = isDev ? 'clocktopus-monitor-dev' : 'clocktopus-monitor';
-const DASH_PM2_NAME = isDev ? 'clocktopus-dash-dev' : 'clocktopus-dash';
+const MONITOR_PM2_NAME = IS_DEV ? 'clocktopus-monitor-dev' : 'clocktopus-monitor';
+const DASH_PM2_NAME = IS_DEV ? 'clocktopus-dash-dev' : 'clocktopus-dash';
 const pm2Bin = path.join(path.dirname(createRequire(import.meta.url).resolve('pm2')), 'bin', 'pm2');
 const bunBin = (() => {
   try {

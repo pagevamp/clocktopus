@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bunx tauri dev",
+    "dev": "bunx tauri dev --config src-tauri/tauri.dev.conf.json",
     "build": "bunx tauri build"
   },
   "devDependencies": {

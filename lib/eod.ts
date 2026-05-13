@@ -38,6 +38,7 @@ export function shouldFireEod(args: { now: Date; state: EodState }): EodDecision
 
   if (state.snoozeUntil) {
     const snoozeDate = new Date(state.snoozeUntil);
+    if (isNaN(snoozeDate.getTime())) return 'skip';
     if (now < snoozeDate) return 'skip';
     if (localDateString(snoozeDate) !== localDateString(now)) return 'skip';
     return state.hasOpenSession ? 'fire-snooze' : 'skip-mark-fired';

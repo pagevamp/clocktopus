@@ -98,4 +98,23 @@ describe('shouldFireEod', () => {
   it('returns skip when time string is malformed', () => {
     expect(shouldFireEod({ now: afterTime, state: { ...base, time: 'oops' } })).toBe('skip');
   });
+
+  it('returns skip when time is null', () => {
+    expect(shouldFireEod({ now: afterTime, state: { ...base, time: null } })).toBe('skip');
+  });
+
+  it('returns skip on Sunday', () => {
+    // Sun 2026-05-10 18:30 local
+    const sunday = new Date(2026, 4, 10, 18, 30, 0);
+    expect(shouldFireEod({ now: sunday, state: base })).toBe('skip');
+  });
+
+  it('returns skip when snoozeUntil is malformed', () => {
+    expect(
+      shouldFireEod({
+        now: afterTime,
+        state: { ...base, snoozeUntil: 'not-a-date' },
+      }),
+    ).toBe('skip');
+  });
 });

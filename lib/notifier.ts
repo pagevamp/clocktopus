@@ -21,11 +21,17 @@ export interface NotifyOptions {
   subtitle: string;
   message: string;
   actions?: string[];
+  closeLabel?: string;
+  open?: string;
   sound?: boolean;
   wait?: boolean;
 }
 
-export type NotifyCallback = (err: unknown, response: unknown, metadata: { activationValue?: string }) => void;
+export type NotifyCallback = (
+  err: unknown,
+  response: unknown,
+  metadata: { activationValue?: string; activationType?: string },
+) => void;
 
 export function notify(opts: NotifyOptions, callback?: NotifyCallback): void {
   notifier.notify(
@@ -36,6 +42,8 @@ export function notify(opts: NotifyOptions, callback?: NotifyCallback): void {
       sound: opts.sound ?? true,
       wait: opts.wait ?? true,
       actions: opts.actions,
+      closeLabel: opts.closeLabel,
+      open: opts.open,
       contentImage: LOGO_PATH,
     },
     callback ??

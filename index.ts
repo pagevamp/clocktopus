@@ -487,7 +487,6 @@ program
         const today = localDateString(new Date());
 
         const isPrimary = decision === 'fire-primary';
-        const actions = isPrimary ? ['Stop', 'Snooze 15m'] : ['Stop'];
 
         if (isPrimary) markEodFired(today);
 
@@ -495,7 +494,9 @@ program
           {
             subtitle: 'End of day',
             message: 'Timer still running. Stop now?',
-            actions,
+            actions: ['Stop'],
+            closeLabel: isPrimary ? 'Snooze 15m' : 'Dismiss',
+            open: DASHBOARD_URL,
           },
           async (err, _resp, meta) => {
             if (err) {
@@ -503,6 +504,7 @@ program
               return;
             }
             const choice = meta?.activationValue;
+            const type = meta?.activationType;
             if (choice === 'Stop') {
               try {
                 await stopTimerAndLog('End-of-day reminder.');
@@ -510,7 +512,7 @@ program
                 console.error('EOD stop failed:', e);
               }
               clearEodSnoozeUntil();
-            } else if (choice === 'Snooze 15m') {
+            } else if (isPrimary && type === 'closed') {
               const snoozeUntil = new Date(Date.now() + 15 * 60_000).toISOString();
               setEodSnoozeUntil(snoozeUntil);
             }

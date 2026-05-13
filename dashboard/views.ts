@@ -386,7 +386,7 @@ export function indexPage() {
           <div class="dot gray" id="eod-dot"></div>
           <h2>End-of-Day Reminder</h2>
         </div>
-        <p style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Pop a notification on weekdays at a chosen time. Click <strong>Stop</strong> to end the timer or <strong>Snooze 15m</strong> for one more reminder.</p>
+        <p style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Pop a notification on weekdays at a chosen time. Click <strong>Stop</strong> to end the timer or close the notification to <strong>Snooze 15m</strong> for one more reminder. May take up to ~1 minute after the configured time to appear.</p>
         <label for="eod-time">Time (24h)</label>
         <input type="time" id="eod-time" value="18:00" />
         <button onclick="saveEod()">Save</button>

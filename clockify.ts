@@ -1,27 +1,9 @@
 import { AxiosInstance } from 'axios';
-import * as fs from 'fs';
-import * as path from 'path';
-import { fileURLToPath } from 'url';
 import { HttpClient } from './lib/http-client.js';
 import { logSessionStart } from './lib/db.js';
 import { v4 as uuidv4 } from 'uuid';
-import { NotificationCenter } from 'node-notifier';
+import { notify, type NotifyCallback } from './lib/notifier.js';
 import { getJiraTicket } from './lib/jira.js';
-
-/**
- * Resolve `assets/logo.png` from the package root regardless of install layout.
- * Walks up from this file until the assets dir is found.
- */
-function resolveLogoPath(): string | undefined {
-  const here = path.dirname(fileURLToPath(import.meta.url));
-  for (let dir = here, prev = ''; dir !== prev; prev = dir, dir = path.dirname(dir)) {
-    const candidate = path.join(dir, 'assets', 'logo.png');
-    if (fs.existsSync(candidate)) return candidate;
-  }
-  return undefined;
-}
-
-const LOGO_PATH = resolveLogoPath();
 
 interface ClockifyProject {
   id: string;
@@ -30,35 +12,13 @@ interface ClockifyProject {
 
 export class Clockify {
   private readonly httpClient: AxiosInstance;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private readonly notifier: any;
 
   constructor() {
     this.httpClient = new HttpClient().getClient();
-    this.notifier = new NotificationCenter();
   }
 
-  private sendNotification(
-    subtitle: string,
-    message: string,
-    actions?: string[],
-    callback?: (err: unknown, response: unknown, metadata: { activationValue?: string }) => void,
-  ) {
-    this.notifier.notify(
-      {
-        title: 'Clocktopus',
-        subtitle,
-        message,
-        sound: true,
-        wait: true,
-        actions,
-        contentImage: LOGO_PATH,
-      },
-      callback ??
-        ((err: unknown) => {
-          if (err) console.error('Notification error:', err);
-        }),
-    );
+  private sendNotification(subtitle: string, message: string, actions?: string[], callback?: NotifyCallback) {
+    notify({ subtitle, message, actions }, callback);
   }
 
   async getUser() {

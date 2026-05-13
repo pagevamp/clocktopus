@@ -380,6 +380,26 @@ export function indexPage() {
         <div class="msg" id="jira-msg"></div>
       </div>
 
+      <!-- End-of-Day Reminder -->
+      <div class="card">
+        <div class="card-header">
+          <div class="dot gray" id="eod-dot"></div>
+          <h2>End-of-Day Reminder</h2>
+        </div>
+        <p style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Pop a notification on weekdays at a chosen time. Click <strong>Stop</strong> to end the timer or <strong>Snooze 15m</strong> for one more reminder.</p>
+        <label for="eod-time">Time (24h)</label>
+        <input type="time" id="eod-time" value="18:00" />
+        <button onclick="saveEod()">Save</button>
+        <div style="display:flex; align-items:center; gap:0.6rem; margin-top:0.75rem;">
+          <label class="toggle">
+            <input type="checkbox" id="eod-enabled" onchange="saveEod()" />
+            <span class="slider"></span>
+          </label>
+          <span id="eod-enabled-label" style="font-size:0.9rem; color:#8b949e;">Disabled</span>
+        </div>
+        <div class="msg" id="eod-msg"></div>
+      </div>
+
     </div>
   </div>
 
@@ -1369,6 +1389,47 @@ export function indexPage() {
       }
     }
 
+    async function loadEod() {
+      try {
+        const r = await fetch('/api/settings/eod');
+        const data = await r.json();
+        const enabledBox = document.getElementById('eod-enabled');
+        const timeInput = document.getElementById('eod-time');
+        const label = document.getElementById('eod-enabled-label');
+        const dot = document.getElementById('eod-dot');
+        if (enabledBox) enabledBox.checked = !!data.enabled;
+        if (timeInput && data.time) timeInput.value = data.time;
+        if (label) label.textContent = data.enabled ? 'Enabled' : 'Disabled';
+        if (dot) dot.className = 'dot ' + (data.enabled ? 'green' : 'gray');
+      } catch (err) {
+        console.error('Failed to load EOD settings', err);
+      }
+    }
+
+    async function saveEod() {
+      const enabled = document.getElementById('eod-enabled').checked;
+      const time = document.getElementById('eod-time').value;
+      try {
+        const r = await fetch('/api/settings/eod', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: enabled, time: time }),
+        });
+        const data = await r.json();
+        if (!r.ok) {
+          setMsg('eod-msg', data.error || 'Save failed.', false);
+          return;
+        }
+        setMsg('eod-msg', 'Saved.', true);
+        const label = document.getElementById('eod-enabled-label');
+        const dot = document.getElementById('eod-dot');
+        if (label) label.textContent = enabled ? 'Enabled' : 'Disabled';
+        if (dot) dot.className = 'dot ' + (enabled ? 'green' : 'gray');
+      } catch {
+        setMsg('eod-msg', 'Network error.', false);
+      }
+    }
+
     async function fetchStatus() {
       try {
         const res = await fetch('/api/status');
@@ -1577,6 +1638,7 @@ export function indexPage() {
     checkActiveTimer();
     checkMonitorStatus();
     loadAllProjects();
+    loadEod();
     setManualDefaults();
 
   </script>

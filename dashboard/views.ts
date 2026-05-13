@@ -310,96 +310,156 @@ export function indexPage() {
 
   <!-- SETTINGS TAB -->
   <div id="tab-settings" class="tab-content">
-    <div class="cards">
+    <div class="track-tabs" id="settings-subtabs" style="margin-bottom:1.25rem;">
+      <button class="track-tab-btn active" data-section="auth" onclick="switchSettingsSection('auth')">Auth</button>
+      <button class="track-tab-btn" data-section="reminders" onclick="switchSettingsSection('reminders')">Reminders</button>
+      <button class="track-tab-btn" data-section="git" onclick="switchSettingsSection('git')">Git</button>
+    </div>
 
-      <!-- Clockify -->
-      <div class="card">
-        <div class="card-header">
-          <div class="dot gray" id="clockify-dot"></div>
-          <h2>Clockify</h2>
+    <!-- Auth section -->
+    <div id="settings-auth" class="settings-section">
+      <div class="cards">
+
+        <!-- Jira -->
+        <div class="card">
+          <div class="card-header">
+            <div class="dot gray" id="jira-dot"></div>
+            <h2>Jira</h2>
+          </div>
+          <p id="jira-desc" style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Connect Jira with an API token to log time on tickets.</p>
+          <div class="guide">
+            <ol>
+              <li>Go to <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank">Atlassian API Tokens</a></li>
+              <li>Click <strong>Create API token</strong> and copy it</li>
+            </ol>
+          </div>
+          <label for="jira-url">Atlassian URL</label>
+          <input type="text" id="jira-url" value="https://outsidetech.atlassian.net/rest/api/3" placeholder="https://your-org.atlassian.net/rest/api/3" />
+          <label for="jira-email">Email</label>
+          <input type="email" id="jira-email" placeholder="you@example.com" />
+          <label for="jira-token">API Token</label>
+          <input type="password" id="jira-token" placeholder="Atlassian API token" />
+          <button onclick="saveJira()">Save &amp; Validate</button>
+          <div style="display:flex; align-items:center; gap:0.6rem; margin-top:0.75rem;">
+            <label class="toggle">
+              <input type="checkbox" id="jira-enabled-toggle" onchange="toggleJiraEnabled()" />
+              <span class="slider"></span>
+            </label>
+            <span id="jira-enabled-label" style="font-size:0.9rem; color:#8b949e;">Enabled</span>
+          </div>
+          <div class="msg" id="jira-msg"></div>
         </div>
-        <div class="guide">
-          <ol>
-            <li>Go to <a href="https://app.clockify.me/manage-api-keys" target="_blank">Manage API Keys</a></li>
-            <li>Click <strong>Generate</strong>, enter a name, and confirm</li>
-            <li>Copy the key and paste it below</li>
-          </ol>
+
+        <!-- Clockify -->
+        <div class="card">
+          <div class="card-header">
+            <div class="dot gray" id="clockify-dot"></div>
+            <h2>Clockify</h2>
+          </div>
+          <div class="guide">
+            <ol>
+              <li>Go to <a href="https://app.clockify.me/manage-api-keys" target="_blank">Manage API Keys</a></li>
+              <li>Click <strong>Generate</strong>, enter a name, and confirm</li>
+              <li>Copy the key and paste it below</li>
+            </ol>
+          </div>
+          <label for="clockify-key">API Key</label>
+          <input type="password" id="clockify-key" placeholder="Enter your Clockify API key" />
+          <button onclick="saveClockify()">Save &amp; Validate</button>
+          <div style="display:flex; align-items:center; gap:0.6rem; margin-top:0.75rem;">
+            <label class="toggle">
+              <input type="checkbox" id="clockify-enabled-toggle" onchange="toggleClockifyEnabled()" />
+              <span class="slider"></span>
+            </label>
+            <span id="clockify-enabled-label" style="font-size:0.9rem; color:#8b949e;">Enabled</span>
+          </div>
+          <div class="msg" id="clockify-msg"></div>
         </div>
-        <label for="clockify-key">API Key</label>
-        <input type="password" id="clockify-key" placeholder="Enter your Clockify API key" />
-        <button onclick="saveClockify()">Save &amp; Validate</button>
-        <div style="display:flex; align-items:center; gap:0.6rem; margin-top:0.75rem;">
-          <label class="toggle">
-            <input type="checkbox" id="clockify-enabled-toggle" onchange="toggleClockifyEnabled()" />
-            <span class="slider"></span>
-          </label>
-          <span id="clockify-enabled-label" style="font-size:0.9rem; color:#8b949e;">Enabled</span>
+
+        <!-- Google Calendar -->
+        <div class="card">
+          <div class="card-header">
+            <div class="dot gray" id="google-dot"></div>
+            <h2>Google Calendar</h2>
+          </div>
+          <p id="google-desc" style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Authorize access to your Google Calendar.</p>
+          <button class="connect" id="google-connect-btn" onclick="connectGoogle()">Connect Google Account</button>
+          <p id="google-connect-note" style="font-size:0.75rem;color:#8b949e;margin-top:0.5rem;display:none;"></p>
+          <div class="msg" id="google-msg"></div>
         </div>
-        <div class="msg" id="clockify-msg"></div>
+
       </div>
+    </div>
 
-      <!-- Google Calendar -->
-      <div class="card">
-        <div class="card-header">
-          <div class="dot gray" id="google-dot"></div>
-          <h2>Google Calendar</h2>
+    <!-- Reminders section -->
+    <div id="settings-reminders" class="settings-section" style="display:none;">
+      <div class="cards">
+
+        <!-- End-of-Day Reminder -->
+        <div class="card">
+          <div class="card-header">
+            <div class="dot gray" id="eod-dot"></div>
+            <h2>End-of-Day Reminder</h2>
+          </div>
+          <p style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Pop a notification on weekdays at a chosen time. Click <strong>Stop</strong> to end the timer or close the notification to <strong>Snooze 15m</strong> for one more reminder. May take up to ~1 minute after the configured time to appear.</p>
+          <label for="eod-time">Time (24h)</label>
+          <input type="time" id="eod-time" value="18:00" />
+          <button onclick="saveEod()">Save</button>
+          <div style="display:flex; align-items:center; gap:0.6rem; margin-top:0.75rem;">
+            <label class="toggle">
+              <input type="checkbox" id="eod-enabled" onchange="saveEod()" />
+              <span class="slider"></span>
+            </label>
+            <span id="eod-enabled-label" style="font-size:0.9rem; color:#8b949e;">Disabled</span>
+          </div>
+          <div class="msg" id="eod-msg"></div>
         </div>
-        <p id="google-desc" style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Authorize access to your Google Calendar.</p>
-        <button class="connect" id="google-connect-btn" onclick="connectGoogle()">Connect Google Account</button>
-        <p id="google-connect-note" style="font-size:0.75rem;color:#8b949e;margin-top:0.5rem;display:none;"></p>
-        <div class="msg" id="google-msg"></div>
+
       </div>
+    </div>
 
-      <!-- Jira -->
-      <div class="card">
-        <div class="card-header">
-          <div class="dot gray" id="jira-dot"></div>
-          <h2>Jira</h2>
+    <!-- Git section -->
+    <div id="settings-git" class="settings-section" style="display:none;">
+      <div class="cards">
+
+        <!-- Global Git Hook -->
+        <div class="card">
+          <div class="card-header">
+            <div class="dot gray" id="git-hook-dot"></div>
+            <h2>Git Post-Checkout Hook</h2>
+          </div>
+          <p style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Installs a global Git hook that prompts to start a timer when you check out a branch. Affects every repo (unless ignored via <code>.clocktopus-ignore</code> file or the branch list below).</p>
+          <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+            <button id="git-hook-install-btn" onclick="installGitHook()" style="margin-top:0;">Install hook</button>
+            <button id="git-hook-uninstall-btn" onclick="uninstallGitHook()" class="stop-btn" style="margin-top:0;" disabled>Uninstall</button>
+          </div>
+          <div class="msg" id="git-hook-msg"></div>
         </div>
-        <p id="jira-desc" style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Connect Jira with an API token to log time on tickets.</p>
-        <div class="guide">
-          <ol>
-            <li>Go to <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank">Atlassian API Tokens</a></li>
-            <li>Click <strong>Create API token</strong> and copy it</li>
-          </ol>
+
+        <!-- Husky instructions -->
+        <div class="card">
+          <div class="card-header">
+            <h2>Husky Repos</h2>
+          </div>
+          <p style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Husky overrides the global hook with a local <code>core.hooksPath</code>. Inside each husky-enabled repo, run this command at the project root to chain the Clocktopus hook into <code>.husky/post-checkout</code>:</p>
+          <pre id="husky-cmd" style="background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:0.6rem 0.75rem; font-size:0.8rem; overflow-x:auto; margin:0 0 0.5rem 0;">clocktopus hook:install-husky</pre>
+          <button onclick="copyHuskyCmd()" style="margin-top:0; background:#30363d;">Copy command</button>
+          <p style="font-size:0.75rem;color:#8b949e;margin-top:0.5rem;">Commit the resulting <code>.husky/post-checkout</code> so teammates using husky get it too.</p>
+          <div class="msg" id="husky-msg"></div>
         </div>
-        <label for="jira-url">Atlassian URL</label>
-        <input type="text" id="jira-url" value="https://outsidetech.atlassian.net/rest/api/3" placeholder="https://your-org.atlassian.net/rest/api/3" />
-        <label for="jira-email">Email</label>
-        <input type="email" id="jira-email" placeholder="you@example.com" />
-        <label for="jira-token">API Token</label>
-        <input type="password" id="jira-token" placeholder="Atlassian API token" />
-        <button onclick="saveJira()">Save &amp; Validate</button>
-        <div style="display:flex; align-items:center; gap:0.6rem; margin-top:0.75rem;">
-          <label class="toggle">
-            <input type="checkbox" id="jira-enabled-toggle" onchange="toggleJiraEnabled()" />
-            <span class="slider"></span>
-          </label>
-          <span id="jira-enabled-label" style="font-size:0.9rem; color:#8b949e;">Enabled</span>
+
+        <!-- Ignored branches -->
+        <div class="card">
+          <div class="card-header">
+            <h2>Ignored Branches</h2>
+          </div>
+          <p style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Branches that should never prompt — typically long-lived ones like <code>main</code> or <code>develop</code>. One branch name per line (exact match).</p>
+          <textarea id="git-ignore-branches" rows="4" placeholder="main&#10;develop" style="width:100%; background:#0d1117; border:1px solid #30363d; border-radius:6px; color:#e1e4e8; padding:0.5rem; font-family:monospace; font-size:0.85rem;"></textarea>
+          <button onclick="saveGitIgnoreBranches()">Save</button>
+          <div class="msg" id="git-ignore-msg"></div>
         </div>
-        <div class="msg" id="jira-msg"></div>
+
       </div>
-
-      <!-- End-of-Day Reminder -->
-      <div class="card">
-        <div class="card-header">
-          <div class="dot gray" id="eod-dot"></div>
-          <h2>End-of-Day Reminder</h2>
-        </div>
-        <p style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Pop a notification on weekdays at a chosen time. Click <strong>Stop</strong> to end the timer or close the notification to <strong>Snooze 15m</strong> for one more reminder. May take up to ~1 minute after the configured time to appear.</p>
-        <label for="eod-time">Time (24h)</label>
-        <input type="time" id="eod-time" value="18:00" />
-        <button onclick="saveEod()">Save</button>
-        <div style="display:flex; align-items:center; gap:0.6rem; margin-top:0.75rem;">
-          <label class="toggle">
-            <input type="checkbox" id="eod-enabled" onchange="saveEod()" />
-            <span class="slider"></span>
-          </label>
-          <span id="eod-enabled-label" style="font-size:0.9rem; color:#8b949e;">Disabled</span>
-        </div>
-        <div class="msg" id="eod-msg"></div>
-      </div>
-
     </div>
   </div>
 
@@ -488,6 +548,16 @@ export function indexPage() {
       });
       document.getElementById('track-auto').style.display = mode === 'auto' ? 'block' : 'none';
       document.getElementById('track-manual').style.display = mode === 'manual' ? 'block' : 'none';
+    }
+
+    function switchSettingsSection(section) {
+      document.querySelectorAll('#settings-subtabs .track-tab-btn').forEach(function(b) {
+        b.classList.toggle('active', b.dataset.section === section);
+      });
+      document.getElementById('settings-auth').style.display = section === 'auth' ? '' : 'none';
+      document.getElementById('settings-reminders').style.display = section === 'reminders' ? '' : 'none';
+      document.getElementById('settings-git').style.display = section === 'git' ? '' : 'none';
+      if (section === 'git') loadGit();
     }
 
     // --- Utilities ---
@@ -1427,6 +1497,80 @@ export function indexPage() {
         if (dot) dot.className = 'dot ' + (enabled ? 'green' : 'gray');
       } catch {
         setMsg('eod-msg', 'Network error.', false);
+      }
+    }
+
+    // --- Settings: Git ---
+    function applyGitHookInstalled(installed) {
+      const dot = document.getElementById('git-hook-dot');
+      const installBtn = document.getElementById('git-hook-install-btn');
+      const uninstallBtn = document.getElementById('git-hook-uninstall-btn');
+      if (dot) dot.className = 'dot ' + (installed ? 'green' : 'gray');
+      if (installBtn) installBtn.disabled = installed;
+      if (uninstallBtn) uninstallBtn.disabled = !installed;
+    }
+
+    async function loadGit() {
+      try {
+        const r = await fetch('/api/settings/git');
+        const data = await r.json();
+        applyGitHookInstalled(!!data.installed);
+        const ta = document.getElementById('git-ignore-branches');
+        if (ta) ta.value = Array.isArray(data.ignoreBranches) ? data.ignoreBranches.join('\\n') : '';
+      } catch (err) {
+        console.error('Failed to load git settings', err);
+      }
+    }
+
+    async function installGitHook() {
+      try {
+        const r = await fetch('/api/settings/git/install', { method: 'POST' });
+        const data = await r.json();
+        if (!data.ok) return setMsg('git-hook-msg', data.error || 'Install failed.', false);
+        applyGitHookInstalled(true);
+        setMsg('git-hook-msg', 'Hook installed globally.', true);
+      } catch {
+        setMsg('git-hook-msg', 'Network error.', false);
+      }
+    }
+
+    async function uninstallGitHook() {
+      try {
+        const r = await fetch('/api/settings/git/uninstall', { method: 'POST' });
+        const data = await r.json();
+        if (!data.ok) return setMsg('git-hook-msg', data.error || 'Uninstall failed.', false);
+        applyGitHookInstalled(false);
+        setMsg('git-hook-msg', 'Hook removed.', true);
+      } catch {
+        setMsg('git-hook-msg', 'Network error.', false);
+      }
+    }
+
+    async function copyHuskyCmd() {
+      const cmd = document.getElementById('husky-cmd').textContent || '';
+      try {
+        await navigator.clipboard.writeText(cmd);
+        setMsg('husky-msg', 'Command copied. Paste in your repo root.', true);
+      } catch {
+        setMsg('husky-msg', 'Copy failed — select and copy manually.', false);
+      }
+    }
+
+    async function saveGitIgnoreBranches() {
+      const ta = document.getElementById('git-ignore-branches');
+      const branches = (ta.value || '').split(/\\r?\\n/).map(function(s){return s.trim();}).filter(Boolean);
+      try {
+        const r = await fetch('/api/settings/git/ignore-branches', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ branches: branches }),
+        });
+        const data = await r.json();
+        if (!data.ok) return setMsg('git-ignore-msg', data.error || 'Save failed.', false);
+        if (Array.isArray(data.ignoreBranches)) ta.value = data.ignoreBranches.join('\\n');
+        setMsg('git-ignore-msg', 'Saved.', true);
+      } catch {
+        setMsg('git-ignore-msg', 'Network error.', false);
       }
     }
 

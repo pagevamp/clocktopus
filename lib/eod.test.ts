@@ -39,8 +39,8 @@ describe('shouldFireEod', () => {
     expect(shouldFireEod({ now: afterTime, state: base })).toBe('fire-primary');
   });
 
-  it('returns skip-mark-fired when after time but no open session', () => {
-    expect(shouldFireEod({ now: afterTime, state: { ...base, hasOpenSession: false } })).toBe('skip-mark-fired');
+  it('returns skip when after time but no open session', () => {
+    expect(shouldFireEod({ now: afterTime, state: { ...base, hasOpenSession: false } })).toBe('skip');
   });
 
   it('returns skip when already fired today', () => {
@@ -73,7 +73,7 @@ describe('shouldFireEod', () => {
     ).toBe('fire-snooze');
   });
 
-  it('returns skip-mark-fired when snooze elapsed but no open session', () => {
+  it('returns skip when snooze elapsed but no open session', () => {
     const snoozeUntil = new Date(2026, 4, 11, 18, 15, 0).toISOString();
     const now = new Date(2026, 4, 11, 18, 20, 0);
     expect(
@@ -81,7 +81,7 @@ describe('shouldFireEod', () => {
         now,
         state: { ...base, lastFiredDate: '2026-05-11', snoozeUntil, hasOpenSession: false },
       }),
-    ).toBe('skip-mark-fired');
+    ).toBe('skip');
   });
 
   it('returns skip when snooze elapsed but date is yesterday', () => {

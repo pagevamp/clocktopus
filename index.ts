@@ -486,11 +486,6 @@ program
 
         const today = localDateString(new Date());
 
-        if (decision === 'skip-mark-fired') {
-          markEodFired(today);
-          return;
-        }
-
         const isPrimary = decision === 'fire-primary';
         const actions = isPrimary ? ['Stop', 'Snooze 15m'] : ['Stop'];
 

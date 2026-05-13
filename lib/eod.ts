@@ -6,7 +6,7 @@ export interface EodState {
   hasOpenSession: boolean;
 }
 
-export type EodDecision = 'fire-primary' | 'fire-snooze' | 'skip-mark-fired' | 'skip';
+export type EodDecision = 'fire-primary' | 'fire-snooze' | 'skip';
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -41,7 +41,7 @@ export function shouldFireEod(args: { now: Date; state: EodState }): EodDecision
     if (isNaN(snoozeDate.getTime())) return 'skip';
     if (now < snoozeDate) return 'skip';
     if (localDateString(snoozeDate) !== localDateString(now)) return 'skip';
-    return state.hasOpenSession ? 'fire-snooze' : 'skip-mark-fired';
+    return state.hasOpenSession ? 'fire-snooze' : 'skip';
   }
 
   const today = localDateString(now);
@@ -50,5 +50,5 @@ export function shouldFireEod(args: { now: Date; state: EodState }): EodDecision
   const fireAt = timeToTodayDate(now, state.time);
   if (now < fireAt) return 'skip';
 
-  return state.hasOpenSession ? 'fire-primary' : 'skip-mark-fired';
+  return state.hasOpenSession ? 'fire-primary' : 'skip';
 }

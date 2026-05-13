@@ -12,6 +12,9 @@ import { isClockifyEnabled } from './lib/credentials.js';
 import { ensureNativeAddons } from './lib/ensure-native-addons.js';
 import { DASHBOARD_PORT, DASHBOARD_URL, IS_DEV } from './lib/constants.js';
 import type { Clockify as ClockifyType } from './clockify.js';
+import { shouldFireEod } from './lib/eod.js';
+import { readEodState, markEodFired, setEodSnoozeUntil, clearEodSnoozeUntil } from './lib/settings.js';
+import { notify } from './lib/notifier.js';
 
 interface Project {
   id: string;
@@ -464,9 +467,75 @@ program
       }
     }, 5000);
 
+    const EOD_TICK_MS = 60_000;
+
+    function localDateString(d: Date): string {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    const eodInterval = setInterval(async () => {
+      try {
+        const { getOpenSession } = await import('./lib/db.js');
+        const open = getOpenSession();
+        const state = readEodState(!!open);
+        const decision = shouldFireEod({ now: new Date(), state });
+        if (decision === 'skip') return;
+
+        const today = localDateString(new Date());
+
+        if (decision === 'skip-mark-fired') {
+          markEodFired(today);
+          return;
+        }
+
+        const isPrimary = decision === 'fire-primary';
+        const actions = isPrimary ? ['Stop', 'Snooze 15m'] : ['Stop'];
+
+        if (isPrimary) markEodFired(today);
+
+        notify(
+          {
+            subtitle: 'End of day',
+            message: 'Timer still running. Stop now?',
+            actions,
+          },
+          async (err, _resp, meta) => {
+            if (err) {
+              console.error('EOD notification error:', err);
+              return;
+            }
+            const choice = meta?.activationValue;
+            if (choice === 'Stop') {
+              try {
+                await stopTimerAndLog('End-of-day reminder.');
+              } catch (e) {
+                console.error('EOD stop failed:', e);
+              }
+              clearEodSnoozeUntil();
+            } else if (choice === 'Snooze 15m') {
+              const snoozeUntil = new Date(Date.now() + 15 * 60_000).toISOString();
+              setEodSnoozeUntil(snoozeUntil);
+            }
+          },
+        );
+
+        if (!isPrimary) {
+          clearEodSnoozeUntil();
+        }
+      } catch (e) {
+        console.error('EOD tick error:', e);
+      }
+    }, EOD_TICK_MS);
+
     function cleanupAndExit(code = 0) {
       try {
         clearInterval(idleInterval);
+      } catch {}
+      try {
+        clearInterval(eodInterval);
       } catch {}
       try {
         if (pollInterval) clearInterval(pollInterval);

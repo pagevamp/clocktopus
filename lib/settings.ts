@@ -6,6 +6,7 @@ const KEY = {
   time: 'eodReminderTime',
   lastFiredDate: 'eodLastFiredDate',
   snoozeUntil: 'eodSnoozeUntil',
+  hookIgnoreBranches: 'hookIgnoreBranches',
 } as const;
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -52,4 +53,21 @@ export function setEodSnoozeUntil(iso: string) {
 
 export function clearEodSnoozeUntil() {
   deleteSetting(KEY.snoozeUntil);
+}
+
+export function getHookIgnoreBranches(): string[] {
+  const raw = getSetting(KEY.hookIgnoreBranches);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((b): b is string => typeof b === 'string' && b.length > 0);
+  } catch {
+    return [];
+  }
+}
+
+export function setHookIgnoreBranches(branches: string[]) {
+  const cleaned = Array.from(new Set(branches.map((b) => b.trim()).filter((b) => b.length > 0)));
+  setSetting(KEY.hookIgnoreBranches, JSON.stringify(cleaned));
 }

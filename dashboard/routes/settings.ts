@@ -1,5 +1,7 @@
 import { Hono } from 'hono';
-import { getEodSettings, setEodSettings } from '../../lib/settings.js';
+import { getEodSettings, setEodSettings, getHookIgnoreBranches, setHookIgnoreBranches } from '../../lib/settings.js';
+import { installHook, uninstallHook, isHookInstalled } from '../../lib/hook-install.js';
+import { huskyHookBody } from '../../lib/husky-install.js';
 
 const settingsRoutes = new Hono();
 
@@ -26,6 +28,48 @@ settingsRoutes.post('/settings/eod', async (c) => {
   const finalTime = TIME_RE.test(time) ? time : '18:00';
   setEodSettings({ enabled, time: finalTime });
   return c.json({ ok: true });
+});
+
+settingsRoutes.get('/settings/git', (c) => {
+  return c.json({
+    installed: isHookInstalled(),
+    ignoreBranches: getHookIgnoreBranches(),
+    huskyHookBody: huskyHookBody(),
+  });
+});
+
+settingsRoutes.post('/settings/git/install', async (c) => {
+  try {
+    await installHook();
+    return c.json({ ok: true, installed: true });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return c.json({ ok: false, error: msg }, 500);
+  }
+});
+
+settingsRoutes.post('/settings/git/uninstall', async (c) => {
+  try {
+    await uninstallHook();
+    return c.json({ ok: true, installed: false });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return c.json({ ok: false, error: msg }, 500);
+  }
+});
+
+settingsRoutes.post('/settings/git/ignore-branches', async (c) => {
+  let body: { branches?: unknown };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ ok: false, error: 'Invalid JSON' }, 400);
+  }
+  if (!Array.isArray(body.branches) || !body.branches.every((b) => typeof b === 'string')) {
+    return c.json({ ok: false, error: 'branches must be string[]' }, 400);
+  }
+  setHookIgnoreBranches(body.branches as string[]);
+  return c.json({ ok: true, ignoreBranches: getHookIgnoreBranches() });
 });
 
 export default settingsRoutes;

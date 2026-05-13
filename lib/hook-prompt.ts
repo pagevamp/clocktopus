@@ -7,6 +7,7 @@ import { getOpenSession as realGetOpenSession, getActiveProjects } from './db.js
 import { matchProjectByTicket, LocalProject } from './project-matcher.js';
 import { simplePrompt } from './simple-prompt.js';
 import { startTimer as realStartTimer, StartTimerInput, StartTimerResult } from './start-timer.js';
+import { getHookIgnoreBranches as realGetHookIgnoreBranches } from './settings.js';
 
 export interface HookPromptResult {
   started: boolean;
@@ -24,6 +25,7 @@ export interface HookPromptDeps {
   readProjects?: () => LocalProject[];
   prompt?: (qs: ReadonlyArray<Record<string, unknown>>) => Promise<Record<string, unknown>>;
   startTimer?: (input: StartTimerInput) => Promise<StartTimerResult>;
+  getIgnoredBranches?: () => string[];
 }
 
 interface Options {
@@ -48,8 +50,13 @@ export async function runHookPrompt(branch: string, opts: Options): Promise<Hook
   const readProjects = d.readProjects ?? defaultReadProjects;
   const prompt = d.prompt ?? simplePrompt;
   const startTimer = d.startTimer ?? realStartTimer;
+  const getIgnoredBranches = d.getIgnoredBranches ?? realGetHookIgnoreBranches;
 
   if (isRepoIgnored(opts.cwd)) {
+    return { started: false, ticket: null, projectId: null, description: null, reason: 'ignored' };
+  }
+
+  if (getIgnoredBranches().includes(branch)) {
     return { started: false, ticket: null, projectId: null, description: null, reason: 'ignored' };
   }
 

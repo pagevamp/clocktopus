@@ -17,6 +17,21 @@ export async function installHook(): Promise<void> {
   execSync(`git config --global init.templateDir "${p.templateDir}"`, { stdio: 'ignore' });
 }
 
+export function isHookInstalled(): boolean {
+  const p = getHookPaths();
+  try {
+    if (!fs.existsSync(p.hookScript)) return false;
+    const hooksPath = execSync('git config --global --get core.hooksPath', {
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+      .toString()
+      .trim();
+    return hooksPath === p.hooksDir;
+  } catch {
+    return false;
+  }
+}
+
 export async function uninstallHook(): Promise<void> {
   const p = getHookPaths();
   try {

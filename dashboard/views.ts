@@ -212,7 +212,7 @@ export function indexPage() {
               <option value="">Loading projects...</option>
             </select>
           </div>
-          <div class="form-row">
+          <div class="form-row" id="manual-range-wrap">
             <div>
               <label for="manual-start-date">Start</label>
               <div style="display:flex; gap:0.4rem;">
@@ -227,6 +227,10 @@ export function indexPage() {
                 <input type="time" id="manual-end-time" style="flex:1;" />
               </div>
             </div>
+          </div>
+          <div id="manual-duration-wrap" style="display:none;">
+            <label for="manual-duration">Time spent</label>
+            <input type="text" id="manual-duration" placeholder="e.g. 1h 30m, 45m, 1.5h" />
           </div>
           <div class="form-row">
             <div id="manual-description-wrap">
@@ -717,23 +721,58 @@ export function indexPage() {
       if (et) et.value = toTimeInputValue(now);
     }
 
+    function parseDurationToSeconds(input) {
+      var s = String(input || '').trim().toLowerCase();
+      if (!s) return null;
+      if (/^\\d+(\\.\\d+)?$/.test(s)) {
+        var num = parseFloat(s);
+        if (!isFinite(num) || num <= 0) return null;
+        return Math.round(num * 3600);
+      }
+      var re = /(\\d+(?:\\.\\d+)?)\\s*(h|hr|hrs|hour|hours|m|min|mins|minute|minutes|s|sec|secs)/g;
+      var total = 0;
+      var matched = false;
+      var m;
+      while ((m = re.exec(s)) !== null) {
+        matched = true;
+        var v = parseFloat(m[1]);
+        if (!isFinite(v) || v < 0) return null;
+        var unit = m[2];
+        if (unit[0] === 'h') total += v * 3600;
+        else if (unit[0] === 'm') total += v * 60;
+        else total += v;
+      }
+      if (!matched) return null;
+      return Math.round(total);
+    }
+
     async function logManualTime() {
       const projectId = document.getElementById('manual-project').value;
-      const startDate = document.getElementById('manual-start-date').value;
-      const startTime = document.getElementById('manual-start-time').value;
-      const endDate = document.getElementById('manual-end-date').value;
-      const endTime = document.getElementById('manual-end-time').value;
       const typedDescription = document.getElementById('manual-description').value.trim();
       const jiraTicket = document.getElementById('manual-jira').value.trim();
       const billable = document.getElementById('manual-billable').checked;
       const description = typedDescription;
+      const useDuration = currentMode.jiraOn && !currentMode.clockifyOn;
 
-      if (!startDate || !startTime || !endDate || !endTime) return setMsg('manual-msg', 'Please set start and end.', false);
-
-      const startMs = new Date(startDate + 'T' + startTime).getTime();
-      const endMs = new Date(endDate + 'T' + endTime).getTime();
-      if (isNaN(startMs) || isNaN(endMs)) return setMsg('manual-msg', 'Invalid date.', false);
-      if (endMs <= startMs) return setMsg('manual-msg', 'End must be after start.', false);
+      let payload;
+      if (useDuration) {
+        const raw = document.getElementById('manual-duration').value;
+        const seconds = parseDurationToSeconds(raw);
+        if (seconds == null) return setMsg('manual-msg', 'Enter a duration like "1h 30m", "45m", or "1.5h".', false);
+        if (seconds < 60) return setMsg('manual-msg', 'Duration must be at least 1 minute.', false);
+        payload = { durationSeconds: seconds };
+      } else {
+        const startDate = document.getElementById('manual-start-date').value;
+        const startTime = document.getElementById('manual-start-time').value;
+        const endDate = document.getElementById('manual-end-date').value;
+        const endTime = document.getElementById('manual-end-time').value;
+        if (!startDate || !startTime || !endDate || !endTime) return setMsg('manual-msg', 'Please set start and end.', false);
+        const startMs = new Date(startDate + 'T' + startTime).getTime();
+        const endMs = new Date(endDate + 'T' + endTime).getTime();
+        if (isNaN(startMs) || isNaN(endMs)) return setMsg('manual-msg', 'Invalid date.', false);
+        if (endMs <= startMs) return setMsg('manual-msg', 'End must be after start.', false);
+        payload = { start: new Date(startMs).toISOString(), end: new Date(endMs).toISOString() };
+      }
 
       if (currentMode.clockifyOn) {
         if (!projectId) return setMsg('manual-msg', 'Please select a project.', false);
@@ -752,20 +791,20 @@ export function indexPage() {
         const res = await fetch('/api/timer/log', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+          body: JSON.stringify(Object.assign({
             projectId: projectId || undefined,
             description: description,
-            start: new Date(startMs).toISOString(),
-            end: new Date(endMs).toISOString(),
             jiraTicket: jiraTicket || undefined,
             billable: billable,
-          }),
+          }, payload)),
         });
         const data = await res.json();
         if (data.ok) {
           setMsg('manual-msg', 'Time logged.', true);
           document.getElementById('manual-description').value = '';
           document.getElementById('manual-jira').value = '';
+          const dur = document.getElementById('manual-duration');
+          if (dur) dur.value = '';
           manualJiraSummary = '';
           renderTicketPreview('manual-description-preview', '', '');
           setManualDefaults();
@@ -1379,10 +1418,15 @@ export function indexPage() {
       const manualJiraWrap = manualJiraInput ? manualJiraInput.closest('.row') || manualJiraInput.parentElement : null;
       const billableWrap = document.getElementById('timer-billable-wrap');
       const manualBillableWrap = document.getElementById('manual-billable-wrap');
+      const manualRangeWrap = document.getElementById('manual-range-wrap');
+      const manualDurationWrap = document.getElementById('manual-duration-wrap');
+      const jiraOnly = jiraOn && !clockifyOn;
 
       if (trackCard) trackCard.style.display = '';
       if (timerLocalHint) timerLocalHint.style.display = localOnly ? '' : 'none';
       if (manualLocalHint) manualLocalHint.style.display = localOnly ? '' : 'none';
+      if (manualRangeWrap) manualRangeWrap.style.display = jiraOnly ? 'none' : '';
+      if (manualDurationWrap) manualDurationWrap.style.display = jiraOnly ? '' : 'none';
 
       if (clockifyOn) {
         if (projWrap) projWrap.style.display = '';

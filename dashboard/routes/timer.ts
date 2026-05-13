@@ -195,26 +195,37 @@ timerRoutes.post('/timer/stop', async (c) => {
 });
 
 timerRoutes.post('/timer/log', async (c) => {
-  const { projectId, description, start, end, jiraTicket, billable } = await c.req.json<{
+  const { projectId, description, start, end, jiraTicket, billable, durationSeconds } = await c.req.json<{
     projectId?: string | null;
     description: string;
-    start: string;
-    end: string;
+    start?: string;
+    end?: string;
     jiraTicket?: string;
     billable?: boolean;
+    durationSeconds?: number;
   }>();
 
-  if (!start || !end) {
-    return c.json({ ok: false, error: 'Start and end are required.' }, 400);
-  }
+  let startMs: number;
+  let endMs: number;
 
-  const startMs = new Date(start).getTime();
-  const endMs = new Date(end).getTime();
-  if (Number.isNaN(startMs) || Number.isNaN(endMs)) {
-    return c.json({ ok: false, error: 'Invalid start or end date.' }, 400);
-  }
-  if (endMs <= startMs) {
-    return c.json({ ok: false, error: 'End must be after start.' }, 400);
+  if (typeof durationSeconds === 'number' && Number.isFinite(durationSeconds)) {
+    if (durationSeconds < 60) {
+      return c.json({ ok: false, error: 'Duration must be at least 1 minute.' }, 400);
+    }
+    endMs = Date.now();
+    startMs = endMs - durationSeconds * 1000;
+  } else {
+    if (!start || !end) {
+      return c.json({ ok: false, error: 'Start and end are required.' }, 400);
+    }
+    startMs = new Date(start).getTime();
+    endMs = new Date(end).getTime();
+    if (Number.isNaN(startMs) || Number.isNaN(endMs)) {
+      return c.json({ ok: false, error: 'Invalid start or end date.' }, 400);
+    }
+    if (endMs <= startMs) {
+      return c.json({ ok: false, error: 'End must be after start.' }, 400);
+    }
   }
 
   const cleanDescription = (description ?? '').trim();

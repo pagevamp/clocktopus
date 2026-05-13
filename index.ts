@@ -497,6 +497,7 @@ program
             actions: ['Stop'],
             closeLabel: isPrimary ? 'Snooze 15m' : 'Dismiss',
             open: DASHBOARD_URL,
+            timeout: 1800,
           },
           async (err, _resp, meta) => {
             if (err) {

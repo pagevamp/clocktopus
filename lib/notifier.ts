@@ -25,6 +25,7 @@ export interface NotifyOptions {
   open?: string;
   sound?: boolean;
   wait?: boolean;
+  timeout?: number;
 }
 
 export type NotifyCallback = (
@@ -44,6 +45,7 @@ export function notify(opts: NotifyOptions, callback?: NotifyCallback): void {
       actions: opts.actions,
       closeLabel: opts.closeLabel,
       open: opts.open,
+      timeout: opts.timeout,
       contentImage: LOGO_PATH,
     },
     callback ??

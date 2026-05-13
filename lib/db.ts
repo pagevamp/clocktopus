@@ -129,6 +129,13 @@ function getDb(): Database {
         createdAt TEXT NOT NULL
       )
     `);
+    dbInstance.exec(`
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      )
+    `);
   }
 
   return dbInstance;
@@ -305,6 +312,23 @@ export function deleteCredential(key: string) {
   const db = getDb();
   const stmt = db.prepare('DELETE FROM credentials WHERE key = ?');
   stmt.run(key);
+}
+
+export function getSetting(key: string): string | null {
+  const db = getDb();
+  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined;
+  return row ? row.value : null;
+}
+
+export function setSetting(key: string, value: string) {
+  const db = getDb();
+  const stmt = db.prepare('INSERT OR REPLACE INTO settings (key, value, updatedAt) VALUES (?, ?, ?)');
+  stmt.run(key, value, new Date().toISOString());
+}
+
+export function deleteSetting(key: string) {
+  const db = getDb();
+  db.prepare('DELETE FROM settings WHERE key = ?').run(key);
 }
 
 export interface AtlassianToken {

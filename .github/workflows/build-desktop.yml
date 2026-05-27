@@ -29,9 +29,54 @@ jobs:
         working-directory: desktop
         run: bun install
 
-      - name: Build Tauri app
+      # Decode the App Store Connect API key (.p8) from a base64 secret to a file
+      # so both Tauri's notarization and the DMG staple step can use it.
+      - name: Write notarization API key
+        run: |
+          echo "$APPLE_API_KEY_B64" | base64 --decode > "$RUNNER_TEMP/api_key.p8"
+          echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/api_key.p8" >> "$GITHUB_ENV"
+        env:
+          APPLE_API_KEY_B64: ${{ secrets.APPLE_API_KEY_B64 }}
+
+      # Tauri imports APPLE_CERTIFICATE into a temporary keychain, signs with the
+      # Developer ID identity, then notarizes + staples the .app (not the .dmg).
+      - name: Build Tauri app (sign + notarize)
         working-directory: desktop
         run: bunx tauri build
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          # APPLE_API_KEY_PATH is exported into $GITHUB_ENV by the previous step.
+
+      # Tauri staples the .app but not the .dmg wrapper; staple it so the DMG
+      # passes Gatekeeper offline.
+      - name: Notarize + staple DMG
+        working-directory: desktop
+        run: |
+          DMG="$(ls -t src-tauri/target/release/bundle/dmg/*.dmg | head -1)"
+          echo "DMG: $DMG"
+          xcrun notarytool submit "$DMG" \
+            --key "$APPLE_API_KEY_PATH" \
+            --key-id "$APPLE_API_KEY" \
+            --issuer "$APPLE_API_ISSUER" \
+            --wait
+          xcrun stapler staple "$DMG"
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+
+      # Verify before publishing so a bad signature fails the build.
+      - name: Verify signature + notarization
+        working-directory: desktop
+        run: |
+          APP="$(ls -dt src-tauri/target/release/bundle/macos/*.app | head -1)"
+          DMG="$(ls -t src-tauri/target/release/bundle/dmg/*.dmg | head -1)"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          spctl -a -vvv "$APP"
+          xcrun stapler validate "$DMG"
 
       - name: Upload DMG to Release
         uses: softprops/action-gh-release@v2

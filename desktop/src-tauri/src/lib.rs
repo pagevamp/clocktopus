@@ -21,6 +21,28 @@ fn dashboard_url() -> String {
     format!("http://localhost:{}", dashboard_port())
 }
 
+/// Candidate absolute paths for the `bun` binary, in priority order.
+/// GUI apps don't inherit the user's shell PATH, so we probe known locations.
+fn bun_candidates(home: &str) -> Vec<String> {
+    vec![
+        format!("{home}/.bun/bin/bun"),
+        "/opt/homebrew/bin/bun".to_string(),
+        "/usr/local/bin/bun".to_string(),
+    ]
+}
+
+/// Absolute path to the globally-installed `clocktopus` binary. We only support
+/// installing it via `bun i -g`, which always lands it in `~/.bun/bin`.
+fn clocktopus_candidates(home: &str) -> Vec<String> {
+    vec![format!("{home}/.bun/bin/clocktopus")]
+}
+
+/// Return the first candidate for which `exists` is true. Injecting the
+/// existence check keeps this pure and unit-testable.
+fn first_matching<F: Fn(&str) -> bool>(candidates: &[String], exists: F) -> Option<String> {
+    candidates.iter().find(|p| exists(p)).cloned()
+}
+
 /// Tracks the server child process spawned by the "Start Server" button,
 /// so the app can stop it via tray menu and reap it on quit.
 #[derive(Default)]
@@ -146,39 +168,55 @@ fn check_server() -> bool {
 
 #[tauri::command]
 fn check_clocktopus_installed() -> bool {
-    // GUI apps on macOS don't inherit user shell PATH, so `which clocktopus`
-    // fails under `zsh -lc` (which doesn't source .zshrc where bun/nvm export
-    // PATH). Check known install paths on disk directly.
+    // GUI apps on macOS don't inherit user shell PATH; probe known paths on disk.
     let home = std::env::var("HOME").unwrap_or_default();
-    let candidates = [
-        format!("{}/.bun/bin/clocktopus", home),
-        format!("{}/.npm-global/bin/clocktopus", home),
-        "/opt/homebrew/bin/clocktopus".to_string(),
-        "/usr/local/bin/clocktopus".to_string(),
-    ];
-    candidates.iter().any(|p| std::path::Path::new(p).exists())
+    let candidates = clocktopus_candidates(&home);
+    first_matching(&candidates, |p| std::path::Path::new(p).exists()).is_some()
 }
 
 #[tauri::command]
-fn install_clocktopus() {
+fn check_bun_installed() -> bool {
     let home = std::env::var("HOME").unwrap_or_default();
-    let bun = format!("{}/.bun/bin/bun", home);
-    std::process::Command::new(&bun)
+    let candidates = bun_candidates(&home);
+    first_matching(&candidates, |p| std::path::Path::new(p).exists()).is_some()
+}
+
+#[tauri::command]
+fn install_bun() -> Result<(), String> {
+    // Official installer; lands the binary at ~/.bun/bin/bun. curl-piped scripts
+    // carry no quarantine xattr, so the result runs without Gatekeeper prompts.
+    let status = std::process::Command::new("sh")
+        .args(["-c", "curl -fsSL https://bun.sh/install | bash"])
+        .status()
+        .map_err(|e| format!("failed to launch installer: {e}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("bun installer exited with status {status}"))
+    }
+}
+
+#[tauri::command]
+fn install_clocktopus() -> Result<(), String> {
+    let home = std::env::var("HOME").unwrap_or_default();
+    let bun = first_matching(&bun_candidates(&home), |p| std::path::Path::new(p).exists())
+        .ok_or_else(|| "bun not found".to_string())?;
+    let status = std::process::Command::new(&bun)
         .args(["i", "-g", "clocktopus", "--trust"])
-        .spawn()
-        .ok();
+        .status()
+        .map_err(|e| format!("failed to launch bun: {e}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("clocktopus install exited with status {status}"))
+    }
 }
 
 fn spawn_server(state: &ServerChild) {
     // Resolve clocktopus binary directly — GUI apps lack shell PATH.
     let home = std::env::var("HOME").unwrap_or_default();
-    let candidates = [
-        format!("{}/.bun/bin/clocktopus", home),
-        format!("{}/.npm-global/bin/clocktopus", home),
-        "/opt/homebrew/bin/clocktopus".to_string(),
-        "/usr/local/bin/clocktopus".to_string(),
-    ];
-    let Some(bin) = candidates.into_iter().find(|p| std::path::Path::new(p).exists()) else {
+    let candidates = clocktopus_candidates(&home);
+    let Some(bin) = first_matching(&candidates, |p| std::path::Path::new(p).exists()) else {
         return;
     };
     // bun shebang in the installed bin needs bun on PATH; inject ~/.bun/bin.
@@ -218,7 +256,7 @@ fn navigate_to_error(app: &tauri::AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let error_html: String = format!("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><style>*{{margin:0;padding:0;box-sizing:border-box}}:root{{--bg:#1a1d23;--fg:#e1e4e8;--sub:#8b949e;--btn:#238636;--btn-h:#2ea043}}@media(prefers-color-scheme:light){{:root{{--bg:#f6f8fa;--fg:#1f2328;--sub:#656d76;--btn:#1a7f37;--btn-h:#2da44e}}}}body{{font-family:-apple-system,sans-serif;background:var(--bg);display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;color:var(--fg)}}h2{{margin-bottom:.4rem;font-size:1.1rem}}p{{color:var(--sub);font-size:.875rem}}button{{margin-top:1.1rem;padding:.55rem 1.4rem;background:var(--btn);border:none;border-radius:8px;color:white;font-size:.9rem;font-weight:500;cursor:pointer}}button:hover:not(:disabled){{background:var(--btn-h)}}button:disabled{{opacity:.5;cursor:not-allowed}}#msg{{font-size:.8rem;color:var(--sub);margin-top:.65rem;min-height:1.1em}}</style></head><body oncontextmenu=\"return false;\"><div><h2 id=\"t\">Server not running</h2><p id=\"sub\">Start the Clocktopus server to continue.</p><button id=\"b\">Start Server</button><div id=\"msg\"></div></div><script>const DASH_URL='{url}';const invoke=window.__TAURI__.core.invoke;async function init(){{const ok=await invoke('check_clocktopus_installed');if(!ok){{document.getElementById('t').textContent='Clocktopus not installed';document.getElementById('sub').textContent='Install the Clocktopus CLI to continue.';document.getElementById('b').textContent='Install Clocktopus';document.getElementById('b').onclick=doInstall;}}else{{document.getElementById('b').onclick=doStart;}}}}async function doInstall(){{const b=document.getElementById('b'),m=document.getElementById('msg');b.disabled=true;b.textContent='Installing…';await invoke('install_clocktopus');m.textContent='Installing Clocktopus…';const t=setInterval(async()=>{{if(await invoke('check_clocktopus_installed')){{clearInterval(t);m.textContent='';document.getElementById('t').textContent='Server not running';document.getElementById('sub').textContent='Start the Clocktopus server to continue.';b.textContent='Start Server';b.disabled=false;b.onclick=doStart;}}}},1500);}}async function doStart(){{const b=document.getElementById('b'),m=document.getElementById('msg');b.disabled=true;b.textContent='Starting…';await invoke('start_server');m.textContent='Waiting for server…';const t=setInterval(async()=>{{if(await invoke('check_server')){{clearInterval(t);location.href=DASH_URL;}}}},1500);}}init();</script></body></html>", url = dashboard_url());
+    let error_html: String = format!("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><style>*{{margin:0;padding:0;box-sizing:border-box}}:root{{--bg:#1a1d23;--fg:#e1e4e8;--sub:#8b949e;--btn:#238636;--btn-h:#2ea043;--err:#f85149}}@media(prefers-color-scheme:light){{:root{{--bg:#f6f8fa;--fg:#1f2328;--sub:#656d76;--btn:#1a7f37;--btn-h:#2da44e;--err:#cf222e}}}}body{{font-family:-apple-system,sans-serif;background:var(--bg);display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;color:var(--fg);padding:1rem}}h2{{margin-bottom:.4rem;font-size:1.1rem}}p{{color:var(--sub);font-size:.875rem}}button{{margin-top:1.1rem;padding:.55rem 1.4rem;background:var(--btn);border:none;border-radius:8px;color:white;font-size:.9rem;font-weight:500;cursor:pointer}}button:hover:not(:disabled){{background:var(--btn-h)}}button:disabled{{opacity:.5;cursor:not-allowed}}#msg{{font-size:.8rem;color:var(--sub);margin-top:.65rem;min-height:1.1em}}#msg.err{{color:var(--err)}}#cmd{{display:none;margin-top:.6rem;font-family:ui-monospace,monospace;font-size:.72rem;background:rgba(128,128,128,.15);padding:.4rem .5rem;border-radius:6px;color:var(--fg);user-select:all;cursor:copy;word-break:break-all}}</style></head><body oncontextmenu=\"return false;\"><div><h2 id=\"t\">Set up Clocktopus</h2><p id=\"sub\">Install prerequisites to continue.</p><button id=\"b\">Set up Clocktopus</button><div id=\"msg\"></div><div id=\"cmd\"></div></div><script>const DASH_URL='{url}';const invoke=window.__TAURI__.core.invoke;const t=document.getElementById('t'),sub=document.getElementById('sub'),b=document.getElementById('b'),m=document.getElementById('msg'),cmd=document.getElementById('cmd');const sleep=ms=>new Promise(r=>setTimeout(r,ms));function setMsg(text,isErr){{m.textContent=text;m.className=isErr?'err':'';}}function showCmd(text){{if(text){{cmd.textContent=text;cmd.style.display='block';}}else{{cmd.style.display='none';}}}}cmd.onclick=()=>{{navigator.clipboard&&navigator.clipboard.writeText(cmd.textContent);}};async function waitFor(check,label){{setMsg(label,false);for(let i=0;i<120;i++){{if(await invoke(check))return true;await sleep(1500);}}return false;}}function fail(step,err,manual){{setMsg((err||'Step failed')+'',true);showCmd(manual);b.disabled=false;b.textContent='Retry';b.onclick=run;}}async function run(){{b.disabled=true;showCmd('');try{{if(!await invoke('check_bun_installed')){{t.textContent='Installing bun';sub.textContent='Downloading the bun runtime…';b.textContent='Installing bun…';await invoke('install_bun');if(!await waitFor('check_bun_installed','Installing bun…'))return fail('bun','bun install timed out','curl -fsSL https://bun.sh/install | bash');}}if(!await invoke('check_clocktopus_installed')){{t.textContent='Installing Clocktopus';sub.textContent='Installing the Clocktopus CLI…';b.textContent='Installing Clocktopus…';await invoke('install_clocktopus');if(!await waitFor('check_clocktopus_installed','Installing Clocktopus…'))return fail('cli','Clocktopus install timed out','bun i -g clocktopus --trust');}}t.textContent='Starting Clocktopus';sub.textContent='Launching the server…';b.textContent='Starting…';await invoke('start_server');if(!await waitFor('check_server','Waiting for server…'))return fail('server','Server did not start','clocktopus dash');setMsg('',false);location.href=DASH_URL;}}catch(e){{fail('error',(e&&e.toString)?e.toString():'Unexpected error',null);}}}}b.onclick=run;</script></body></html>", url = dashboard_url());
 
     let loading_html: String = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><style>*{margin:0;padding:0;box-sizing:border-box}:root{--bg:#1a1d23;--fg:#e1e4e8;--sub:#8b949e;--accent:#d29922}@media(prefers-color-scheme:light){:root{--bg:#f6f8fa;--fg:#1f2328;--sub:#656d76;--accent:#bf8700}}body{font-family:-apple-system,sans-serif;background:var(--bg);display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;color:var(--fg)}.sp{width:32px;height:32px;border:3px solid rgba(128,128,128,.25);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto .9rem}@keyframes sp{to{transform:rotate(360deg)}}h2{font-size:1rem;font-weight:500}p{color:var(--sub);font-size:.8rem;margin-top:.35rem}</style></head><body oncontextmenu=\"return false;\"><div><div class=\"sp\"></div><h2>Starting Clocktopus</h2><p>Launching server…</p></div></body></html>".to_string();
 
@@ -233,7 +271,7 @@ pub fn run() {
     }
 
     builder
-        .invoke_handler(tauri::generate_handler![start_server, stop_server, check_server, check_clocktopus_installed, install_clocktopus])
+        .invoke_handler(tauri::generate_handler![start_server, stop_server, check_server, check_bun_installed, install_bun, check_clocktopus_installed, install_clocktopus])
         .register_uri_scheme_protocol("clocktopus", move |_app, request| {
             let body = if request.uri().path() == "/loading" {
                 loading_html.as_bytes().to_vec()
@@ -647,5 +685,33 @@ mod tests {
         let result = format_label(None, Some(&desc)).unwrap();
         assert_eq!(result.chars().count(), 30);
         assert!(result.ends_with('…'));
+    }
+
+    #[test]
+    fn bun_candidates_includes_home_and_system_paths() {
+        let c = bun_candidates("/Users/alice");
+        assert_eq!(c[0], "/Users/alice/.bun/bin/bun");
+        assert!(c.contains(&"/opt/homebrew/bin/bun".to_string()));
+        assert!(c.contains(&"/usr/local/bin/bun".to_string()));
+    }
+
+    #[test]
+    fn clocktopus_candidates_is_bun_global_only() {
+        let c = clocktopus_candidates("/Users/alice");
+        assert_eq!(c, vec!["/Users/alice/.bun/bin/clocktopus".to_string()]);
+    }
+
+    #[test]
+    fn first_matching_returns_first_existing() {
+        let cands = vec!["/a".to_string(), "/b".to_string(), "/c".to_string()];
+        let got = first_matching(&cands, |p| p == "/b" || p == "/c");
+        assert_eq!(got, Some("/b".to_string()));
+    }
+
+    #[test]
+    fn first_matching_returns_none_when_no_match() {
+        let cands = vec!["/a".to_string(), "/b".to_string()];
+        let got = first_matching(&cands, |_| false);
+        assert_eq!(got, None);
     }
 }

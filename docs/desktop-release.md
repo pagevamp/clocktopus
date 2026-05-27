@@ -7,42 +7,61 @@ kept as-is.
 
 ## One-time prerequisites
 
-1. Apple Developer Program membership (already enrolled).
-2. Create a **Developer ID Application** certificate:
-   - Xcode → Settings → Accounts → your team → Manage Certificates → "+" →
-     "Developer ID Application".
-   - Confirm it is installed: `security find-identity -v -p codesigning`
-     (note the line like `"Developer ID Application: Your Name (TEAMID)"`).
-3. Create notarization credentials (choose one):
-   - **App Store Connect API key** (preferred): App Store Connect → Users and Access →
-     Integrations → Keys → generate a key with the "Developer" role. Download the `.p8`
-     once, note the **Key ID** and **Issuer ID**.
-   - or an **app-specific password** for your Apple ID
-     (appleid.apple.com → Sign-In & Security → App-Specific Passwords).
+1. Apple Developer Program membership (paid).
+2. Create a **Developer ID Application** certificate. Note: only the **Account Holder**
+   can create Developer ID certs — Admins cannot, and the option won't appear for them
+   (you'll only see Apple Development / Apple Distribution / Mac Installer Distribution).
+   - developer.apple.com → Certificates, IDs & Profiles → Certificates → "+" →
+     under **Software** choose **Developer ID Application** (NOT Apple Distribution —
+     that's for the App Store).
+   - Profile Type: choose **G2 Sub-CA (Xcode 11.4.1 or later)** (the "Previous Sub-CA"
+     is legacy and expires Feb 01, 2027).
+   - It asks for a CSR. Generate one in **Keychain Access** (menu bar) →
+     **Certificate Assistant → Request a Certificate From a Certificate Authority…**:
+     enter your email + a Common Name, leave CA Email blank, select **Saved to disk**.
+     Upload the resulting `.certSigningRequest`.
+   - Download the issued `.cer`, double-click to install into your Keychain.
+   - Confirm: `security find-identity -v -p codesigning` shows the identity. Ours is
+     `Developer ID Application: OUTSIDE TECH, INC. (RWWN85PDLH)`.
+   - Note: this signs the app as **OUTSIDE TECH, INC.** — that org is the listed
+     developer on every distributed build.
+3. Create notarization credentials — **App Store Connect API key**:
+   App Store Connect → Users and Access → Integrations → Keys → **Team Keys** tab →
+   generate a key with the **Developer** role. Download the `.p8` **once** (you cannot
+   re-download it), and note the **Key ID** and **Issuer ID**.
+   (Alternative: an Apple ID app-specific password — see Option B below.)
 
-## Environment (set per shell, never commit)
+## Environment
+
+Store these in `desktop/.env` (already gitignored — see `desktop/.gitignore`, so it is
+never committed). Set only one of Option A / Option B.
 
 ```sh
-export APPLE_SIGNING_IDENTITY="Developer ID Application: Your Name (TEAMID)"
+APPLE_SIGNING_IDENTITY="Developer ID Application: OUTSIDE TECH, INC. (RWWN85PDLH)"
 
 # Option A — App Store Connect API key (preferred):
-export APPLE_API_KEY="AB12CD34EF"            # Key ID
-export APPLE_API_ISSUER="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # Issuer ID
-export APPLE_API_KEY_PATH="$HOME/keys/AuthKey_AB12CD34EF.p8"
+APPLE_API_KEY="AB12CD34EF"            # Key ID
+APPLE_API_ISSUER="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # Issuer ID
+APPLE_API_KEY_PATH="/Users/szn/keys/AuthKey_AB12CD34EF.p8"
 
 # Option B — Apple ID + app-specific password (use instead of Option A):
-export APPLE_ID="you@example.com"
-export APPLE_PASSWORD="abcd-efgh-ijkl-mnop"  # app-specific password
-export APPLE_TEAM_ID="TEAMID"
+APPLE_ID="you@example.com"
+APPLE_PASSWORD="abcd-efgh-ijkl-mnop"  # app-specific password
+APPLE_TEAM_ID="RWWN85PDLH"
 ```
 
-Tauri reads `APPLE_SIGNING_IDENTITY` automatically, so no signing identity is stored in
-the repo. Set only one of Option A / Option B.
+Keep the `.p8` file **outside** the repo (e.g. `~/keys/`) — `.gitignore` does not cover
+loose `*.p8` files, so a key dropped inside `desktop/` could be committed.
+
+`desktop/.env` is NOT auto-exported into the build. Load it into the shell before every
+build (`set -a; source .env; set +a`), as shown below.
 
 ## Build + notarize
 
 ```sh
 cd desktop
+set -a; source .env; set +a
+echo "$APPLE_SIGNING_IDENTITY"   # MUST print the identity — empty means ad-hoc fallback
 bunx tauri build
 ```
 

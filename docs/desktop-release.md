@@ -25,6 +25,11 @@ kept as-is.
      `Developer ID Application: OUTSIDE TECH, INC. (RWWN85PDLH)`.
    - Note: this signs the app as **OUTSIDE TECH, INC.** — that org is the listed
      developer on every distributed build.
+   - **Setting up on a different machine:** the Developer ID cert's private key cannot
+     be re-downloaded and lives only in the Keychain that created it. On the original
+     machine, export it from Keychain Access (right-click the identity → Export → `.p12`,
+     set a password). On the new machine, double-click the `.p12` to import. Re-issuing a
+     new cert is also possible but the old one keeps signing existing builds.
 3. Create notarization credentials — **App Store Connect API key**:
    App Store Connect → Users and Access → Integrations → Keys → **Team Keys** tab →
    generate a key with the **Developer** role. Download the `.p8` **once** (you cannot
@@ -36,19 +41,27 @@ kept as-is.
 Store these in `desktop/.env` (already gitignored — see `desktop/.gitignore`, so it is
 never committed). Set only one of Option A / Option B.
 
-```sh
-APPLE_SIGNING_IDENTITY="Developer ID Application: OUTSIDE TECH, INC. (RWWN85PDLH)"
+# Use the exact string from `security find-identity -v -p codesigning` on THIS machine.
+
+# Ours happens to be "Developer ID Application: OUTSIDE TECH, INC. (RWWN85PDLH)", but on
+
+# a fresh setup it only exists after you've installed/imported the cert (see prerequisites).
+
+APPLE_SIGNING_IDENTITY="Developer ID Application: <YOUR ORG> (<TEAMID>)"
 
 # Option A — App Store Connect API key (preferred):
-APPLE_API_KEY="AB12CD34EF"            # Key ID
-APPLE_API_ISSUER="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # Issuer ID
+
+APPLE_API_KEY="AB12CD34EF" # Key ID
+APPLE_API_ISSUER="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" # Issuer ID
 APPLE_API_KEY_PATH="/Users/szn/keys/AuthKey_AB12CD34EF.p8"
 
 # Option B — Apple ID + app-specific password (use instead of Option A):
+
 APPLE_ID="you@example.com"
-APPLE_PASSWORD="abcd-efgh-ijkl-mnop"  # app-specific password
+APPLE_PASSWORD="abcd-efgh-ijkl-mnop" # app-specific password
 APPLE_TEAM_ID="RWWN85PDLH"
-```
+
+````
 
 Keep the `.p8` file **outside** the repo (e.g. `~/keys/`) — `.gitignore` does not cover
 loose `*.p8` files, so a key dropped inside `desktop/` could be committed.
@@ -63,7 +76,7 @@ cd desktop
 set -a; source .env; set +a
 echo "$APPLE_SIGNING_IDENTITY"   # MUST print the identity — empty means ad-hoc fallback
 bunx tauri build
-```
+````
 
 Tauri signs the app with the Developer ID identity, enables hardened runtime + the
 entitlements at `src-tauri/entitlements.plist`, submits the app to Apple's notary

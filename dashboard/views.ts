@@ -19,11 +19,14 @@ export function indexPage() {
     h2 { font-size: 1.1rem; color: #fff; margin-bottom: 1rem; }
 
     /* Nav */
-    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
-    .nav { display: flex; gap: 0.25rem; background: #1c1f26; border-radius: 10px; padding: 0.3rem; flex-wrap: nowrap; }
+    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+    .nav-bar { display: flex; margin-bottom: 1.5rem; }
+    .nav { display: flex; flex: 1; justify-content: space-evenly; gap: 0.25rem; background: #1c1f26; border-radius: 10px; padding: 0.3rem; flex-wrap: nowrap; }
     .nav-btn { margin-top: 0; padding: 0.5rem 0.85rem; border: none; border-radius: 6px; background: transparent; color: #8b949e; font-size: 0.9rem; cursor: pointer; white-space: nowrap; }
     .nav-btn:hover { color: #e1e4e8; }
     .nav-btn.active { background: #30363d; color: #fff; }
+    .gear-btn { display: inline-flex; align-items: center; justify-content: center; margin-top: 0; padding: 0.35rem; border: none; border-radius: 8px; background: transparent; color: #8b949e; line-height: 0; cursor: pointer; }
+    .gear-btn:hover { color: #e1e4e8; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 
@@ -79,6 +82,24 @@ export function indexPage() {
     .sessions-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid #21262d; }
     .sessions-table tr:hover { background: #161b22; }
     .sessions-table .in-progress { color: #3fb950; font-style: italic; }
+    .jira-table input[type="number"] { width: 90px; }
+    .jira-table .note-input { width: 220px; }
+    .jira-icon-btn { margin-top: 0; padding: 0.35rem 0.65rem; border: 1px solid #2ea043; border-radius: 6px; background: #238636; color: #fff; cursor: pointer; }
+    .jira-icon-btn:hover:not(:disabled) { background: #2ea043; }
+    .jira-icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .jira-table .row-msg { margin: 0.4rem 0 0; font-size: 0.8rem; }
+    .jira-table .row-msg.ok { color: #3fb950; }
+    .jira-table .row-msg.err { color: #f85149; }
+    .jira-table .row-msg:empty { display: none; }
+    @media (max-width: 560px) {
+      .jira-table, .jira-table thead, .jira-table tbody, .jira-table tr, .jira-table th, .jira-table td { display: block; }
+      .jira-table thead { display: none; }
+      table.jira-table { min-width: 0; }
+      .jira-table tr { border: 1px solid #30363d; border-radius: 8px; margin-bottom: 0.75rem; padding: 0.5rem; }
+      .jira-table td { border: none; padding: 0.3rem 0.5rem; }
+      .jira-table td::before { content: attr(data-label); color: #8b949e; display: inline-block; min-width: 70px; }
+      .jira-table input[type="number"], .jira-table .note-input { width: calc(100% - 80px); max-width: 100%; }
+    }
     .delete-btn { background: transparent; color: #8b949e; border: none; cursor: pointer; font-size: 1.1rem; line-height: 1; padding: 0 0.4rem; margin-top: 0; }
     .delete-btn:hover { color: #f85149; background: transparent; }
     .delete-btn[disabled] { color: #484f58; cursor: not-allowed; opacity: 0.5; }
@@ -110,8 +131,9 @@ export function indexPage() {
       body { padding: 0.75rem; }
       .form-row { grid-template-columns: 1fr; }
       .home-cards { grid-template-columns: 1fr; }
-      .header { flex-direction: column; gap: 0; align-items: stretch; margin-bottom: 1rem; }
-      .header h1 { display: none; }
+      .header { justify-content: space-between; margin-bottom: 0.5rem; }
+      .header h1 { font-size: 1.3rem; }
+      .nav-bar { justify-content: center; }
       .nav { justify-content: center; flex-wrap: wrap; }
       .nav-btn { padding: 0.4rem 0.7rem; font-size: 0.8rem; }
     }
@@ -146,12 +168,15 @@ export function indexPage() {
   </div>
   <div class="header">
     <h1>Clocktopus</h1>
+    <button class="nav-btn gear-btn" onclick="switchTab('settings')" id="nav-settings" aria-label="Settings" title="Settings"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></button>
+  </div>
+  <div class="nav-bar">
     <div class="nav">
       <button class="nav-btn active" onclick="switchTab('home')" id="nav-home">Home</button>
       <button class="nav-btn" onclick="switchTab('sessions')" id="nav-sessions">Sessions</button>
       <button class="nav-btn" onclick="switchTab('projects')" id="nav-projects">Projects</button>
       <button class="nav-btn" onclick="switchTab('calendar')" id="nav-calendar">Calendar</button>
-      <button class="nav-btn" onclick="switchTab('settings')" id="nav-settings">Settings</button>
+      <button class="nav-btn" onclick="switchTab('jira')" id="nav-jira">Jira</button>
     </div>
   </div>
 
@@ -212,7 +237,7 @@ export function indexPage() {
               <option value="">Loading projects...</option>
             </select>
           </div>
-          <div class="form-row">
+          <div class="form-row" id="manual-range-wrap">
             <div>
               <label for="manual-start-date">Start</label>
               <div style="display:flex; gap:0.4rem;">
@@ -227,6 +252,10 @@ export function indexPage() {
                 <input type="time" id="manual-end-time" style="flex:1;" />
               </div>
             </div>
+          </div>
+          <div id="manual-duration-wrap" style="display:none;">
+            <label for="manual-duration">Time spent</label>
+            <input type="text" id="manual-duration" placeholder="e.g. 1h 30m, 45m, 1.5h" />
           </div>
           <div class="form-row">
             <div id="manual-description-wrap">
@@ -506,6 +535,30 @@ export function indexPage() {
     </div>
   </div>
 
+  <!-- JIRA TAB -->
+  <div id="tab-jira" class="tab-content">
+    <div class="card">
+      <h2>Jira Worklog</h2>
+      <div id="jira-loading" style="color:#8b949e;">Loading…</div>
+      <div id="jira-notconnected" style="display:none; color:#8b949e;">
+        Connect Jira in <a href="#" onclick="switchTab('settings');return false;">Settings</a>.
+      </div>
+      <div id="jira-empty" style="display:none; color:#8b949e;">No To Do tickets assigned to you.</div>
+      <div id="jira-body" style="display:none;">
+        <select id="jira-project" aria-label="Project" onchange="renderJiraProject(this.value)"></select>
+        <input id="jira-search" type="search" aria-label="Search tickets" placeholder="Search by ticket id or title" oninput="filterJiraRows(this.value)" style="margin-top:0.5rem; display:block; width:100%;" />
+        <div class="table-wrap" style="margin-top:1rem;">
+          <table class="sessions-table jira-table">
+            <thead>
+              <tr><th>Ticket</th><th>Est</th><th>Spent</th><th>Hours</th><th>Note</th><th aria-label="Actions"></th></tr>
+            </thead>
+            <tbody id="jira-rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     // Suppress WebKit's Back/Forward menu. Capture-phase wins the race with
     // the native WKWebView menu. Our custom menu offers Reload only.
@@ -540,6 +593,7 @@ export function indexPage() {
       document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
       document.getElementById('tab-' + tab).classList.add('active');
       if (nav) nav.classList.add('active');
+      if (tab === 'jira') loadJira();
     }
 
     function switchTrackMode(mode) {
@@ -558,6 +612,158 @@ export function indexPage() {
       document.getElementById('settings-reminders').style.display = section === 'reminders' ? '' : 'none';
       document.getElementById('settings-git').style.display = section === 'git' ? '' : 'none';
       if (section === 'git') loadGit();
+    }
+
+    // --- Jira tab ---
+    let jiraData = null;
+    let jiraLoading = false;
+    let jiraMsgTimer = null;
+
+    function jiraFmtHrs(sec) {
+      return sec == null ? '—' : (sec / 3600).toFixed(1) + 'h';
+    }
+
+    function jiraEscape(s) {
+      return String(s).replace(/[&<>"]/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+      });
+    }
+
+    async function loadJira() {
+      if (jiraData !== null || jiraLoading) return;
+      jiraLoading = true;
+      document.getElementById('jira-loading').style.display = 'block';
+      document.getElementById('jira-notconnected').style.display = 'none';
+      document.getElementById('jira-empty').style.display = 'none';
+      document.getElementById('jira-body').style.display = 'none';
+      try {
+        const res = await fetch('/api/jira/issues');
+        const data = await res.json();
+        document.getElementById('jira-loading').style.display = 'none';
+        if (!data.ok) {
+          document.getElementById('jira-notconnected').style.display = 'block';
+          return;
+        }
+        jiraData = data.projects;
+        if (!jiraData.length) {
+          document.getElementById('jira-empty').style.display = 'block';
+          return;
+        }
+        const sel = document.getElementById('jira-project');
+        sel.innerHTML = jiraData
+          .map(function (p) {
+            return '<option value="' + jiraEscape(p.projectKey) + '">' + jiraEscape(p.projectName) + '</option>';
+          })
+          .join('');
+        document.getElementById('jira-body').style.display = 'block';
+        renderJiraProject(jiraData[0].projectKey);
+      } catch (e) {
+        document.getElementById('jira-loading').style.display = 'none';
+        document.getElementById('jira-notconnected').style.display = 'block';
+      } finally {
+        jiraLoading = false;
+      }
+    }
+
+    function renderJiraProject(projectKey) {
+      const proj = (jiraData || []).find(function (p) {
+        return p.projectKey === projectKey;
+      });
+      const tbody = document.getElementById('jira-rows');
+      if (!proj) {
+        tbody.innerHTML = '';
+        return;
+      }
+      tbody.innerHTML = proj.issues
+        .map(function (it) {
+          return (
+            '<tr data-key="' + jiraEscape(it.key) + '">' +
+            '<td data-label="Ticket">' + jiraEscape(it.key) + ' — ' + jiraEscape(it.summary) + '</td>' +
+            '<td data-label="Est">' + jiraFmtHrs(it.estimateSeconds) + '</td>' +
+            '<td data-label="Spent" class="spent-cell">' + jiraFmtHrs(it.spentSeconds) + '</td>' +
+            '<td data-label="Hours"><input type="number" min="0" step="0.25" class="hours-input"></td>' +
+            '<td data-label="Note"><input type="text" class="note-input" placeholder="optional"></td>' +
+            '<td><button type="button" class="jira-icon-btn" disabled>Log</button><div class="row-msg"></div></td>' +
+            '</tr>'
+          );
+        })
+        .join('');
+      Array.prototype.forEach.call(tbody.querySelectorAll('tr'), function (row) {
+        const hours = row.querySelector('.hours-input');
+        const btn = row.querySelector('.jira-icon-btn');
+        hours.addEventListener('input', function () {
+          btn.disabled = !(parseFloat(hours.value) > 0);
+        });
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          saveWorklog(row);
+        });
+      });
+      const search = document.getElementById('jira-search');
+      if (search && search.value) filterJiraRows(search.value);
+    }
+
+    function filterJiraRows(q) {
+      const needle = (q || '').trim().toLowerCase();
+      const rows = document.getElementById('jira-rows').querySelectorAll('tr');
+      Array.prototype.forEach.call(rows, function (row) {
+        const cell = row.querySelector('td');
+        const text = cell ? cell.textContent.toLowerCase() : '';
+        row.style.display = !needle || text.indexOf(needle) !== -1 ? '' : 'none';
+      });
+    }
+
+    async function saveWorklog(row) {
+      const key = row.dataset.key;
+      const hoursInput = row.querySelector('.hours-input');
+      const noteInput = row.querySelector('.note-input');
+      const btn = row.querySelector('.jira-icon-btn');
+      const hours = parseFloat(hoursInput.value);
+      if (!(hours > 0)) return;
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/jira/worklog', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ticketId: key, hours: hours, note: noteInput.value }),
+        });
+        const data = await res.json();
+        if (!data.ok) {
+          setRowMsg(row, data.error || 'Failed to log worklog.', false);
+          btn.disabled = false;
+          return;
+        }
+        const cell = row.querySelector('.spent-cell');
+        const prev = parseFloat(cell.textContent) || 0;
+        cell.textContent = (prev + hours).toFixed(1) + 'h';
+        hoursInput.value = '';
+        noteInput.value = '';
+        if (jiraData) {
+          for (const p of jiraData) {
+            const hit = p.issues.find(function (i) { return i.key === key; });
+            if (hit) { hit.spentSeconds = (hit.spentSeconds || 0) + (data.addedSeconds || 0); break; }
+          }
+        }
+        setRowMsg(row, 'Logged ' + hours + 'h to ' + key + '.', true);
+        clearTimeout(jiraMsgTimer);
+        const msgEl = row.querySelector('.row-msg');
+        jiraMsgTimer = setTimeout(function () {
+          if (msgEl) {
+            msgEl.textContent = '';
+            msgEl.className = 'row-msg';
+          }
+        }, 5000);
+      } catch (e) {
+        setRowMsg(row, 'Failed to log worklog.', false);
+        btn.disabled = false;
+      }
+    }
+
+    function setRowMsg(row, text, ok) {
+      const el = row.querySelector('.row-msg');
+      if (!el) return;
+      el.textContent = text;
+      el.className = 'row-msg ' + (ok ? 'ok' : 'err');
     }
 
     // --- Utilities ---
@@ -717,23 +923,58 @@ export function indexPage() {
       if (et) et.value = toTimeInputValue(now);
     }
 
+    function parseDurationToSeconds(input) {
+      var s = String(input || '').trim().toLowerCase();
+      if (!s) return null;
+      if (/^\\d+(\\.\\d+)?$/.test(s)) {
+        var num = parseFloat(s);
+        if (!isFinite(num) || num <= 0) return null;
+        return Math.round(num * 3600);
+      }
+      var re = /(\\d+(?:\\.\\d+)?)\\s*(h|hr|hrs|hour|hours|m|min|mins|minute|minutes|s|sec|secs)/g;
+      var total = 0;
+      var matched = false;
+      var m;
+      while ((m = re.exec(s)) !== null) {
+        matched = true;
+        var v = parseFloat(m[1]);
+        if (!isFinite(v) || v < 0) return null;
+        var unit = m[2];
+        if (unit[0] === 'h') total += v * 3600;
+        else if (unit[0] === 'm') total += v * 60;
+        else total += v;
+      }
+      if (!matched) return null;
+      return Math.round(total);
+    }
+
     async function logManualTime() {
       const projectId = document.getElementById('manual-project').value;
-      const startDate = document.getElementById('manual-start-date').value;
-      const startTime = document.getElementById('manual-start-time').value;
-      const endDate = document.getElementById('manual-end-date').value;
-      const endTime = document.getElementById('manual-end-time').value;
       const typedDescription = document.getElementById('manual-description').value.trim();
       const jiraTicket = document.getElementById('manual-jira').value.trim();
       const billable = document.getElementById('manual-billable').checked;
       const description = typedDescription;
+      const useDuration = currentMode.jiraOn && !currentMode.clockifyOn;
 
-      if (!startDate || !startTime || !endDate || !endTime) return setMsg('manual-msg', 'Please set start and end.', false);
-
-      const startMs = new Date(startDate + 'T' + startTime).getTime();
-      const endMs = new Date(endDate + 'T' + endTime).getTime();
-      if (isNaN(startMs) || isNaN(endMs)) return setMsg('manual-msg', 'Invalid date.', false);
-      if (endMs <= startMs) return setMsg('manual-msg', 'End must be after start.', false);
+      let payload;
+      if (useDuration) {
+        const raw = document.getElementById('manual-duration').value;
+        const seconds = parseDurationToSeconds(raw);
+        if (seconds == null) return setMsg('manual-msg', 'Enter a duration like "1h 30m", "45m", or "1.5h".', false);
+        if (seconds < 60) return setMsg('manual-msg', 'Duration must be at least 1 minute.', false);
+        payload = { durationSeconds: seconds };
+      } else {
+        const startDate = document.getElementById('manual-start-date').value;
+        const startTime = document.getElementById('manual-start-time').value;
+        const endDate = document.getElementById('manual-end-date').value;
+        const endTime = document.getElementById('manual-end-time').value;
+        if (!startDate || !startTime || !endDate || !endTime) return setMsg('manual-msg', 'Please set start and end.', false);
+        const startMs = new Date(startDate + 'T' + startTime).getTime();
+        const endMs = new Date(endDate + 'T' + endTime).getTime();
+        if (isNaN(startMs) || isNaN(endMs)) return setMsg('manual-msg', 'Invalid date.', false);
+        if (endMs <= startMs) return setMsg('manual-msg', 'End must be after start.', false);
+        payload = { start: new Date(startMs).toISOString(), end: new Date(endMs).toISOString() };
+      }
 
       if (currentMode.clockifyOn) {
         if (!projectId) return setMsg('manual-msg', 'Please select a project.', false);
@@ -752,20 +993,20 @@ export function indexPage() {
         const res = await fetch('/api/timer/log', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+          body: JSON.stringify(Object.assign({
             projectId: projectId || undefined,
             description: description,
-            start: new Date(startMs).toISOString(),
-            end: new Date(endMs).toISOString(),
             jiraTicket: jiraTicket || undefined,
             billable: billable,
-          }),
+          }, payload)),
         });
         const data = await res.json();
         if (data.ok) {
           setMsg('manual-msg', 'Time logged.', true);
           document.getElementById('manual-description').value = '';
           document.getElementById('manual-jira').value = '';
+          const dur = document.getElementById('manual-duration');
+          if (dur) dur.value = '';
           manualJiraSummary = '';
           renderTicketPreview('manual-description-preview', '', '');
           setManualDefaults();
@@ -1379,10 +1620,15 @@ export function indexPage() {
       const manualJiraWrap = manualJiraInput ? manualJiraInput.closest('.row') || manualJiraInput.parentElement : null;
       const billableWrap = document.getElementById('timer-billable-wrap');
       const manualBillableWrap = document.getElementById('manual-billable-wrap');
+      const manualRangeWrap = document.getElementById('manual-range-wrap');
+      const manualDurationWrap = document.getElementById('manual-duration-wrap');
+      const jiraOnly = jiraOn && !clockifyOn;
 
       if (trackCard) trackCard.style.display = '';
       if (timerLocalHint) timerLocalHint.style.display = localOnly ? '' : 'none';
       if (manualLocalHint) manualLocalHint.style.display = localOnly ? '' : 'none';
+      if (manualRangeWrap) manualRangeWrap.style.display = jiraOnly ? 'none' : '';
+      if (manualDurationWrap) manualDurationWrap.style.display = jiraOnly ? '' : 'none';
 
       if (clockifyOn) {
         if (projWrap) projWrap.style.display = '';

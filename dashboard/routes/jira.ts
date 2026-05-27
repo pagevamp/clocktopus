@@ -3,6 +3,7 @@ import axios from 'axios';
 import { saveCredential, setJiraDisabled } from '../../lib/credentials.js';
 import { clearAtlassianToken, storeAtlassianToken } from '../../lib/db.js';
 import { getAtlassianAuthUrl, exchangeCodeForTokens, getAccessibleResources } from '../../lib/atlassian.js';
+import { getMyTodoIssues, logJiraWorklog, worklogSecondsFromHours } from '../../lib/jira.js';
 
 const jiraRoutes = new Hono();
 
@@ -94,6 +95,34 @@ jiraRoutes.post('/jira', async (c) => {
   } catch {
     return c.json({ ok: false, error: 'Could not validate credentials with Jira.' });
   }
+});
+
+// Read: user's To Do tickets grouped by project
+jiraRoutes.get('/jira/issues', async (c) => {
+  const projects = await getMyTodoIssues();
+  if (projects === null) return c.json({ ok: false, reason: 'not_connected' });
+  return c.json({ ok: true, projects });
+});
+
+// Write: log a worklog against a ticket
+jiraRoutes.post('/jira/worklog', async (c) => {
+  const { ticketId, hours, note } = await c.req.json<{
+    ticketId?: string;
+    hours?: number;
+    note?: string;
+  }>();
+  if (!ticketId) {
+    return c.json({ ok: false, error: 'ticketId is required.' }, 400);
+  }
+  const seconds = worklogSecondsFromHours(Number(hours));
+  if (seconds === null) {
+    return c.json({ ok: false, error: 'hours must be greater than 0 and at most 12.' }, 400);
+  }
+  const result = await logJiraWorklog(ticketId, seconds, note);
+  if (!result) {
+    return c.json({ ok: false, error: 'Failed to log worklog to Jira.' }, 502);
+  }
+  return c.json({ ok: true, addedSeconds: seconds });
 });
 
 export default jiraRoutes;

@@ -543,7 +543,7 @@ export function indexPage() {
       <div id="jira-empty" style="display:none; color:#8b949e;">No To Do tickets assigned to you.</div>
       <div id="jira-body" style="display:none;">
         <select id="jira-project" aria-label="Project" onchange="renderJiraProject(this.value)"></select>
-        <input id="jira-search" type="search" aria-label="Search tickets" placeholder="Search by ticket id or title" oninput="filterJiraRows(this.value)" style="margin-top:0.5rem; display:block; width:100%; max-width:320px;" />
+        <input id="jira-search" type="search" aria-label="Search tickets" placeholder="Search by ticket id or title" oninput="filterJiraRows(this.value)" style="margin-top:0.5rem; display:block; width:100%;" />
         <div class="table-wrap" style="margin-top:1rem;">
           <table class="sessions-table jira-table">
             <thead>
@@ -693,6 +693,18 @@ export function indexPage() {
         btn.addEventListener('click', function () {
           saveWorklog(row);
         });
+      });
+      const search = document.getElementById('jira-search');
+      if (search && search.value) filterJiraRows(search.value);
+    }
+
+    function filterJiraRows(q) {
+      const needle = (q || '').trim().toLowerCase();
+      const rows = document.getElementById('jira-rows').querySelectorAll('tr');
+      Array.prototype.forEach.call(rows, function (row) {
+        const cell = row.querySelector('td');
+        const text = cell ? cell.textContent.toLowerCase() : '';
+        row.style.display = !needle || text.indexOf(needle) !== -1 ? '' : 'none';
       });
     }
 

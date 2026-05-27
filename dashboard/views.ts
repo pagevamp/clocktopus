@@ -671,7 +671,7 @@ export function indexPage() {
             '<td data-label="Spent" class="spent-cell">' + jiraFmtHrs(it.spentSeconds) + '</td>' +
             '<td data-label="Hours"><input type="number" min="0" step="0.25" class="hours-input"></td>' +
             '<td data-label="Note"><input type="text" class="note-input" placeholder="optional"></td>' +
-            '<td><button class="jira-icon-btn" disabled>✓</button></td>' +
+            '<td><button class="jira-icon-btn" disabled>Log</button></td>' +
             '</tr>'
           );
         })

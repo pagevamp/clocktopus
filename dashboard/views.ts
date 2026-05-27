@@ -582,6 +582,7 @@ export function indexPage() {
       document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
       document.getElementById('tab-' + tab).classList.add('active');
       if (nav) nav.classList.add('active');
+      if (tab === 'jira') loadJira();
     }
 
     function switchTrackMode(mode) {
@@ -600,6 +601,129 @@ export function indexPage() {
       document.getElementById('settings-reminders').style.display = section === 'reminders' ? '' : 'none';
       document.getElementById('settings-git').style.display = section === 'git' ? '' : 'none';
       if (section === 'git') loadGit();
+    }
+
+    // --- Jira tab ---
+    let jiraData = null;
+    let jiraLoading = false;
+
+    function jiraFmtHrs(sec) {
+      return sec == null ? '—' : (sec / 3600).toFixed(1) + 'h';
+    }
+
+    function jiraEscape(s) {
+      return String(s).replace(/[&<>"]/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+      });
+    }
+
+    async function loadJira() {
+      if (jiraData !== null || jiraLoading) return;
+      jiraLoading = true;
+      document.getElementById('jira-loading').style.display = 'block';
+      document.getElementById('jira-notconnected').style.display = 'none';
+      document.getElementById('jira-empty').style.display = 'none';
+      document.getElementById('jira-body').style.display = 'none';
+      try {
+        const res = await fetch('/api/jira/issues');
+        const data = await res.json();
+        document.getElementById('jira-loading').style.display = 'none';
+        if (!data.ok) {
+          document.getElementById('jira-notconnected').style.display = 'block';
+          return;
+        }
+        jiraData = data.projects;
+        if (!jiraData.length) {
+          document.getElementById('jira-empty').style.display = 'block';
+          return;
+        }
+        const sel = document.getElementById('jira-project');
+        sel.innerHTML = jiraData
+          .map(function (p) {
+            return '<option value="' + jiraEscape(p.projectKey) + '">' + jiraEscape(p.projectName) + '</option>';
+          })
+          .join('');
+        document.getElementById('jira-body').style.display = 'block';
+        renderJiraProject(jiraData[0].projectKey);
+      } catch (e) {
+        document.getElementById('jira-loading').style.display = 'none';
+        document.getElementById('jira-notconnected').style.display = 'block';
+      } finally {
+        jiraLoading = false;
+      }
+    }
+
+    function renderJiraProject(projectKey) {
+      const proj = (jiraData || []).find(function (p) {
+        return p.projectKey === projectKey;
+      });
+      const tbody = document.getElementById('jira-rows');
+      if (!proj) {
+        tbody.innerHTML = '';
+        return;
+      }
+      tbody.innerHTML = proj.issues
+        .map(function (it) {
+          return (
+            '<tr data-key="' + jiraEscape(it.key) + '">' +
+            '<td data-label="Ticket">' + jiraEscape(it.key) + ' — ' + jiraEscape(it.summary) + '</td>' +
+            '<td data-label="Est">' + jiraFmtHrs(it.estimateSeconds) + '</td>' +
+            '<td data-label="Spent" class="spent-cell">' + jiraFmtHrs(it.spentSeconds) + '</td>' +
+            '<td data-label="Hours"><input type="number" min="0" step="0.25" class="hours-input"></td>' +
+            '<td data-label="Note"><input type="text" class="note-input" placeholder="optional"></td>' +
+            '<td><button class="jira-icon-btn" disabled>✓</button></td>' +
+            '</tr>'
+          );
+        })
+        .join('');
+      Array.prototype.forEach.call(tbody.querySelectorAll('tr'), function (row) {
+        const hours = row.querySelector('.hours-input');
+        const btn = row.querySelector('.jira-icon-btn');
+        hours.addEventListener('input', function () {
+          btn.disabled = !(parseFloat(hours.value) > 0);
+        });
+        btn.addEventListener('click', function () {
+          saveWorklog(row);
+        });
+      });
+    }
+
+    async function saveWorklog(row) {
+      const key = row.dataset.key;
+      const hoursInput = row.querySelector('.hours-input');
+      const noteInput = row.querySelector('.note-input');
+      const btn = row.querySelector('.jira-icon-btn');
+      const hours = parseFloat(hoursInput.value);
+      if (!(hours > 0)) return;
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/jira/worklog', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ticketId: key, hours: hours, note: noteInput.value }),
+        });
+        const data = await res.json();
+        if (!data.ok) {
+          setMsg('jira-msg', data.error || 'Failed to log worklog.', false);
+          btn.disabled = false;
+          return;
+        }
+        const cell = row.querySelector('.spent-cell');
+        const prev = parseFloat(cell.textContent) || 0;
+        cell.textContent = (prev + hours).toFixed(1) + 'h';
+        hoursInput.value = '';
+        noteInput.value = '';
+        if (jiraData) {
+          for (const p of jiraData) {
+            const hit = p.issues.find(function (i) { return i.key === key; });
+            if (hit) { hit.spentSeconds = (hit.spentSeconds || 0) + (data.addedSeconds || 0); break; }
+          }
+        }
+        setMsg('jira-msg', 'Logged ' + hours + 'h to ' + key + '.', true);
+      } catch (e) {
+        setMsg('jira-msg', 'Failed to log worklog.', false);
+        btn.disabled = false;
+      }
     }
 
     // --- Utilities ---

@@ -31,14 +31,10 @@ fn bun_candidates(home: &str) -> Vec<String> {
     ]
 }
 
-/// Candidate absolute paths for the globally-installed `clocktopus` binary.
+/// Absolute path to the globally-installed `clocktopus` binary. We only support
+/// installing it via `bun i -g`, which always lands it in `~/.bun/bin`.
 fn clocktopus_candidates(home: &str) -> Vec<String> {
-    vec![
-        format!("{home}/.bun/bin/clocktopus"),
-        format!("{home}/.npm-global/bin/clocktopus"),
-        "/opt/homebrew/bin/clocktopus".to_string(),
-        "/usr/local/bin/clocktopus".to_string(),
-    ]
+    vec![format!("{home}/.bun/bin/clocktopus")]
 }
 
 /// Return the first candidate for which `exists` is true. Injecting the
@@ -700,12 +696,9 @@ mod tests {
     }
 
     #[test]
-    fn clocktopus_candidates_includes_known_install_dirs() {
+    fn clocktopus_candidates_is_bun_global_only() {
         let c = clocktopus_candidates("/Users/alice");
-        assert_eq!(c[0], "/Users/alice/.bun/bin/clocktopus");
-        assert!(c.contains(&"/Users/alice/.npm-global/bin/clocktopus".to_string()));
-        assert!(c.contains(&"/opt/homebrew/bin/clocktopus".to_string()));
-        assert!(c.contains(&"/usr/local/bin/clocktopus".to_string()));
+        assert_eq!(c, vec!["/Users/alice/.bun/bin/clocktopus".to_string()]);
     }
 
     #[test]

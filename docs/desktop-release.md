@@ -71,6 +71,17 @@ build (`set -a; source .env; set +a`), as shown below.
 
 ## Build + notarize
 
+Once the one-time prerequisites are done and `desktop/.env` is populated, the whole
+build → notarize → staple → verify pipeline is one command:
+
+```sh
+cd desktop && ./release.sh
+```
+
+`release.sh` loads `.env`, fails fast if the signing identity is missing or not in the
+Keychain, builds, notarizes + staples the DMG, and runs all verification checks. The
+manual steps below are what it automates (useful for debugging).
+
 ```sh
 cd desktop
 set -a; source .env; set +a

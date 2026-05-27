@@ -79,6 +79,19 @@ export function indexPage() {
     .sessions-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid #21262d; }
     .sessions-table tr:hover { background: #161b22; }
     .sessions-table .in-progress { color: #3fb950; font-style: italic; }
+    .jira-table input[type="number"] { width: 64px; }
+    .jira-table .note-input { width: 130px; }
+    .jira-icon-btn { margin-top: 0; padding: 0.35rem 0.65rem; border: 1px solid #2ea043; border-radius: 6px; background: #238636; color: #fff; cursor: pointer; }
+    .jira-icon-btn:hover:not(:disabled) { background: #2ea043; }
+    .jira-icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    @media (max-width: 560px) {
+      .jira-table, .jira-table thead, .jira-table tbody, .jira-table tr, .jira-table th, .jira-table td { display: block; }
+      .jira-table thead { display: none; }
+      table.jira-table { min-width: 0; }
+      .jira-table tr { border: 1px solid #30363d; border-radius: 8px; margin-bottom: 0.75rem; padding: 0.5rem; }
+      .jira-table td { border: none; padding: 0.3rem 0.5rem; }
+      .jira-table td::before { content: attr(data-label); color: #8b949e; display: inline-block; min-width: 70px; }
+    }
     .delete-btn { background: transparent; color: #8b949e; border: none; cursor: pointer; font-size: 1.1rem; line-height: 1; padding: 0 0.4rem; margin-top: 0; }
     .delete-btn:hover { color: #f85149; background: transparent; }
     .delete-btn[disabled] { color: #484f58; cursor: not-allowed; opacity: 0.5; }
@@ -151,6 +164,7 @@ export function indexPage() {
       <button class="nav-btn" onclick="switchTab('sessions')" id="nav-sessions">Sessions</button>
       <button class="nav-btn" onclick="switchTab('projects')" id="nav-projects">Projects</button>
       <button class="nav-btn" onclick="switchTab('calendar')" id="nav-calendar">Calendar</button>
+      <button class="nav-btn" onclick="switchTab('jira')" id="nav-jira">Jira</button>
       <button class="nav-btn" onclick="switchTab('settings')" id="nav-settings">Settings</button>
     </div>
   </div>
@@ -505,6 +519,30 @@ export function indexPage() {
           <div id="cal-cards"></div>
           <button id="cal-log-btn" onclick="logCalendarEvents()" style="margin-top:1rem;">Log to Clockify</button>
           <div class="msg" id="cal-log-msg"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JIRA TAB -->
+  <div id="tab-jira" class="tab-content">
+    <div class="card">
+      <h2>Jira Worklog</h2>
+      <div id="jira-msg" class="msg"></div>
+      <div id="jira-loading" style="color:#8b949e;">Loading…</div>
+      <div id="jira-notconnected" style="display:none; color:#8b949e;">
+        Connect Jira in <a href="#" onclick="switchTab('settings');return false;">Settings</a>.
+      </div>
+      <div id="jira-empty" style="display:none; color:#8b949e;">No To Do tickets assigned to you.</div>
+      <div id="jira-body" style="display:none;">
+        <select id="jira-project" aria-label="Project" onchange="renderJiraProject(this.value)"></select>
+        <div class="table-wrap" style="margin-top:1rem;">
+          <table class="sessions-table jira-table">
+            <thead>
+              <tr><th>Ticket</th><th>Est</th><th>Spent</th><th>Hours</th><th>Note</th><th aria-label="Actions"></th></tr>
+            </thead>
+            <tbody id="jira-rows"></tbody>
+          </table>
         </div>
       </div>
     </div>

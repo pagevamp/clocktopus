@@ -25,7 +25,7 @@ export function indexPage() {
     .nav-btn { margin-top: 0; padding: 0.5rem 0.85rem; border: none; border-radius: 6px; background: transparent; color: #8b949e; font-size: 0.9rem; cursor: pointer; white-space: nowrap; }
     .nav-btn:hover { color: #e1e4e8; }
     .nav-btn.active { background: #30363d; color: #fff; }
-    .gear-btn { margin-top: 0; padding: 0.3rem 0.45rem; border: none; border-radius: 8px; background: transparent; color: #8b949e; font-size: 1.95rem; line-height: 1; cursor: pointer; }
+    .gear-btn { display: inline-flex; align-items: center; justify-content: center; margin-top: 0; padding: 0.35rem; border: none; border-radius: 8px; background: transparent; color: #8b949e; line-height: 0; cursor: pointer; }
     .gear-btn:hover { color: #e1e4e8; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
@@ -164,7 +164,7 @@ export function indexPage() {
   </div>
   <div class="header">
     <h1>Clocktopus</h1>
-    <button class="nav-btn gear-btn" onclick="switchTab('settings')" id="nav-settings" aria-label="Settings" title="Settings">⚙</button>
+    <button class="nav-btn gear-btn" onclick="switchTab('settings')" id="nav-settings" aria-label="Settings" title="Settings"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></button>
   </div>
   <div class="nav-bar">
     <div class="nav">

@@ -126,6 +126,34 @@ xcrun stapler validate src-tauri/target/release/bundle/dmg/Clocktopus_*.dmg  # �
 If `spctl` rejects due to a hardened-runtime / entitlement issue, add the specific
 entitlement to `src-tauri/entitlements.plist`, rebuild, and re-verify.
 
+## CI (GitHub Actions)
+
+`.github/workflows/build-desktop.yml` builds, signs, notarizes, staples, verifies, and
+attaches the DMG to a GitHub Release on any `v*` tag push. It needs these repo secrets
+(Settings → Secrets and variables → Actions → New repository secret):
+
+| Secret                       | Value                                                       |
+| ---------------------------- | ----------------------------------------------------------- |
+| `APPLE_CERTIFICATE`          | base64 of the exported Developer ID `.p12`                  |
+| `APPLE_CERTIFICATE_PASSWORD` | the password set when exporting the `.p12`                  |
+| `APPLE_SIGNING_IDENTITY`     | `Developer ID Application: OUTSIDE TECH, INC. (RWWN85PDLH)` |
+| `APPLE_API_KEY`              | App Store Connect **Key ID**                                |
+| `APPLE_API_ISSUER`           | App Store Connect **Issuer ID**                             |
+| `APPLE_API_KEY_B64`          | base64 of the `.p8` key file                                |
+
+Generate the base64 values (macOS pipes to clipboard):
+
+```sh
+# Export the cert+key first: Keychain Access → right-click the Developer ID identity →
+# Export → .p12 (set a password = APPLE_CERTIFICATE_PASSWORD), then:
+base64 -i DeveloperID.p12 | pbcopy        # → APPLE_CERTIFICATE
+base64 -i ~/keys/AuthKey_XXXX.p8 | pbcopy # → APPLE_API_KEY_B64
+```
+
+Tauri imports `APPLE_CERTIFICATE` into a temporary keychain on the runner — no manual
+keychain setup needed. Trigger a release by pushing a tag, e.g.
+`git tag v1.0.3 && git push origin v1.0.3`.
+
 ## Final check
 
 Download the `.dmg` on a clean macOS user account, open it, drag Clocktopus to

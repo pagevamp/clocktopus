@@ -123,6 +123,14 @@ export function groupTodoIssues(data: unknown): JiraProjectGroup[] {
   return order.map((k) => map.get(k)!);
 }
 
+export async function getMyTodoIssues(): Promise<JiraProjectGroup[] | null> {
+  const jql = 'assignee = currentUser() AND statusCategory = "To Do" ORDER BY project';
+  const endpoint = `/search/jql?jql=${encodeURIComponent(jql)}&fields=summary,project,timetracking&maxResults=100`;
+  const data = await jiraApiRequest(endpoint, 'GET');
+  if (data === null) return null;
+  return groupTodoIssues(data);
+}
+
 export async function stopJiraTimer(ticketId: string, timeSpentSeconds: number): Promise<{ id: string } | null> {
   if (!Number.isFinite(timeSpentSeconds) || timeSpentSeconds <= 0) {
     console.warn(`[jira] stopJiraTimer: refusing non-positive duration (${timeSpentSeconds}s) for ${ticketId}.`);
@@ -152,6 +160,29 @@ export async function stopJiraTimer(ticketId: string, timeSpentSeconds: number):
           ],
         },
       ],
+    },
+  };
+  const response = await jiraApiRequest(`/issue/${ticketId}/worklog`, 'POST', body);
+  const id = (response as { id?: string | number } | null)?.id;
+  return id != null ? { id: String(id) } : null;
+}
+
+export async function logJiraWorklog(
+  ticketId: string,
+  seconds: number,
+  comment?: string,
+): Promise<{ id: string } | null> {
+  if (!Number.isFinite(seconds) || seconds <= 0 || seconds > MAX_WORKLOG_SECONDS) {
+    console.warn(`[jira] logJiraWorklog: refusing invalid duration (${seconds}s) for ${ticketId}.`);
+    return null;
+  }
+  const text = comment && comment.trim() ? comment.trim() : 'Logged from Clocktopus';
+  const body = {
+    timeSpentSeconds: seconds,
+    comment: {
+      type: 'doc',
+      version: 1,
+      content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
     },
   };
   const response = await jiraApiRequest(`/issue/${ticketId}/worklog`, 'POST', body);

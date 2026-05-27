@@ -203,7 +203,8 @@ fn install_bun() -> Result<(), String> {
 #[tauri::command]
 fn install_clocktopus() -> Result<(), String> {
     let home = std::env::var("HOME").unwrap_or_default();
-    let bun = format!("{home}/.bun/bin/bun");
+    let bun = first_matching(&bun_candidates(&home), |p| std::path::Path::new(p).exists())
+        .ok_or_else(|| "bun not found".to_string())?;
     let status = std::process::Command::new(&bun)
         .args(["i", "-g", "clocktopus", "--trust"])
         .status()

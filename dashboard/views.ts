@@ -535,7 +535,7 @@ export function indexPage() {
   <div id="tab-jira" class="tab-content">
     <div class="card">
       <h2>Jira Worklog</h2>
-      <div id="jira-msg" class="msg"></div>
+      <div id="jira-log-msg" class="msg"></div>
       <div id="jira-loading" style="color:#8b949e;">Loading…</div>
       <div id="jira-notconnected" style="display:none; color:#8b949e;">
         Connect Jira in <a href="#" onclick="switchTab('settings');return false;">Settings</a>.
@@ -726,7 +726,7 @@ export function indexPage() {
         });
         const data = await res.json();
         if (!data.ok) {
-          setMsg('jira-msg', data.error || 'Failed to log worklog.', false);
+          setMsg('jira-log-msg', data.error || 'Failed to log worklog.', false);
           btn.disabled = false;
           return;
         }
@@ -741,17 +741,17 @@ export function indexPage() {
             if (hit) { hit.spentSeconds = (hit.spentSeconds || 0) + (data.addedSeconds || 0); break; }
           }
         }
-        setMsg('jira-msg', 'Logged ' + hours + 'h to ' + key + '.', true);
+        setMsg('jira-log-msg', 'Logged ' + hours + 'h to ' + key + '.', true);
         clearTimeout(jiraMsgTimer);
         jiraMsgTimer = setTimeout(function () {
-          const el = document.getElementById('jira-msg');
+          const el = document.getElementById('jira-log-msg');
           if (el) {
             el.textContent = '';
             el.className = 'msg';
           }
         }, 5000);
       } catch (e) {
-        setMsg('jira-msg', 'Failed to log worklog.', false);
+        setMsg('jira-log-msg', 'Failed to log worklog.', false);
         btn.disabled = false;
       }
     }

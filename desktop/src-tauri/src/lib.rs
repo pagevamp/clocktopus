@@ -185,14 +185,19 @@ fn check_bun_installed() -> bool {
 fn install_bun() -> Result<(), String> {
     // Official installer; lands the binary at ~/.bun/bin/bun. curl-piped scripts
     // carry no quarantine xattr, so the result runs without Gatekeeper prompts.
-    let status = std::process::Command::new("sh")
+    // Capture output so a failure surfaces in the Setup UI instead of vanishing
+    // to the GUI app's invisible stderr.
+    let output = std::process::Command::new("sh")
         .args(["-c", "curl -fsSL https://bun.sh/install | bash"])
-        .status()
+        .output()
         .map_err(|e| format!("failed to launch installer: {e}"))?;
-    if status.success() {
+    if output.status.success() {
         Ok(())
     } else {
-        Err(format!("bun installer exited with status {status}"))
+        Err(format!(
+            "bun install failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ))
     }
 }
 
@@ -201,14 +206,25 @@ fn install_clocktopus() -> Result<(), String> {
     let home = std::env::var("HOME").unwrap_or_default();
     let bun = first_matching(&bun_candidates(&home), |p| std::path::Path::new(p).exists())
         .ok_or_else(|| "bun not found".to_string())?;
-    let status = std::process::Command::new(&bun)
+    // `--trust` runs lifecycle scripts (clocktopus postinstall, native rebuilds) that
+    // shell out to bun/bunx. GUI apps don't inherit the shell PATH, so inject
+    // ~/.bun/bin like spawn_server does — without it the first install can fail.
+    let bun_bin = format!("{home}/.bun/bin");
+    let current_path = std::env::var("PATH").unwrap_or_default();
+    let new_path = format!("{bun_bin}:{current_path}");
+    // Capture output so a failure surfaces in the Setup UI instead of vanishing.
+    let output = std::process::Command::new(&bun)
         .args(["i", "-g", "clocktopus", "--trust"])
-        .status()
+        .env("PATH", new_path)
+        .output()
         .map_err(|e| format!("failed to launch bun: {e}"))?;
-    if status.success() {
+    if output.status.success() {
         Ok(())
     } else {
-        Err(format!("clocktopus install exited with status {status}"))
+        Err(format!(
+            "clocktopus install failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ))
     }
 }
 
@@ -256,7 +272,7 @@ fn navigate_to_error(app: &tauri::AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let error_html: String = format!("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><style>*{{margin:0;padding:0;box-sizing:border-box}}:root{{--bg:#1a1d23;--fg:#e1e4e8;--sub:#8b949e;--btn:#238636;--btn-h:#2ea043;--err:#f85149}}@media(prefers-color-scheme:light){{:root{{--bg:#f6f8fa;--fg:#1f2328;--sub:#656d76;--btn:#1a7f37;--btn-h:#2da44e;--err:#cf222e}}}}body{{font-family:-apple-system,sans-serif;background:var(--bg);display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;color:var(--fg);padding:1rem}}h2{{margin-bottom:.4rem;font-size:1.1rem}}p{{color:var(--sub);font-size:.875rem}}button{{margin-top:1.1rem;padding:.55rem 1.4rem;background:var(--btn);border:none;border-radius:8px;color:white;font-size:.9rem;font-weight:500;cursor:pointer}}button:hover:not(:disabled){{background:var(--btn-h)}}button:disabled{{opacity:.5;cursor:not-allowed}}#msg{{font-size:.8rem;color:var(--sub);margin-top:.65rem;min-height:1.1em}}#msg.err{{color:var(--err)}}#cmd{{display:none;margin-top:.6rem;font-family:ui-monospace,monospace;font-size:.72rem;background:rgba(128,128,128,.15);padding:.4rem .5rem;border-radius:6px;color:var(--fg);user-select:all;cursor:copy;word-break:break-all}}</style></head><body oncontextmenu=\"return false;\"><div><h2 id=\"t\">Set up Clocktopus</h2><p id=\"sub\">Install prerequisites to continue.</p><button id=\"b\">Set up Clocktopus</button><div id=\"msg\"></div><div id=\"cmd\"></div></div><script>const DASH_URL='{url}';const invoke=window.__TAURI__.core.invoke;const t=document.getElementById('t'),sub=document.getElementById('sub'),b=document.getElementById('b'),m=document.getElementById('msg'),cmd=document.getElementById('cmd');const sleep=ms=>new Promise(r=>setTimeout(r,ms));function setMsg(text,isErr){{m.textContent=text;m.className=isErr?'err':'';}}function showCmd(text){{if(text){{cmd.textContent=text;cmd.style.display='block';}}else{{cmd.style.display='none';}}}}cmd.onclick=()=>{{navigator.clipboard&&navigator.clipboard.writeText(cmd.textContent);}};async function waitFor(check,label){{setMsg(label,false);for(let i=0;i<120;i++){{if(await invoke(check))return true;await sleep(1500);}}return false;}}function fail(step,err,manual){{setMsg((err||'Step failed')+'',true);showCmd(manual);b.disabled=false;b.textContent='Retry';b.onclick=run;}}async function run(){{b.disabled=true;showCmd('');try{{if(!await invoke('check_bun_installed')){{t.textContent='Installing bun';sub.textContent='Downloading the bun runtime…';b.textContent='Installing bun…';await invoke('install_bun');if(!await waitFor('check_bun_installed','Installing bun…'))return fail('bun','bun install timed out','curl -fsSL https://bun.sh/install | bash');}}if(!await invoke('check_clocktopus_installed')){{t.textContent='Installing Clocktopus';sub.textContent='Installing the Clocktopus CLI…';b.textContent='Installing Clocktopus…';await invoke('install_clocktopus');if(!await waitFor('check_clocktopus_installed','Installing Clocktopus…'))return fail('cli','Clocktopus install timed out','bun i -g clocktopus --trust');}}t.textContent='Starting Clocktopus';sub.textContent='Launching the server…';b.textContent='Starting…';await invoke('start_server');if(!await waitFor('check_server','Waiting for server…'))return fail('server','Server did not start','clocktopus dash');setMsg('',false);location.href=DASH_URL;}}catch(e){{fail('error',(e&&e.toString)?e.toString():'Unexpected error',null);}}}}b.onclick=run;</script></body></html>", url = dashboard_url());
+    let error_html: String = format!("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><style>*{{margin:0;padding:0;box-sizing:border-box}}:root{{--bg:#1a1d23;--fg:#e1e4e8;--sub:#8b949e;--btn:#238636;--btn-h:#2ea043;--err:#f85149}}@media(prefers-color-scheme:light){{:root{{--bg:#f6f8fa;--fg:#1f2328;--sub:#656d76;--btn:#1a7f37;--btn-h:#2da44e;--err:#cf222e}}}}body{{font-family:-apple-system,sans-serif;background:var(--bg);display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;color:var(--fg);padding:1rem}}h2{{margin-bottom:.4rem;font-size:1.1rem}}p{{color:var(--sub);font-size:.875rem}}button{{margin-top:1.1rem;padding:.55rem 1.4rem;background:var(--btn);border:none;border-radius:8px;color:white;font-size:.9rem;font-weight:500;cursor:pointer}}button:hover:not(:disabled){{background:var(--btn-h)}}button:disabled{{opacity:.5;cursor:not-allowed}}#msg{{font-size:.8rem;color:var(--sub);margin-top:.65rem;min-height:1.1em}}#msg.err{{color:var(--err)}}#cmd{{display:none;margin-top:.6rem;font-family:ui-monospace,monospace;font-size:.72rem;background:rgba(128,128,128,.15);padding:.4rem .5rem;border-radius:6px;color:var(--fg);user-select:all;cursor:copy;word-break:break-all}}</style></head><body oncontextmenu=\"return false;\"><div><h2 id=\"t\">Set up Clocktopus</h2><p id=\"sub\">Install prerequisites to continue.</p><button id=\"b\">Set up Clocktopus</button><div id=\"msg\"></div><div id=\"cmd\"></div></div><script>const DASH_URL='{url}';const invoke=window.__TAURI__.core.invoke;const t=document.getElementById('t'),sub=document.getElementById('sub'),b=document.getElementById('b'),m=document.getElementById('msg'),cmd=document.getElementById('cmd');const sleep=ms=>new Promise(r=>setTimeout(r,ms));function setMsg(text,isErr){{m.textContent=text;m.className=isErr?'err':'';}}function showCmd(text){{if(text){{cmd.textContent=text;cmd.style.display='block';}}else{{cmd.style.display='none';}}}}cmd.onclick=()=>{{navigator.clipboard&&navigator.clipboard.writeText(cmd.textContent);}};async function waitFor(check,label){{setMsg(label,false);for(let i=0;i<120;i++){{if(await invoke(check))return true;await sleep(1500);}}return false;}}function fail(step,err,manual){{setMsg((err||'Step failed')+'',true);showCmd(manual);b.disabled=false;b.textContent='Retry';b.onclick=run;}}async function run(){{b.disabled=true;showCmd('');try{{if(!await invoke('check_bun_installed')){{t.textContent='Installing bun';sub.textContent='Downloading the bun runtime…';b.textContent='Installing bun…';await invoke('install_bun');if(!await waitFor('check_bun_installed','Installing bun…'))return fail('bun','bun install timed out','curl -fsSL https://bun.sh/install | bash');}}if(!await invoke('check_clocktopus_installed')){{t.textContent='Installing Clocktopus';sub.textContent='Installing the Clocktopus CLI…';b.textContent='Installing Clocktopus…';await invoke('install_clocktopus');if(!await waitFor('check_clocktopus_installed','Installing Clocktopus…'))return fail('cli','Clocktopus install timed out','bun i -g clocktopus --trust');}}t.textContent='Starting Clocktopus';sub.textContent='Launching the server…';b.textContent='Starting…';await invoke('start_server');if(!await waitFor('check_server','Waiting for server…'))return fail('server','Server did not start','clocktopus dash');setMsg('',false);location.href=DASH_URL;}}catch(e){{fail('error',(e&&e.toString)?e.toString():'Unexpected error',null);}}}}b.onclick=run;async function init(){{if(await invoke('check_bun_installed')&&await invoke('check_clocktopus_installed')){{t.textContent='Server not running';sub.textContent='Start the Clocktopus server to continue.';b.textContent='Start Server';}}}}init();</script></body></html>", url = dashboard_url());
 
     let loading_html: String = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><style>*{margin:0;padding:0;box-sizing:border-box}:root{--bg:#1a1d23;--fg:#e1e4e8;--sub:#8b949e;--accent:#d29922}@media(prefers-color-scheme:light){:root{--bg:#f6f8fa;--fg:#1f2328;--sub:#656d76;--accent:#bf8700}}body{font-family:-apple-system,sans-serif;background:var(--bg);display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;color:var(--fg)}.sp{width:32px;height:32px;border:3px solid rgba(128,128,128,.25);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto .9rem}@keyframes sp{to{transform:rotate(360deg)}}h2{font-size:1rem;font-weight:500}p{color:var(--sub);font-size:.8rem;margin-top:.35rem}</style></head><body oncontextmenu=\"return false;\"><div><div class=\"sp\"></div><h2>Starting Clocktopus</h2><p>Launching server…</p></div></body></html>".to_string();
 

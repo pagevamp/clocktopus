@@ -2,6 +2,28 @@ import axios from 'axios';
 import { resolveCredential } from './credentials.js';
 import { getValidAccessToken } from './atlassian.js';
 
+export type JiraIssue = {
+  key: string;
+  summary: string;
+  estimateSeconds: number | null;
+  spentSeconds: number;
+};
+
+export type JiraProjectGroup = {
+  projectKey: string;
+  projectName: string;
+  issues: JiraIssue[];
+};
+
+type RawIssue = {
+  key?: string;
+  fields?: {
+    summary?: string;
+    project?: { key?: string; name?: string };
+    timetracking?: { originalEstimateSeconds?: number; timeSpentSeconds?: number };
+  };
+};
+
 async function jiraApiRequest(endpoint: string, method: 'POST' | 'GET' | 'DELETE', body?: unknown) {
   // Try OAuth first
   const oauthToken = await getValidAccessToken();
@@ -73,6 +95,32 @@ export function worklogSecondsFromHours(hours: number): number | null {
   const seconds = Math.round(hours * 3600);
   if (seconds <= 0) return null;
   return seconds;
+}
+
+export function groupTodoIssues(data: unknown): JiraProjectGroup[] {
+  const issues = (data as { issues?: unknown } | null)?.issues;
+  if (!Array.isArray(issues)) return [];
+  const order: string[] = [];
+  const map = new Map<string, JiraProjectGroup>();
+  for (const raw of issues as RawIssue[]) {
+    const fields = raw?.fields;
+    const project = fields?.project;
+    if (!raw?.key || !project?.key) continue;
+    let group = map.get(project.key);
+    if (!group) {
+      group = { projectKey: project.key, projectName: project.name ?? project.key, issues: [] };
+      map.set(project.key, group);
+      order.push(project.key);
+    }
+    const tt = fields?.timetracking ?? {};
+    group.issues.push({
+      key: raw.key,
+      summary: fields?.summary ?? '',
+      estimateSeconds: typeof tt.originalEstimateSeconds === 'number' ? tt.originalEstimateSeconds : null,
+      spentSeconds: typeof tt.timeSpentSeconds === 'number' ? tt.timeSpentSeconds : 0,
+    });
+  }
+  return order.map((k) => map.get(k)!);
 }
 
 export async function stopJiraTimer(ticketId: string, timeSpentSeconds: number): Promise<{ id: string } | null> {

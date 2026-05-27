@@ -87,7 +87,7 @@ export function indexPage() {
     .jira-icon-btn { margin-top: 0; padding: 0.35rem 0.65rem; border: 1px solid #2ea043; border-radius: 6px; background: #238636; color: #fff; cursor: pointer; }
     .jira-icon-btn:hover:not(:disabled) { background: #2ea043; }
     .jira-icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-    .jira-table .row-msg { margin: 0 0 0.4rem; font-size: 0.8rem; }
+    .jira-table .row-msg { margin: 0.4rem 0 0; font-size: 0.8rem; }
     .jira-table .row-msg.ok { color: #3fb950; }
     .jira-table .row-msg.err { color: #f85149; }
     .jira-table .row-msg:empty { display: none; }
@@ -683,7 +683,7 @@ export function indexPage() {
             '<td data-label="Spent" class="spent-cell">' + jiraFmtHrs(it.spentSeconds) + '</td>' +
             '<td data-label="Hours"><input type="number" min="0" step="0.25" class="hours-input"></td>' +
             '<td data-label="Note"><input type="text" class="note-input" placeholder="optional"></td>' +
-            '<td><div class="row-msg"></div><button type="button" class="jira-icon-btn" disabled>Log</button></td>' +
+            '<td><button type="button" class="jira-icon-btn" disabled>Log</button><div class="row-msg"></div></td>' +
             '</tr>'
           );
         })

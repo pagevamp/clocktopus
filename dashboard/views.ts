@@ -19,13 +19,13 @@ export function indexPage() {
     h2 { font-size: 1.1rem; color: #fff; margin-bottom: 1rem; }
 
     /* Nav */
-    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
+    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
     .nav-bar { display: flex; margin-bottom: 1.5rem; }
-    .nav { display: flex; gap: 0.25rem; background: #1c1f26; border-radius: 10px; padding: 0.3rem; flex-wrap: nowrap; }
+    .nav { display: flex; flex: 1; justify-content: space-between; gap: 0.25rem; background: #1c1f26; border-radius: 10px; padding: 0.3rem; flex-wrap: nowrap; }
     .nav-btn { margin-top: 0; padding: 0.5rem 0.85rem; border: none; border-radius: 6px; background: transparent; color: #8b949e; font-size: 0.9rem; cursor: pointer; white-space: nowrap; }
     .nav-btn:hover { color: #e1e4e8; }
     .nav-btn.active { background: #30363d; color: #fff; }
-    .gear-btn { margin-top: 0; padding: 0.35rem 0.5rem; border: none; border-radius: 8px; background: transparent; color: #8b949e; font-size: 1.55rem; line-height: 1; cursor: pointer; }
+    .gear-btn { margin-top: 0; padding: 0.3rem 0.45rem; border: none; border-radius: 8px; background: transparent; color: #8b949e; font-size: 1.95rem; line-height: 1; cursor: pointer; }
     .gear-btn:hover { color: #e1e4e8; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }

@@ -21,6 +21,35 @@ fn dashboard_url() -> String {
     format!("http://localhost:{}", dashboard_port())
 }
 
+/// Candidate absolute paths for the `bun` binary, in priority order.
+/// GUI apps don't inherit the user's shell PATH, so we probe known locations.
+#[allow(dead_code)]
+fn bun_candidates(home: &str) -> Vec<String> {
+    vec![
+        format!("{home}/.bun/bin/bun"),
+        "/opt/homebrew/bin/bun".to_string(),
+        "/usr/local/bin/bun".to_string(),
+    ]
+}
+
+/// Candidate absolute paths for the globally-installed `clocktopus` binary.
+#[allow(dead_code)]
+fn clocktopus_candidates(home: &str) -> Vec<String> {
+    vec![
+        format!("{home}/.bun/bin/clocktopus"),
+        format!("{home}/.npm-global/bin/clocktopus"),
+        "/opt/homebrew/bin/clocktopus".to_string(),
+        "/usr/local/bin/clocktopus".to_string(),
+    ]
+}
+
+/// Return the first candidate for which `exists` is true. Injecting the
+/// existence check keeps this pure and unit-testable.
+#[allow(dead_code)]
+fn first_matching<F: Fn(&str) -> bool>(candidates: &[String], exists: F) -> Option<String> {
+    candidates.iter().find(|p| exists(p)).cloned()
+}
+
 /// Tracks the server child process spawned by the "Start Server" button,
 /// so the app can stop it via tray menu and reap it on quit.
 #[derive(Default)]
@@ -647,5 +676,36 @@ mod tests {
         let result = format_label(None, Some(&desc)).unwrap();
         assert_eq!(result.chars().count(), 30);
         assert!(result.ends_with('…'));
+    }
+
+    #[test]
+    fn bun_candidates_includes_home_and_system_paths() {
+        let c = bun_candidates("/Users/alice");
+        assert_eq!(c[0], "/Users/alice/.bun/bin/bun");
+        assert!(c.contains(&"/opt/homebrew/bin/bun".to_string()));
+        assert!(c.contains(&"/usr/local/bin/bun".to_string()));
+    }
+
+    #[test]
+    fn clocktopus_candidates_includes_known_install_dirs() {
+        let c = clocktopus_candidates("/Users/alice");
+        assert_eq!(c[0], "/Users/alice/.bun/bin/clocktopus");
+        assert!(c.contains(&"/Users/alice/.npm-global/bin/clocktopus".to_string()));
+        assert!(c.contains(&"/opt/homebrew/bin/clocktopus".to_string()));
+        assert!(c.contains(&"/usr/local/bin/clocktopus".to_string()));
+    }
+
+    #[test]
+    fn first_matching_returns_first_existing() {
+        let cands = vec!["/a".to_string(), "/b".to_string(), "/c".to_string()];
+        let got = first_matching(&cands, |p| p == "/b" || p == "/c");
+        assert_eq!(got, Some("/b".to_string()));
+    }
+
+    #[test]
+    fn first_matching_returns_none_when_no_match() {
+        let cands = vec!["/a".to_string(), "/b".to_string()];
+        let got = first_matching(&cands, |_| false);
+        assert_eq!(got, None);
     }
 }

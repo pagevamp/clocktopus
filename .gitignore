@@ -22,3 +22,6 @@
 yarn--*/
 v8-compile-cache-*/
 node-compile-cache/
+
+# npm lockfile — this project uses bun (bun.lock)
+package-lock.json

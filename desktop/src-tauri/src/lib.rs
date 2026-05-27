@@ -33,7 +33,6 @@ fn bun_candidates(home: &str) -> Vec<String> {
 }
 
 /// Candidate absolute paths for the globally-installed `clocktopus` binary.
-#[allow(dead_code)]
 fn clocktopus_candidates(home: &str) -> Vec<String> {
     vec![
         format!("{home}/.bun/bin/clocktopus"),
@@ -45,7 +44,6 @@ fn clocktopus_candidates(home: &str) -> Vec<String> {
 
 /// Return the first candidate for which `exists` is true. Injecting the
 /// existence check keeps this pure and unit-testable.
-#[allow(dead_code)]
 fn first_matching<F: Fn(&str) -> bool>(candidates: &[String], exists: F) -> Option<String> {
     candidates.iter().find(|p| exists(p)).cloned()
 }
@@ -175,17 +173,10 @@ fn check_server() -> bool {
 
 #[tauri::command]
 fn check_clocktopus_installed() -> bool {
-    // GUI apps on macOS don't inherit user shell PATH, so `which clocktopus`
-    // fails under `zsh -lc` (which doesn't source .zshrc where bun/nvm export
-    // PATH). Check known install paths on disk directly.
+    // GUI apps on macOS don't inherit user shell PATH; probe known paths on disk.
     let home = std::env::var("HOME").unwrap_or_default();
-    let candidates = [
-        format!("{}/.bun/bin/clocktopus", home),
-        format!("{}/.npm-global/bin/clocktopus", home),
-        "/opt/homebrew/bin/clocktopus".to_string(),
-        "/usr/local/bin/clocktopus".to_string(),
-    ];
-    candidates.iter().any(|p| std::path::Path::new(p).exists())
+    let candidates = clocktopus_candidates(&home);
+    first_matching(&candidates, |p| std::path::Path::new(p).exists()).is_some()
 }
 
 #[tauri::command]
@@ -201,13 +192,8 @@ fn install_clocktopus() {
 fn spawn_server(state: &ServerChild) {
     // Resolve clocktopus binary directly — GUI apps lack shell PATH.
     let home = std::env::var("HOME").unwrap_or_default();
-    let candidates = [
-        format!("{}/.bun/bin/clocktopus", home),
-        format!("{}/.npm-global/bin/clocktopus", home),
-        "/opt/homebrew/bin/clocktopus".to_string(),
-        "/usr/local/bin/clocktopus".to_string(),
-    ];
-    let Some(bin) = candidates.into_iter().find(|p| std::path::Path::new(p).exists()) else {
+    let candidates = clocktopus_candidates(&home);
+    let Some(bin) = first_matching(&candidates, |p| std::path::Path::new(p).exists()) else {
         return;
     };
     // bun shebang in the installed bin needs bun on PATH; inject ~/.bun/bin.

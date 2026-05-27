@@ -38,36 +38,35 @@ kept as-is.
 
 ## Environment
 
-Store these in `desktop/.env` (already gitignored — see `desktop/.gitignore`, so it is
-never committed). Set only one of Option A / Option B.
+`desktop/.env` (already gitignored — see `desktop/.gitignore`, never committed) holds
+everything for local builds. The same values feed CI as GitHub secrets (see the CI
+section). Full set:
 
-# Use the exact string from `security find-identity -v -p codesigning` on THIS machine.
+```sh
+# Signing identity — exact string from `security find-identity -v -p codesigning`.
+APPLE_SIGNING_IDENTITY="Developer ID Application: OUTSIDE TECH, INC. (RWWN85PDLH)"
 
-# Ours happens to be "Developer ID Application: OUTSIDE TECH, INC. (RWWN85PDLH)", but on
+# Notarization — App Store Connect API key.
+APPLE_API_KEY="<Key ID>"
+APPLE_API_ISSUER="<Issuer ID>"
+APPLE_API_KEY_PATH="/Users/szn/keys/AuthKey_<Key ID>.p8"   # path to the .p8 (local builds)
 
-# a fresh setup it only exists after you've installed/imported the cert (see prerequisites).
+# Cert + private key for signing. Locally the cert lives in the Keychain, so these are
+# only strictly needed by CI — but release.sh / Tauri will use them if present.
+APPLE_CERTIFICATE_PASSWORD="<password set when exporting the .p12>"
+APPLE_CERTIFICATE="<base64 of the .p12>"        # base64 -i DeveloperID.p12
+APPLE_API_KEY_B64="<base64 of the .p8>"          # base64 -i ~/keys/AuthKey_<Key ID>.p8
+```
 
-APPLE_SIGNING_IDENTITY="Developer ID Application: <YOUR ORG> (<TEAMID>)"
+Notes:
 
-# Option A — App Store Connect API key (preferred):
-
-APPLE_API_KEY="AB12CD34EF" # Key ID
-APPLE_API_ISSUER="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" # Issuer ID
-APPLE_API_KEY_PATH="/Users/szn/keys/AuthKey_AB12CD34EF.p8"
-
-# Option B — Apple ID + app-specific password (use instead of Option A):
-
-APPLE_ID="you@example.com"
-APPLE_PASSWORD="abcd-efgh-ijkl-mnop" # app-specific password
-APPLE_TEAM_ID="RWWN85PDLH"
-
-````
-
-Keep the `.p8` file **outside** the repo (e.g. `~/keys/`) — `.gitignore` does not cover
-loose `*.p8` files, so a key dropped inside `desktop/` could be committed.
-
-`desktop/.env` is NOT auto-exported into the build. Load it into the shell before every
-build (`set -a; source .env; set +a`), as shown below.
+- `.p12` (cert + private key) = **signing**. `.p8` (App Store Connect key) = **notarization**.
+  CI needs both; a local build can sign straight from the Keychain and only needs the
+  `.p8` (`APPLE_API_KEY_PATH`) for notarization.
+- Keep the `.p8` file **outside** the repo (e.g. `~/keys/`) — `.gitignore` does not cover
+  loose `*.p8` files, so a key dropped inside `desktop/` could be committed.
+- `desktop/.env` is NOT auto-exported into the build. `release.sh` loads it for you; for
+  manual builds run `set -a; source .env; set +a` first.
 
 ## Build + notarize
 
@@ -87,7 +86,7 @@ cd desktop
 set -a; source .env; set +a
 echo "$APPLE_SIGNING_IDENTITY"   # MUST print the identity — empty means ad-hoc fallback
 bunx tauri build
-````
+```
 
 Tauri signs the app with the Developer ID identity, enables hardened runtime + the
 entitlements at `src-tauri/entitlements.plist`, submits the app to Apple's notary

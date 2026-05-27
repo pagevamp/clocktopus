@@ -25,7 +25,7 @@ export function indexPage() {
     .nav-btn { margin-top: 0; padding: 0.5rem 0.85rem; border: none; border-radius: 6px; background: transparent; color: #8b949e; font-size: 0.9rem; cursor: pointer; white-space: nowrap; }
     .nav-btn:hover { color: #e1e4e8; }
     .nav-btn.active { background: #30363d; color: #fff; }
-    .gear-btn { margin-top: 0; padding: 0.4rem 0.55rem; border: none; border-radius: 6px; background: transparent; color: #8b949e; font-size: 1.15rem; line-height: 1; cursor: pointer; }
+    .gear-btn { margin-top: 0; padding: 0.35rem 0.5rem; border: none; border-radius: 8px; background: transparent; color: #8b949e; font-size: 1.55rem; line-height: 1; cursor: pointer; }
     .gear-btn:hover { color: #e1e4e8; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
@@ -127,8 +127,8 @@ export function indexPage() {
       body { padding: 0.75rem; }
       .form-row { grid-template-columns: 1fr; }
       .home-cards { grid-template-columns: 1fr; }
-      .header { justify-content: flex-end; margin-bottom: 0.5rem; }
-      .header h1 { display: none; }
+      .header { justify-content: space-between; margin-bottom: 0.5rem; }
+      .header h1 { font-size: 1.3rem; }
       .nav-bar { justify-content: center; }
       .nav { justify-content: center; flex-wrap: wrap; }
       .nav-btn { padding: 0.4rem 0.7rem; font-size: 0.8rem; }

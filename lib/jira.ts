@@ -67,6 +67,14 @@ async function jiraApiRequest(endpoint: string, method: 'POST' | 'GET' | 'DELETE
 // cannot post a multi-day worklog to Jira.
 export const MAX_WORKLOG_SECONDS = 12 * 60 * 60; // 12h
 
+export function worklogSecondsFromHours(hours: number): number | null {
+  if (typeof hours !== 'number' || !Number.isFinite(hours) || hours <= 0) return null;
+  if (hours * 3600 > MAX_WORKLOG_SECONDS) return null;
+  const seconds = Math.round(hours * 3600);
+  if (seconds <= 0) return null;
+  return seconds;
+}
+
 export async function stopJiraTimer(ticketId: string, timeSpentSeconds: number): Promise<{ id: string } | null> {
   if (!Number.isFinite(timeSpentSeconds) || timeSpentSeconds <= 0) {
     console.warn(`[jira] stopJiraTimer: refusing non-positive duration (${timeSpentSeconds}s) for ${ticketId}.`);

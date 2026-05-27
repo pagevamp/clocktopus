@@ -51,6 +51,25 @@ entitlements at `src-tauri/entitlements.plist`, submits the app to Apple's notar
 service, staples the ticket, and produces the artifacts under
 `desktop/src-tauri/target/release/bundle/` (`.app` under `macos/`, `.dmg` under `dmg/`).
 
+Verify the env vars are actually loaded before building — if `APPLE_SIGNING_IDENTITY`
+is missing, Tauri silently falls back to an ad-hoc signature (no notarization), and the
+checks below fail with "code has no resources" / "no ticket stapled". Confirm with
+`echo "$APPLE_SIGNING_IDENTITY"`.
+
+## Staple the DMG
+
+Tauri notarizes and staples the `.app`, but NOT the `.dmg` wrapper. Staple the DMG too
+so it passes Gatekeeper offline. The contents are already notarized, so the submit
+returns quickly:
+
+```sh
+cd desktop
+set -a; source .env; set +a
+DMG=src-tauri/target/release/bundle/dmg/Clocktopus_*.dmg
+xcrun notarytool submit $DMG --key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER" --wait
+xcrun stapler staple $DMG
+```
+
 ## Verify
 
 ```sh

@@ -23,7 +23,6 @@ fn dashboard_url() -> String {
 
 /// Candidate absolute paths for the `bun` binary, in priority order.
 /// GUI apps don't inherit the user's shell PATH, so we probe known locations.
-#[allow(dead_code)]
 fn bun_candidates(home: &str) -> Vec<String> {
     vec![
         format!("{home}/.bun/bin/bun"),
@@ -180,13 +179,40 @@ fn check_clocktopus_installed() -> bool {
 }
 
 #[tauri::command]
-fn install_clocktopus() {
+fn check_bun_installed() -> bool {
     let home = std::env::var("HOME").unwrap_or_default();
-    let bun = format!("{}/.bun/bin/bun", home);
-    std::process::Command::new(&bun)
+    let candidates = bun_candidates(&home);
+    first_matching(&candidates, |p| std::path::Path::new(p).exists()).is_some()
+}
+
+#[tauri::command]
+fn install_bun() -> Result<(), String> {
+    // Official installer; lands the binary at ~/.bun/bin/bun. curl-piped scripts
+    // carry no quarantine xattr, so the result runs without Gatekeeper prompts.
+    let status = std::process::Command::new("sh")
+        .args(["-c", "curl -fsSL https://bun.sh/install | bash"])
+        .status()
+        .map_err(|e| format!("failed to launch installer: {e}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("bun installer exited with status {status}"))
+    }
+}
+
+#[tauri::command]
+fn install_clocktopus() -> Result<(), String> {
+    let home = std::env::var("HOME").unwrap_or_default();
+    let bun = format!("{home}/.bun/bin/bun");
+    let status = std::process::Command::new(&bun)
         .args(["i", "-g", "clocktopus", "--trust"])
-        .spawn()
-        .ok();
+        .status()
+        .map_err(|e| format!("failed to launch bun: {e}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("clocktopus install exited with status {status}"))
+    }
 }
 
 fn spawn_server(state: &ServerChild) {
@@ -248,7 +274,7 @@ pub fn run() {
     }
 
     builder
-        .invoke_handler(tauri::generate_handler![start_server, stop_server, check_server, check_clocktopus_installed, install_clocktopus])
+        .invoke_handler(tauri::generate_handler![start_server, stop_server, check_server, check_bun_installed, install_bun, check_clocktopus_installed, install_clocktopus])
         .register_uri_scheme_protocol("clocktopus", move |_app, request| {
             let body = if request.uri().path() == "/loading" {
                 loading_html.as_bytes().to_vec()

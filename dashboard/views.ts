@@ -614,6 +614,7 @@ export function indexPage() {
     // --- Jira tab ---
     let jiraData = null;
     let jiraLoading = false;
+    let jiraMsgTimer = null;
 
     function jiraFmtHrs(sec) {
       return sec == null ? '—' : (sec / 3600).toFixed(1) + 'h';
@@ -679,7 +680,7 @@ export function indexPage() {
             '<td data-label="Spent" class="spent-cell">' + jiraFmtHrs(it.spentSeconds) + '</td>' +
             '<td data-label="Hours"><input type="number" min="0" step="0.25" class="hours-input"></td>' +
             '<td data-label="Note"><input type="text" class="note-input" placeholder="optional"></td>' +
-            '<td><button class="jira-icon-btn" disabled>Log</button></td>' +
+            '<td><button type="button" class="jira-icon-btn" disabled>Log</button></td>' +
             '</tr>'
           );
         })
@@ -690,7 +691,8 @@ export function indexPage() {
         hours.addEventListener('input', function () {
           btn.disabled = !(parseFloat(hours.value) > 0);
         });
-        btn.addEventListener('click', function () {
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
           saveWorklog(row);
         });
       });
@@ -740,6 +742,14 @@ export function indexPage() {
           }
         }
         setMsg('jira-msg', 'Logged ' + hours + 'h to ' + key + '.', true);
+        clearTimeout(jiraMsgTimer);
+        jiraMsgTimer = setTimeout(function () {
+          const el = document.getElementById('jira-msg');
+          if (el) {
+            el.textContent = '';
+            el.className = 'msg';
+          }
+        }, 5000);
       } catch (e) {
         setMsg('jira-msg', 'Failed to log worklog.', false);
         btn.disabled = false;

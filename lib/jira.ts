@@ -89,6 +89,14 @@ async function jiraApiRequest(endpoint: string, method: 'POST' | 'GET' | 'DELETE
 // cannot post a multi-day worklog to Jira.
 export const MAX_WORKLOG_SECONDS = 12 * 60 * 60; // 12h
 
+function buildAdfComment(text: string) {
+  return {
+    type: 'doc',
+    version: 1,
+    content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
+  };
+}
+
 export function worklogSecondsFromHours(hours: number): number | null {
   if (typeof hours !== 'number' || !Number.isFinite(hours) || hours <= 0) return null;
   if (hours * 3600 > MAX_WORKLOG_SECONDS) return null;
@@ -146,21 +154,7 @@ export async function stopJiraTimer(ticketId: string, timeSpentSeconds: number):
   }
   const body = {
     timeSpentSeconds,
-    comment: {
-      type: 'doc',
-      version: 1,
-      content: [
-        {
-          type: 'paragraph',
-          content: [
-            {
-              type: 'text',
-              text: 'Timer stopped from Clocktopus',
-            },
-          ],
-        },
-      ],
-    },
+    comment: buildAdfComment('Timer stopped from Clocktopus'),
   };
   const response = await jiraApiRequest(`/issue/${ticketId}/worklog`, 'POST', body);
   const id = (response as { id?: string | number } | null)?.id;
@@ -176,14 +170,11 @@ export async function logJiraWorklog(
     console.warn(`[jira] logJiraWorklog: refusing invalid duration (${seconds}s) for ${ticketId}.`);
     return null;
   }
-  const text = comment && comment.trim() ? comment.trim() : 'Logged from Clocktopus';
+  const trimmed = comment?.trim();
+  const text = trimmed ? trimmed : 'Logged from Clocktopus';
   const body = {
     timeSpentSeconds: seconds,
-    comment: {
-      type: 'doc',
-      version: 1,
-      content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
-    },
+    comment: buildAdfComment(text),
   };
   const response = await jiraApiRequest(`/issue/${ticketId}/worklog`, 'POST', body);
   const id = (response as { id?: string | number } | null)?.id;

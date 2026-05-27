@@ -19,11 +19,14 @@ export function indexPage() {
     h2 { font-size: 1.1rem; color: #fff; margin-bottom: 1rem; }
 
     /* Nav */
-    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
+    .nav-bar { display: flex; margin-bottom: 1.5rem; }
     .nav { display: flex; gap: 0.25rem; background: #1c1f26; border-radius: 10px; padding: 0.3rem; flex-wrap: nowrap; }
     .nav-btn { margin-top: 0; padding: 0.5rem 0.85rem; border: none; border-radius: 6px; background: transparent; color: #8b949e; font-size: 0.9rem; cursor: pointer; white-space: nowrap; }
     .nav-btn:hover { color: #e1e4e8; }
     .nav-btn.active { background: #30363d; color: #fff; }
+    .gear-btn { margin-top: 0; padding: 0.4rem 0.55rem; border: none; border-radius: 6px; background: transparent; color: #8b949e; font-size: 1.15rem; line-height: 1; cursor: pointer; }
+    .gear-btn:hover { color: #e1e4e8; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 
@@ -79,8 +82,8 @@ export function indexPage() {
     .sessions-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid #21262d; }
     .sessions-table tr:hover { background: #161b22; }
     .sessions-table .in-progress { color: #3fb950; font-style: italic; }
-    .jira-table input[type="number"] { width: 64px; }
-    .jira-table .note-input { width: 130px; }
+    .jira-table input[type="number"] { width: 90px; }
+    .jira-table .note-input { width: 220px; }
     .jira-icon-btn { margin-top: 0; padding: 0.35rem 0.65rem; border: 1px solid #2ea043; border-radius: 6px; background: #238636; color: #fff; cursor: pointer; }
     .jira-icon-btn:hover:not(:disabled) { background: #2ea043; }
     .jira-icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -91,6 +94,7 @@ export function indexPage() {
       .jira-table tr { border: 1px solid #30363d; border-radius: 8px; margin-bottom: 0.75rem; padding: 0.5rem; }
       .jira-table td { border: none; padding: 0.3rem 0.5rem; }
       .jira-table td::before { content: attr(data-label); color: #8b949e; display: inline-block; min-width: 70px; }
+      .jira-table input[type="number"], .jira-table .note-input { width: calc(100% - 80px); max-width: 100%; }
     }
     .delete-btn { background: transparent; color: #8b949e; border: none; cursor: pointer; font-size: 1.1rem; line-height: 1; padding: 0 0.4rem; margin-top: 0; }
     .delete-btn:hover { color: #f85149; background: transparent; }
@@ -123,8 +127,9 @@ export function indexPage() {
       body { padding: 0.75rem; }
       .form-row { grid-template-columns: 1fr; }
       .home-cards { grid-template-columns: 1fr; }
-      .header { flex-direction: column; gap: 0; align-items: stretch; margin-bottom: 1rem; }
+      .header { justify-content: flex-end; margin-bottom: 0.5rem; }
       .header h1 { display: none; }
+      .nav-bar { justify-content: center; }
       .nav { justify-content: center; flex-wrap: wrap; }
       .nav-btn { padding: 0.4rem 0.7rem; font-size: 0.8rem; }
     }
@@ -159,13 +164,15 @@ export function indexPage() {
   </div>
   <div class="header">
     <h1>Clocktopus</h1>
+    <button class="nav-btn gear-btn" onclick="switchTab('settings')" id="nav-settings" aria-label="Settings" title="Settings">⚙</button>
+  </div>
+  <div class="nav-bar">
     <div class="nav">
       <button class="nav-btn active" onclick="switchTab('home')" id="nav-home">Home</button>
       <button class="nav-btn" onclick="switchTab('sessions')" id="nav-sessions">Sessions</button>
       <button class="nav-btn" onclick="switchTab('projects')" id="nav-projects">Projects</button>
       <button class="nav-btn" onclick="switchTab('calendar')" id="nav-calendar">Calendar</button>
       <button class="nav-btn" onclick="switchTab('jira')" id="nav-jira">Jira</button>
-      <button class="nav-btn" onclick="switchTab('settings')" id="nav-settings">Settings</button>
     </div>
   </div>
 
@@ -536,6 +543,7 @@ export function indexPage() {
       <div id="jira-empty" style="display:none; color:#8b949e;">No To Do tickets assigned to you.</div>
       <div id="jira-body" style="display:none;">
         <select id="jira-project" aria-label="Project" onchange="renderJiraProject(this.value)"></select>
+        <input id="jira-search" type="search" aria-label="Search tickets" placeholder="Search by ticket id or title" oninput="filterJiraRows(this.value)" style="margin-top:0.5rem; display:block; width:100%; max-width:320px;" />
         <div class="table-wrap" style="margin-top:1rem;">
           <table class="sessions-table jira-table">
             <thead>

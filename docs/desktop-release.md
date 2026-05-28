@@ -190,11 +190,20 @@ base64 -i ~/keys/AuthKey_XXXX.p8  | pbcopy   # → APPLE_API_KEY_B64
 ```
 
 Tauri imports `APPLE_CERTIFICATE` into a temporary keychain on the runner — no manual
-keychain setup needed. Cut a release by pushing a tag:
+keychain setup needed. Cut a release by bumping the version + pushing the tag:
 
 ```sh
-git tag v1.0.3 && git push origin v1.0.3
+# Bumps desktop/package.json, Cargo.toml, tauri.conf.json in lockstep,
+# refreshes Cargo.lock, then commits and tags vX.Y.Z. Pass an explicit
+# version or one of patch|minor|major.
+bun run desktop:version patch
+git push origin HEAD --follow-tags
 ```
+
+The tag push triggers `.github/workflows/build-desktop.yml`, which builds, signs,
+notarizes, and uploads the `.dmg` to the GitHub release. Until the workflow
+finishes the release exists with no assets — the dashboard About card shows
+"X.Y.Z building…" during that window.
 
 ---
 

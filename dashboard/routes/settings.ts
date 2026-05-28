@@ -1,5 +1,12 @@
 import { Hono } from 'hono';
-import { getEodSettings, setEodSettings, getHookIgnoreBranches, setHookIgnoreBranches } from '../../lib/settings.js';
+import {
+  getEodSettings,
+  setEodSettings,
+  getHookIgnoreBranches,
+  setHookIgnoreBranches,
+  getUpdateSettings,
+  setUpdateSettings,
+} from '../../lib/settings.js';
 import { installHook, uninstallHook, isHookInstalled } from '../../lib/hook-install.js';
 import { huskyHookBody } from '../../lib/husky-install.js';
 
@@ -56,6 +63,18 @@ settingsRoutes.post('/settings/git/uninstall', async (c) => {
     const msg = e instanceof Error ? e.message : String(e);
     return c.json({ ok: false, error: msg }, 500);
   }
+});
+
+settingsRoutes.get('/settings/updates', (c) => c.json(getUpdateSettings()));
+
+settingsRoutes.put('/settings/updates', async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as { autoCheck?: boolean; notify?: boolean };
+  const current = getUpdateSettings();
+  setUpdateSettings({
+    autoCheck: typeof body.autoCheck === 'boolean' ? body.autoCheck : current.autoCheck,
+    notify: typeof body.notify === 'boolean' ? body.notify : current.notify,
+  });
+  return c.json(getUpdateSettings());
 });
 
 settingsRoutes.post('/settings/git/ignore-branches', async (c) => {

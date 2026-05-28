@@ -27,6 +27,7 @@ export function indexPage() {
     .nav-btn.active { background: #30363d; color: #fff; }
     .gear-btn { display: inline-flex; align-items: center; justify-content: center; margin-top: 0; padding: 0.35rem; border: none; border-radius: 8px; background: transparent; color: #8b949e; line-height: 0; cursor: pointer; }
     .gear-btn:hover { color: #e1e4e8; }
+    .header-actions { display: inline-flex; align-items: center; gap: 0.25rem; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 
@@ -187,6 +188,27 @@ export function indexPage() {
     .timeline-drag-ghost { position:absolute; left:0; right:0; background:rgba(31,111,235,0.22); border:1px dashed #58a6ff; color:#58a6ff; font-size:0.7rem; padding:2px 6px; display:flex; align-items:center; pointer-events:none; z-index:3; border-radius:4px; box-sizing:border-box; }
     .timeline-track.dragging { cursor:crosshair; }
 
+    /* About section */
+    .about-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 0.75rem; padding: 0.6rem 0; border-bottom: 1px solid rgba(128, 128, 128, 0.15); }
+    .about-row:last-child { border-bottom: none; }
+    .about-row-info { min-width: 0; flex: 1 1 auto; }
+    .about-row-info strong { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; color: #e1e4e8; }
+    .about-row .muted { font-size: 0.8rem; color: #8b949e; margin-top: 0.15rem; }
+    .about-row-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+    .about-row-actions button { margin: 0; white-space: nowrap; padding: 0.4rem 0.75rem; font-size: 0.85rem; }
+    .about-row-actions a { color: #58a6ff; font-size: 0.8rem; text-decoration: none; padding: 0.2rem 0.4rem; white-space: nowrap; }
+    .about-row-actions a:hover { text-decoration: underline; }
+    .badge { display: inline-flex; align-items: center; background: rgba(210, 153, 34, 0.2); color: #d29922; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.7rem; line-height: 1.4; white-space: nowrap; }
+    .toggle-row { display: flex; align-items: center; gap: 0.5rem; margin: 0.3rem 0; font-size: 0.85rem; color: #c9d1d9; }
+    .toggle-row input[type="checkbox"] { width: auto; margin: 0; }
+    .modal { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    .modal { padding: 1rem; }
+    .modal-body { background: #1c1f26; color: #e1e4e8; padding: 1.25rem; border: 1px solid #2d3139; border-radius: 12px; width: 100%; max-width: 600px; box-sizing: border-box; }
+    .modal-body h3 { margin-bottom: 0.75rem; color: #fff; }
+    .modal-body pre { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 0.6rem 0.75rem; color: #c9d1d9; margin-bottom: 0.5rem; white-space: pre-wrap; }
+    .modal-body progress { width: 100%; margin-right: 0.5rem; }
+    #update-modal-actions { margin-top: 0.75rem; display: flex; gap: 0.5rem; justify-content: flex-end; }
+
   </style>
 </head>
 <body>
@@ -195,7 +217,10 @@ export function indexPage() {
   </div>
   <div class="header">
     <h1>Clocktopus</h1>
-    <button class="nav-btn gear-btn" onclick="switchTab('settings')" id="nav-settings" aria-label="Settings" title="Settings"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></button>
+    <div class="header-actions">
+      <button class="nav-btn gear-btn" onclick="location.reload()" id="nav-reload" aria-label="Reload" title="Reload"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"></path><path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"></path></svg></button>
+      <button class="nav-btn gear-btn" onclick="switchTab('settings')" id="nav-settings" aria-label="Settings" title="Settings"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></button>
+    </div>
   </div>
   <div class="nav-bar">
     <div class="nav">
@@ -386,6 +411,7 @@ export function indexPage() {
       <button class="track-tab-btn active" data-section="auth" onclick="switchSettingsSection('auth')">Auth</button>
       <button class="track-tab-btn" data-section="reminders" onclick="switchSettingsSection('reminders')">Reminders</button>
       <button class="track-tab-btn" data-section="git" onclick="switchSettingsSection('git')">Git</button>
+      <button class="track-tab-btn" data-section="about" onclick="switchSettingsSection('about')">About</button>
     </div>
 
     <!-- Auth section -->
@@ -533,6 +559,67 @@ export function indexPage() {
 
       </div>
     </div>
+
+    <!-- About section -->
+    <div id="settings-about" class="settings-section" style="display:none;">
+      <div class="cards">
+        <div class="card">
+          <div class="card-header">
+            <div class="dot gray" id="about-dot"></div>
+            <h2>About</h2>
+          </div>
+
+          <div class="about-row" id="about-cli-row">
+            <div class="about-row-info">
+              <strong>Clocktopus CLI <span id="about-cli-badge" class="badge" style="display:none;"></span></strong>
+              <div class="muted"><span id="about-cli-current">…</span></div>
+            </div>
+            <div class="about-row-actions">
+              <button id="about-cli-check" onclick="checkCliUpdate()">Check for updates</button>
+              <button id="about-cli-update" onclick="startCliUpdate()" style="display:none;">Update</button>
+            </div>
+          </div>
+
+          <div class="about-row" id="about-desktop-row" style="display:none;">
+            <div class="about-row-info">
+              <strong>Desktop app <span id="about-desktop-badge" class="badge" style="display:none;"></span></strong>
+              <div class="muted"><span id="about-desktop-current">…</span></div>
+            </div>
+            <div class="about-row-actions">
+              <button id="about-desktop-check" onclick="checkDesktopUpdate()">Check for updates</button>
+              <button id="about-desktop-update" onclick="startDesktopDownload()" style="display:none;">Download</button>
+              <a id="about-desktop-notes" href="#" target="_blank" style="display:none;">Release notes</a>
+            </div>
+          </div>
+
+          <div style="margin-top:1rem;">
+            <label class="toggle-row">
+              <input type="checkbox" id="updates-autocheck" onchange="saveUpdateSettings()" />
+              Check for updates automatically
+            </label>
+            <label class="toggle-row">
+              <input type="checkbox" id="updates-notify" onchange="saveUpdateSettings()" />
+              Notify when an update is available
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="update-modal" class="modal" style="display:none;">
+    <div class="modal-body">
+      <h3 id="update-modal-title">Updating…</h3>
+      <pre id="update-modal-log" style="max-height:200px;overflow:auto;font-family:ui-monospace,monospace;font-size:0.75rem;"></pre>
+      <div id="update-modal-progress" style="display:none;">
+        <progress id="update-modal-progress-bar" value="0" max="100"></progress>
+        <span id="update-modal-progress-label"></span>
+      </div>
+      <div id="update-modal-actions">
+        <button id="update-modal-close" onclick="closeUpdateModal()" style="display:none;">Close</button>
+        <button id="update-modal-retry" onclick="retryUpdate()" style="display:none;">Retry</button>
+      </div>
+    </div>
   </div>
 
   <!-- PROJECTS TAB -->
@@ -636,6 +723,7 @@ export function indexPage() {
       document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
       document.getElementById('tab-' + tab).classList.add('active');
       if (nav) nav.classList.add('active');
+      try { localStorage.setItem('clocktopus.lastTab', tab); } catch {}
       if (tab === 'jira') loadJira();
     }
 
@@ -883,6 +971,8 @@ export function indexPage() {
       document.getElementById('settings-auth').style.display = section === 'auth' ? '' : 'none';
       document.getElementById('settings-reminders').style.display = section === 'reminders' ? '' : 'none';
       document.getElementById('settings-git').style.display = section === 'git' ? '' : 'none';
+      document.getElementById('settings-about').style.display = section === 'about' ? '' : 'none';
+      try { localStorage.setItem('clocktopus.lastSettingsSection', section); } catch {}
       if (section === 'git') loadGit();
     }
 
@@ -2159,6 +2249,211 @@ export function indexPage() {
       }
     }
 
+    // --- About / Updates ---
+    let pendingRetry = null;
+
+    async function checkCliUpdate() {
+      document.getElementById('about-cli-check').disabled = true;
+      try {
+        const res = await fetch('/api/version?refresh=1');
+        const v = await res.json();
+        document.getElementById('about-cli-current').textContent = v.current;
+        const badge = document.getElementById('about-cli-badge');
+        const updateBtn = document.getElementById('about-cli-update');
+        if (v.updateAvailable) {
+          badge.textContent = v.latest + ' available';
+          badge.style.display = 'inline-block';
+          updateBtn.style.display = 'inline-block';
+          updateBtn.dataset.version = v.latest;
+        } else if (v.latest) {
+          badge.textContent = 'Up to date';
+          badge.style.display = 'inline-block';
+          updateBtn.style.display = 'none';
+        } else {
+          badge.textContent = "Couldn't reach registry";
+          badge.style.display = 'inline-block';
+          updateBtn.style.display = 'none';
+        }
+      } catch (err) {
+        console.error('checkCliUpdate failed', err);
+      } finally {
+        document.getElementById('about-cli-check').disabled = false;
+      }
+    }
+
+    async function startCliUpdate() {
+      openUpdateModal('Updating CLI…');
+      pendingRetry = startCliUpdate;
+      const isTauri = !!window.__TAURI__;
+      if (isTauri) {
+        const unlisten = await window.__TAURI__.event.listen('update://log', (e) => {
+          appendUpdateLog(e.payload);
+        });
+        try {
+          await window.__TAURI__.core.invoke('update_clocktopus');
+          finishUpdateModal({ ok: true, message: 'Updated. Reloading…' });
+          setTimeout(() => location.reload(), 800);
+        } catch (err) {
+          finishUpdateModal({ ok: false, message: String(err) });
+        } finally {
+          unlisten();
+        }
+        return;
+      }
+      // Browser / CLI dashboard path
+      try {
+        const resp = await fetch('/api/update', { method: 'POST' });
+        const { jobId } = await resp.json();
+        const evt = new EventSource('/api/update/' + jobId + '/stream');
+        evt.addEventListener('log', (e) => appendUpdateLog(e.data));
+        evt.addEventListener('done', () => {
+          evt.close();
+          finishUpdateModal({ ok: true, message: 'Updated. Reloading…' });
+          setTimeout(() => location.reload(), 1500);
+        });
+        evt.addEventListener('error', (e) => {
+          evt.close();
+          finishUpdateModal({ ok: false, message: e.data || 'Update failed' });
+        });
+      } catch (err) {
+        finishUpdateModal({ ok: false, message: String(err) });
+      }
+    }
+
+    async function checkDesktopUpdate() {
+      if (!window.__TAURI__) return;
+      document.getElementById('about-desktop-check').disabled = true;
+      try {
+        const { getVersion } = window.__TAURI__.app;
+        const current = await getVersion();
+        const res = await fetch('/api/desktop-version?refresh=1&currentDesktopVersion=' + encodeURIComponent(current));
+        const v = await res.json();
+        document.getElementById('about-desktop-current').textContent = current;
+        const badge = document.getElementById('about-desktop-badge');
+        const updateBtn = document.getElementById('about-desktop-update');
+        const notes = document.getElementById('about-desktop-notes');
+        if (v.updateAvailable) {
+          badge.textContent = v.latest + ' available';
+          badge.style.display = 'inline-block';
+          if (v.downloadUrl) {
+            updateBtn.style.display = 'inline-block';
+            updateBtn.dataset.url = v.downloadUrl;
+          } else {
+            updateBtn.style.display = 'none';
+          }
+          if (v.htmlUrl) {
+            notes.href = v.htmlUrl;
+            notes.style.display = 'inline';
+          }
+        } else if (v.latest) {
+          badge.textContent = 'Up to date';
+          badge.style.display = 'inline-block';
+          updateBtn.style.display = 'none';
+          notes.style.display = 'none';
+        } else {
+          badge.textContent = "Couldn't reach GitHub";
+          badge.style.display = 'inline-block';
+        }
+      } catch (err) {
+        console.error('checkDesktopUpdate failed', err);
+      } finally {
+        document.getElementById('about-desktop-check').disabled = false;
+      }
+    }
+
+    async function startDesktopDownload() {
+      const url = document.getElementById('about-desktop-update').dataset.url;
+      if (!url) return;
+      openUpdateModal('Downloading…');
+      pendingRetry = startDesktopDownload;
+      document.getElementById('update-modal-progress').style.display = 'block';
+      const unlisten = await window.__TAURI__.event.listen('desktop-update://progress', (e) => {
+        const { downloaded, total } = e.payload;
+        const pct = total > 0 ? Math.round((downloaded / total) * 100) : 0;
+        document.getElementById('update-modal-progress-bar').value = pct;
+        document.getElementById('update-modal-progress-label').textContent =
+          total > 0 ? pct + '%' : (downloaded / 1024 / 1024).toFixed(1) + ' MB';
+      });
+      try {
+        const filePath = await window.__TAURI__.core.invoke('download_desktop_update', { url });
+        finishUpdateModal({
+          ok: true,
+          message: 'Saved to ' + filePath + ' — opened in Finder. Drag Clocktopus to Applications to finish updating.',
+        });
+      } catch (err) {
+        finishUpdateModal({ ok: false, message: String(err) });
+      } finally {
+        unlisten();
+      }
+    }
+
+    function openUpdateModal(title) {
+      document.getElementById('update-modal-title').textContent = title;
+      document.getElementById('update-modal-log').textContent = '';
+      document.getElementById('update-modal-progress').style.display = 'none';
+      document.getElementById('update-modal-close').style.display = 'none';
+      document.getElementById('update-modal-retry').style.display = 'none';
+      document.getElementById('update-modal').style.display = 'flex';
+    }
+
+    function appendUpdateLog(line) {
+      const el = document.getElementById('update-modal-log');
+      el.textContent += line + '\\n';
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function finishUpdateModal({ ok, message }) {
+      document.getElementById('update-modal-title').textContent = ok ? '✅ Done' : '❌ Failed';
+      appendUpdateLog(message);
+      document.getElementById('update-modal-close').style.display = 'inline-block';
+      if (!ok) document.getElementById('update-modal-retry').style.display = 'inline-block';
+    }
+
+    function closeUpdateModal() {
+      document.getElementById('update-modal').style.display = 'none';
+    }
+
+    function retryUpdate() {
+      closeUpdateModal();
+      if (pendingRetry) pendingRetry();
+    }
+
+    async function loadUpdateSettings() {
+      try {
+        const res = await fetch('/api/settings/updates');
+        const s = await res.json();
+        document.getElementById('updates-autocheck').checked = !!s.autoCheck;
+        document.getElementById('updates-notify').checked = !!s.notify;
+      } catch (err) {
+        console.error('loadUpdateSettings failed', err);
+      }
+    }
+
+    async function saveUpdateSettings() {
+      const body = {
+        autoCheck: document.getElementById('updates-autocheck').checked,
+        notify: document.getElementById('updates-notify').checked,
+      };
+      try {
+        await fetch('/api/settings/updates', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+      } catch (err) {
+        console.error('saveUpdateSettings failed', err);
+      }
+    }
+
+    async function initAboutSection() {
+      await checkCliUpdate();
+      await loadUpdateSettings();
+      if (window.__TAURI__) {
+        document.getElementById('about-desktop-row').style.display = 'flex';
+        await checkDesktopUpdate();
+      }
+    }
+
     async function fetchStatus() {
       try {
         const res = await fetch('/api/status');
@@ -2491,6 +2786,19 @@ export function indexPage() {
     loadAllProjects();
     loadEod();
     setManualDefaults();
+    initAboutSection();
+
+    // Restore last visited tab + settings sub-tab across refresh.
+    try {
+      const lastSection = localStorage.getItem('clocktopus.lastSettingsSection');
+      if (lastSection && document.getElementById('settings-' + lastSection)) {
+        switchSettingsSection(lastSection);
+      }
+      const lastTab = localStorage.getItem('clocktopus.lastTab');
+      if (lastTab && document.getElementById('tab-' + lastTab)) {
+        switchTab(lastTab);
+      }
+    } catch {}
 
   </script>
 </body>

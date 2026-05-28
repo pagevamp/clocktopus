@@ -13,7 +13,14 @@ import { ensureNativeAddons } from './lib/ensure-native-addons.js';
 import { DASHBOARD_PORT, DASHBOARD_URL, IS_DEV } from './lib/constants.js';
 import type { Clockify as ClockifyType } from './clockify.js';
 import { shouldFireEod } from './lib/eod.js';
-import { readEodState, markEodFired, setEodSnoozeUntil, clearEodSnoozeUntil } from './lib/settings.js';
+import {
+  readEodState,
+  markEodFired,
+  setEodSnoozeUntil,
+  clearEodSnoozeUntil,
+  getUpdateSettings,
+} from './lib/settings.js';
+import { getUpdateCache, setUpdateCache, markNotifiedVersion } from './lib/update-cache.js';
 import { notify } from './lib/notifier.js';
 
 interface Project {
@@ -259,6 +266,42 @@ program
     } catch (err) {
       console.error(chalk.red('Failed to scan for stale open sessions:'), err);
     }
+
+    async function runUpdateCheck() {
+      const settings = getUpdateSettings();
+      if (!settings.autoCheck) return;
+      const { getCurrentVersion, fetchLatestVersion, isUpdateAvailable } = await import('./lib/updater.js');
+      const latest = await fetchLatestVersion({ force: true });
+      if (!latest) return;
+      setUpdateCache({
+        latestVersion: latest.version,
+        publishedAt: latest.publishedAt,
+        checkedAt: new Date().toISOString(),
+      });
+      const current = getCurrentVersion();
+      if (!isUpdateAvailable(current, latest.version)) return;
+      if (!settings.notify) return;
+      const cache = getUpdateCache();
+      if (cache?.notifiedVersion === latest.version) return;
+      notify({
+        subtitle: 'Update available',
+        message: `Clocktopus ${latest.version} available — open dashboard to update`,
+        sound: false,
+        wait: false,
+        timeout: 8,
+      });
+      markNotifiedVersion(latest.version);
+    }
+
+    runUpdateCheck().catch((err) => console.error(chalk.red('Update check failed:'), err));
+    const updateCheckInterval = setInterval(
+      () => {
+        runUpdateCheck().catch((err) => console.error(chalk.red('Update check failed:'), err));
+      },
+      6 * 60 * 60 * 1000,
+    );
+    process.on('SIGTERM', () => clearInterval(updateCheckInterval));
+    process.on('SIGINT', () => clearInterval(updateCheckInterval));
 
     async function stopTimerAndLog(reason: string) {
       const clockifyOn = isClockifyEnabled();
@@ -568,6 +611,55 @@ const bunBin = (() => {
   }
 })();
 const pm2Cmd = `${bunBin} ${pm2Bin}`;
+
+program
+  .command('update')
+  .description('Check for and install a newer clocktopus npm release.')
+  .option('--yes', 'Install without prompting.', false)
+  .option('--check', 'Only print current + latest, do not install.', false)
+  .action(async (opts: { yes: boolean; check: boolean }) => {
+    const { getCurrentVersion, fetchLatestVersion, isUpdateAvailable, runUpdate, stopMonitorIfRunning } = await import(
+      './lib/updater.js'
+    );
+    const current = getCurrentVersion();
+    process.stdout.write(`Current: ${current}\n`);
+    const latest = await fetchLatestVersion({ force: true });
+    if (!latest) {
+      console.error(chalk.red('Could not reach the npm registry.'));
+      process.exit(1);
+    }
+    process.stdout.write(`Latest:  ${latest.version}\n`);
+    if (!isUpdateAvailable(current, latest.version)) {
+      console.log(chalk.green('Already up to date.'));
+      return;
+    }
+    if (opts.check) return;
+    if (!opts.yes) {
+      const { simplePrompt } = await import('./lib/simple-prompt.js');
+      const answers = await simplePrompt([
+        {
+          type: 'confirm',
+          name: 'install',
+          message: `Install clocktopus ${latest.version}?`,
+          default: false,
+        },
+      ]);
+      if (!answers.install) {
+        console.log('Cancelled.');
+        return;
+      }
+    }
+    console.log(chalk.blue('Stopping monitor (if running)…'));
+    await stopMonitorIfRunning();
+    console.log(chalk.blue('Installing…'));
+    try {
+      await runUpdate({ onLog: (line) => process.stdout.write(line + '\n') });
+    } catch (err) {
+      console.error(chalk.red(`Update failed: ${err instanceof Error ? err.message : String(err)}`));
+      process.exit(1);
+    }
+    console.log(chalk.green(`Updated to ${latest.version}. Restart monitor with: mrestart`));
+  });
 
 program
   .command('monitor')

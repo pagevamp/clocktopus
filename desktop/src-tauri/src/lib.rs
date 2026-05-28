@@ -2,7 +2,7 @@ use tauri::{
     image::Image,
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{TrayIconBuilder, TrayIconId},
-    Manager,
+    Emitter, Manager,
 };
 use std::sync::Mutex;
 use std::time::Duration;
@@ -201,31 +201,142 @@ fn install_bun() -> Result<(), String> {
     }
 }
 
-#[tauri::command]
-fn install_clocktopus() -> Result<(), String> {
+fn run_bun_install_clocktopus(app: Option<&tauri::AppHandle>) -> Result<(), String> {
+    use std::io::{BufRead, BufReader};
+    use std::process::Stdio;
+
     let home = std::env::var("HOME").unwrap_or_default();
     let bun = first_matching(&bun_candidates(&home), |p| std::path::Path::new(p).exists())
         .ok_or_else(|| "bun not found".to_string())?;
-    // `--trust` runs lifecycle scripts (clocktopus postinstall, native rebuilds) that
-    // shell out to bun/bunx. GUI apps don't inherit the shell PATH, so inject
-    // ~/.bun/bin like spawn_server does — without it the first install can fail.
+    // `--trust` runs lifecycle scripts (clocktopus postinstall, native rebuilds)
+    // that shell out to bun/bunx. GUI apps don't inherit the shell PATH, so
+    // inject ~/.bun/bin like spawn_server does — without it the first install
+    // can fail.
     let bun_bin = format!("{home}/.bun/bin");
     let current_path = std::env::var("PATH").unwrap_or_default();
     let new_path = format!("{bun_bin}:{current_path}");
-    // Capture output so a failure surfaces in the Setup UI instead of vanishing.
-    let output = std::process::Command::new(&bun)
+
+    let mut child = std::process::Command::new(&bun)
         .args(["i", "-g", "clocktopus", "--trust"])
         .env("PATH", new_path)
-        .output()
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .map_err(|e| format!("failed to launch bun: {e}"))?;
-    if output.status.success() {
+
+    // Stream stdout on a background thread so we don't block on it before
+    // joining stderr below.
+    if let Some(stdout) = child.stdout.take() {
+        let app_clone = app.cloned();
+        std::thread::spawn(move || {
+            for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+                if let Some(a) = &app_clone {
+                    let _ = a.emit("update://log", line);
+                }
+            }
+        });
+    }
+
+    let mut stderr_buf = String::new();
+    if let Some(stderr) = child.stderr.take() {
+        for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+            stderr_buf.push_str(&line);
+            stderr_buf.push('\n');
+            if let Some(a) = app {
+                let _ = a.emit("update://log", line);
+            }
+        }
+    }
+
+    let status = child.wait().map_err(|e| format!("wait failed: {e}"))?;
+    if status.success() {
         Ok(())
     } else {
-        Err(format!(
-            "clocktopus install failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ))
+        Err(format!("clocktopus install failed: {}", stderr_buf.trim()))
     }
+}
+
+#[tauri::command]
+fn install_clocktopus() -> Result<(), String> {
+    run_bun_install_clocktopus(None)
+}
+
+#[tauri::command]
+fn update_clocktopus(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, ServerChild>,
+) -> Result<(), String> {
+    kill_server_child(&state);
+    kill_server_by_port();
+    run_bun_install_clocktopus(Some(&app))?;
+    spawn_server(&state);
+    Ok(())
+}
+
+#[tauri::command]
+async fn download_desktop_update(app: tauri::AppHandle, url: String) -> Result<String, String> {
+    use futures_util::StreamExt;
+    use std::io::Write;
+
+    let home = std::env::var("HOME").unwrap_or_default();
+    let downloads = std::path::PathBuf::from(home).join("Downloads");
+    if !downloads.exists() {
+        std::fs::create_dir_all(&downloads).map_err(|e| format!("mkdir Downloads: {e}"))?;
+    }
+    // Filename = URL path's basename, stripped of query/fragment. Fall back to a
+    // generic name when the URL ends in a slash or has no usable tail.
+    let path_only = url.split(|c| c == '?' || c == '#').next().unwrap_or(&url);
+    let filename = path_only
+        .rsplit('/')
+        .find(|s| !s.is_empty())
+        .unwrap_or("clocktopus.dmg")
+        .to_string();
+    let dest = downloads.join(&filename);
+    let tmp = downloads.join(format!("{filename}.partial"));
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("request failed: {e}"))?
+        .error_for_status()
+        .map_err(|e| format!("http error: {e}"))?;
+    let total = resp.content_length().unwrap_or(0);
+    let mut stream = resp.bytes_stream();
+    let mut file = std::fs::File::create(&tmp).map_err(|e| format!("create tmp: {e}"))?;
+    let mut downloaded: u64 = 0;
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| {
+            let _ = std::fs::remove_file(&tmp);
+            format!("read chunk: {e}")
+        })?;
+        file.write_all(&chunk).map_err(|e| {
+            let _ = std::fs::remove_file(&tmp);
+            format!("write chunk: {e}")
+        })?;
+        downloaded += chunk.len() as u64;
+        let _ = app.emit(
+            "desktop-update://progress",
+            serde_json::json!({ "downloaded": downloaded, "total": total }),
+        );
+    }
+    file.flush().map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        format!("flush tmp: {e}")
+    })?;
+    drop(file);
+    std::fs::rename(&tmp, &dest).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        format!("rename: {e}")
+    })?;
+
+    // Reveal in Finder.
+    let _ = std::process::Command::new("open")
+        .args(["-R", dest.to_str().unwrap_or("")])
+        .spawn();
+
+    Ok(dest.to_string_lossy().into_owned())
 }
 
 fn spawn_server(state: &ServerChild) {
@@ -287,7 +398,7 @@ pub fn run() {
     }
 
     builder
-        .invoke_handler(tauri::generate_handler![start_server, stop_server, check_server, check_bun_installed, install_bun, check_clocktopus_installed, install_clocktopus])
+        .invoke_handler(tauri::generate_handler![start_server, stop_server, check_server, check_bun_installed, install_bun, check_clocktopus_installed, install_clocktopus, update_clocktopus, download_desktop_update])
         .register_uri_scheme_protocol("clocktopus", move |_app, request| {
             let body = if request.uri().path() == "/loading" {
                 loading_html.as_bytes().to_vec()
@@ -336,12 +447,14 @@ pub fn run() {
             let show = MenuItem::with_id(app, "show", "Open Dashboard", true, None::<&str>)?;
             let stop_timer = MenuItem::with_id(app, "stop-timer", "Stop Timer", false, None::<&str>)?;
             let stop_server_item = MenuItem::with_id(app, "stop-server", "Stop Server", false, None::<&str>)?;
+            let update_cli = MenuItem::with_id(app, "update-cli", "Update CLI", false, None::<&str>)?;
+            let update_desktop = MenuItem::with_id(app, "update-desktop", "Update desktop", false, None::<&str>)?;
             let sep1 = PredefinedMenuItem::separator(app)?;
             let sep2 = PredefinedMenuItem::separator(app)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = Menu::with_items(
                 app,
-                &[&show, &stop_timer, &sep1, &stop_server_item, &sep2, &quit],
+                &[&show, &stop_timer, &sep1, &stop_server_item, &update_cli, &update_desktop, &sep2, &quit],
             )?;
 
             // Idle icon: black template — macOS auto-adapts white/black
@@ -392,6 +505,21 @@ pub fn run() {
                         kill_server_child(&state);
                         kill_server_by_port();
                         navigate_to_error(app);
+                    }
+                    "update-cli" | "update-desktop" => {
+                        if let Some(win) = app.get_webview_window("main") {
+                            if let Ok(url) = dashboard_url().parse() {
+                                let _ = win.navigate(url);
+                            }
+                        }
+                        #[cfg(target_os = "macos")]
+                        if let Ok(panel) = app.get_webview_panel("main") {
+                            panel.show();
+                        }
+                        #[cfg(not(target_os = "macos"))]
+                        if let Some(win) = app.get_webview_window("main") {
+                            let _ = win.show();
+                        }
                     }
                     "quit" => {
                         kill_server_child(&app.state::<ServerChild>());
@@ -484,11 +612,14 @@ pub fn run() {
             let stop_timer_for_thread = stop_timer.clone();
             let stop_server_for_thread = stop_server_item.clone();
             let active_url = format!("{}/api/timer/active", dashboard_url());
+            let monitor_status_url = format!("{}/api/monitor/status", dashboard_url());
             let dash_url_for_thread = dashboard_url();
             let window_for_thread = window.clone();
             std::thread::spawn(move || {
                 let client = reqwest::blocking::Client::new();
                 let mut is_active: bool = false;
+                let mut monitor_on: bool = false;
+                let mut icon_active: bool = false;
                 let mut start_ms: Option<i64> = None;
                 let mut description: Option<String> = None;
                 let mut tick: u32 = 0;
@@ -532,18 +663,6 @@ pub fn run() {
 
                             if new_active != is_active {
                                 is_active = new_active;
-
-                                let rgba = if new_active { &active_rgba } else { &idle_rgba };
-                                let img = Image::new_owned(rgba.clone(), w, h);
-                                let _ = tray.set_icon(Some(img));
-                                let _ = tray.set_icon_as_template(true);
-
-                                let _ = tray.set_tooltip(Some(if new_active {
-                                    product_name_active.as_str()
-                                } else {
-                                    product_name.as_str()
-                                }));
-
                                 let _ = stop_timer_for_thread.set_enabled(new_active);
                             }
 
@@ -555,6 +674,33 @@ pub fn run() {
                             }
                         }
                         // On request/parse failure: leave is_active and start_ms unchanged
+
+                        // Poll monitor status — when the idle monitor daemon is on,
+                        // surface the active icon even without an explicit timer so
+                        // the user has a visual cue that auto-tracking is armed.
+                        monitor_on = client
+                            .get(&monitor_status_url)
+                            .timeout(Duration::from_secs(3))
+                            .send()
+                            .and_then(|r| r.text())
+                            .ok()
+                            .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+                            .and_then(|json| json.get("running").and_then(|v| v.as_bool()))
+                            .unwrap_or(monitor_on);
+
+                        let desired_icon_active = is_active || monitor_on;
+                        if desired_icon_active != icon_active {
+                            icon_active = desired_icon_active;
+                            let rgba = if icon_active { &active_rgba } else { &idle_rgba };
+                            let img = Image::new_owned(rgba.clone(), w, h);
+                            let _ = tray.set_icon(Some(img));
+                            let _ = tray.set_icon_as_template(true);
+                            let _ = tray.set_tooltip(Some(if icon_active {
+                                product_name_active.as_str()
+                            } else {
+                                product_name.as_str()
+                            }));
+                        }
                     }
 
                     // Drive the title every tick
@@ -578,6 +724,78 @@ pub fn run() {
 
                     tick = tick.wrapping_add(1);
                     std::thread::sleep(Duration::from_secs(1));
+                }
+            });
+
+            // Background poller: check for CLI / desktop updates every 6 hours.
+            // Updates the corresponding tray menu item text + enabled state.
+            let update_cli_handle = update_cli.clone();
+            let update_desktop_handle = update_desktop.clone();
+            let update_dash_url = dashboard_url();
+            let desktop_current = app.package_info().version.to_string();
+            std::thread::spawn(move || {
+                let client = reqwest::blocking::Client::new();
+                let cli_url = format!("{}/api/version", update_dash_url);
+                let desktop_url = format!(
+                    "{}/api/desktop-version?currentDesktopVersion={}",
+                    update_dash_url, desktop_current
+                );
+                loop {
+                    // CLI version
+                    let cli_body: Option<serde_json::Value> = client
+                        .get(&cli_url)
+                        .timeout(Duration::from_secs(5))
+                        .send()
+                        .ok()
+                        .and_then(|r| r.text().ok())
+                        .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok());
+                    if let Some(body) = cli_body {
+                        let avail = body
+                            .get("updateAvailable")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false);
+                        let latest = body
+                            .get("latest")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        if avail && !latest.is_empty() {
+                            let _ = update_cli_handle
+                                .set_text(format!("Update CLI to v{latest}"));
+                            let _ = update_cli_handle.set_enabled(true);
+                        } else {
+                            let _ = update_cli_handle.set_text("Update CLI");
+                            let _ = update_cli_handle.set_enabled(false);
+                        }
+                    }
+                    // Desktop version
+                    let desktop_body: Option<serde_json::Value> = client
+                        .get(&desktop_url)
+                        .timeout(Duration::from_secs(5))
+                        .send()
+                        .ok()
+                        .and_then(|r| r.text().ok())
+                        .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok());
+                    if let Some(body) = desktop_body {
+                        let avail = body
+                            .get("updateAvailable")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false);
+                        let latest = body
+                            .get("latest")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        if avail && !latest.is_empty() {
+                            let _ = update_desktop_handle
+                                .set_text(format!("Update desktop to v{latest}"));
+                            let _ = update_desktop_handle.set_enabled(true);
+                        } else {
+                            let _ = update_desktop_handle.set_text("Update desktop");
+                            let _ = update_desktop_handle.set_enabled(false);
+                        }
+                    }
+                    std::thread::sleep(Duration::from_secs(6 * 60 * 60));
                 }
             });
 

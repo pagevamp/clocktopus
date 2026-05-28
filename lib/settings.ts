@@ -7,6 +7,8 @@ const KEY = {
   lastFiredDate: 'eodLastFiredDate',
   snoozeUntil: 'eodSnoozeUntil',
   hookIgnoreBranches: 'hookIgnoreBranches',
+  updatesAutoCheck: 'updatesAutoCheck',
+  updatesNotify: 'updatesNotify',
 } as const;
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -70,4 +72,23 @@ export function getHookIgnoreBranches(): string[] {
 export function setHookIgnoreBranches(branches: string[]) {
   const cleaned = Array.from(new Set(branches.map((b) => b.trim()).filter((b) => b.length > 0)));
   setSetting(KEY.hookIgnoreBranches, JSON.stringify(cleaned));
+}
+
+export interface UpdateSettings {
+  autoCheck: boolean;
+  notify: boolean;
+}
+
+export function getUpdateSettings(): UpdateSettings {
+  const autoRaw = getSetting(KEY.updatesAutoCheck);
+  const notifyRaw = getSetting(KEY.updatesNotify);
+  return {
+    autoCheck: autoRaw === null ? true : autoRaw === 'true',
+    notify: notifyRaw === null ? true : notifyRaw === 'true',
+  };
+}
+
+export function setUpdateSettings(input: UpdateSettings) {
+  setSetting(KEY.updatesAutoCheck, input.autoCheck ? 'true' : 'false');
+  setSetting(KEY.updatesNotify, input.notify ? 'true' : 'false');
 }

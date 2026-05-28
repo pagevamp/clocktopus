@@ -80,6 +80,7 @@ name = "app"
 version = "1.0.2"
 dependencies = [
  "chrono",
+ "futures-util",
  "log",
  "png 0.18.1",
  "reqwest",

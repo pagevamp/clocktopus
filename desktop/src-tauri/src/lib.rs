@@ -273,6 +273,72 @@ fn update_clocktopus(
     Ok(())
 }
 
+#[tauri::command]
+async fn download_desktop_update(app: tauri::AppHandle, url: String) -> Result<String, String> {
+    use futures_util::StreamExt;
+    use std::io::Write;
+
+    let home = std::env::var("HOME").unwrap_or_default();
+    let downloads = std::path::PathBuf::from(home).join("Downloads");
+    if !downloads.exists() {
+        std::fs::create_dir_all(&downloads).map_err(|e| format!("mkdir Downloads: {e}"))?;
+    }
+    // Filename = URL path's basename, stripped of query/fragment. Fall back to a
+    // generic name when the URL ends in a slash or has no usable tail.
+    let path_only = url.split(|c| c == '?' || c == '#').next().unwrap_or(&url);
+    let filename = path_only
+        .rsplit('/')
+        .find(|s| !s.is_empty())
+        .unwrap_or("clocktopus.dmg")
+        .to_string();
+    let dest = downloads.join(&filename);
+    let tmp = downloads.join(format!("{filename}.partial"));
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("request failed: {e}"))?
+        .error_for_status()
+        .map_err(|e| format!("http error: {e}"))?;
+    let total = resp.content_length().unwrap_or(0);
+    let mut stream = resp.bytes_stream();
+    let mut file = std::fs::File::create(&tmp).map_err(|e| format!("create tmp: {e}"))?;
+    let mut downloaded: u64 = 0;
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| {
+            let _ = std::fs::remove_file(&tmp);
+            format!("read chunk: {e}")
+        })?;
+        file.write_all(&chunk).map_err(|e| {
+            let _ = std::fs::remove_file(&tmp);
+            format!("write chunk: {e}")
+        })?;
+        downloaded += chunk.len() as u64;
+        let _ = app.emit(
+            "desktop-update://progress",
+            serde_json::json!({ "downloaded": downloaded, "total": total }),
+        );
+    }
+    file.flush().map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        format!("flush tmp: {e}")
+    })?;
+    drop(file);
+    std::fs::rename(&tmp, &dest).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        format!("rename: {e}")
+    })?;
+
+    // Reveal in Finder.
+    let _ = std::process::Command::new("open")
+        .args(["-R", dest.to_str().unwrap_or("")])
+        .spawn();
+
+    Ok(dest.to_string_lossy().into_owned())
+}
+
 fn spawn_server(state: &ServerChild) {
     // Resolve clocktopus binary directly — GUI apps lack shell PATH.
     let home = std::env::var("HOME").unwrap_or_default();
@@ -332,7 +398,7 @@ pub fn run() {
     }
 
     builder
-        .invoke_handler(tauri::generate_handler![start_server, stop_server, check_server, check_bun_installed, install_bun, check_clocktopus_installed, install_clocktopus, update_clocktopus])
+        .invoke_handler(tauri::generate_handler![start_server, stop_server, check_server, check_bun_installed, install_bun, check_clocktopus_installed, install_clocktopus, update_clocktopus, download_desktop_update])
         .register_uri_scheme_protocol("clocktopus", move |_app, request| {
             let body = if request.uri().path() == "/loading" {
                 loading_html.as_bytes().to_vec()

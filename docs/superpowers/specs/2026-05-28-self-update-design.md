@@ -5,10 +5,17 @@
 
 ## Goal
 
-Let users update the globally-installed `clocktopus` npm package from within the
-app itself, without dropping to a terminal to run `bun i -g clocktopus --trust`
-by hand. Cover all three surfaces: dashboard web UI, Tauri desktop app, and
-CLI. Detect new releases periodically and surface them.
+Two related self-update flows surfaced from the same Settings → About section:
+
+1. **CLI package update** — pull a newer `clocktopus` npm release via
+   `bun i -g clocktopus --trust` without dropping to a terminal. Covers
+   dashboard web UI, Tauri webview, and the CLI itself.
+2. **Desktop app update** — when running inside Tauri, detect that a newer
+   `.dmg` exists in GitHub Releases, download it to `~/Downloads`, and reveal
+   the file in Finder so the user can drag it to Applications.
+
+Both flows periodically check for new versions and badge the UI when updates
+are available.
 
 ## Non-goals
 
@@ -17,6 +24,8 @@ CLI. Detect new releases periodically and surface them.
 - Bundled release notes / changelog rendering.
 - Signature verification beyond what npm/bun already do.
 - Updating bun itself (existing `install_bun` already covers initial setup).
+- Auto-installing the desktop `.dmg`. We download + reveal in Finder; user
+  drags to Applications. No tauri-plugin-updater integration in this scope.
 
 ## Architecture
 
@@ -177,16 +186,81 @@ Dashboard process runs the same checker as fallback when monitor is disabled:
 on dashboard boot + every 6h while alive. Both writers target the same
 `update_check` row; last-write-wins is fine.
 
-### Tauri tray indicator
+### Desktop app version check (Tauri-only)
 
-Tauri frontend polls `/api/version` on app focus + every 6h. When
-`updateAvailable`:
+Source of truth for releases: GitHub Releases on `pagevamp/clocktopus`. The
+build workflow (`.github/workflows/build-desktop.yml`) tags `v*` and uploads
+the signed `.dmg` as a release asset.
 
-- Swap tray icon to dot variant (add `tray-update.png` asset alongside existing
-  tray icon).
-- Rename tray menu item `Check for updates…` → `Update to X.Y.Z`. Clicking it
-  navigates the webview to dashboard settings.
-- Reset on update success.
+**Current version**: read via `@tauri-apps/api/app` `getVersion()` in the
+frontend (returns the value from `desktop/src-tauri/tauri.conf.json`). Pass
+to backend as `?currentDesktopVersion=…` so caching can key on it.
+
+**Latest release lookup** — new dashboard route since fetching has to come
+from a server (CORS + token-rate-limit handling) rather than the webview:
+
+- `GET /api/desktop-version?currentDesktopVersion=X.Y.Z`
+  Returns `{ current, latest, updateAvailable, downloadUrl, htmlUrl, publishedAt }`.
+  Fetches `https://api.github.com/repos/pagevamp/clocktopus/releases/latest`,
+  6-hour in-memory cache. `downloadUrl` = first asset matching `*.dmg`;
+  `htmlUrl` = release page. Returns `latest: null` on network / 5xx.
+  Endpoint exists in all dashboard processes but the UI only calls it when
+  `window.__TAURI__` is present, so non-desktop users never see it.
+
+**Download command** (Tauri Rust):
+
+```rust
+#[tauri::command]
+async fn download_desktop_update(url: String) -> Result<String, String> {
+    // Stream the .dmg into ~/Downloads/<filename>, emit "desktop-update://progress"
+    // events with bytes downloaded so the UI can render a progress bar.
+    // On finish: Command::new("open").args(["-R", &path]).spawn() to reveal in Finder.
+    // Returns the absolute path so the modal can show "Saved to <path>".
+}
+```
+
+Registered in `invoke_handler!`. Filename derived from the URL's basename
+(GitHub asset names already include version, e.g. `Clocktopus_1.0.3_aarch64.dmg`).
+
+**UI** — second row inside the same About section, only rendered when
+`window.__TAURI__` is present:
+
+- `Desktop app 1.0.2` · `Check for updates` button.
+- After check, if newer: badge `1.0.3 available` (with published date
+  tooltip) + primary `Download` button + secondary `Release notes` link to
+  `htmlUrl`.
+- Click `Download` → modal with progress bar (driven by the
+  `desktop-update://progress` event). Terminal state:
+  ✅ "Saved to ~/Downloads/Clocktopus_1.0.3_aarch64.dmg — opened in Finder.
+  Drag Clocktopus to Applications to finish updating." with `Open Finder
+again` button.
+  ❌ stderr + `Retry`.
+
+**Periodic check**: the Tauri frontend (which already polls `/api/version`
+for tray indicator) also polls `/api/desktop-version` on the same cadence
+(app focus + every 6h). No monitor-daemon involvement — desktop version is
+meaningless in non-Tauri contexts.
+
+**OS notification** for desktop updates: skipped. Tray badge + dashboard
+banner are enough; we don't want to fire a second toast on top of the CLI
+toast.
+
+### Tray indicator
+
+Tauri frontend polls both `/api/version` and `/api/desktop-version` on app
+focus + every 6h. When either reports `updateAvailable`:
+
+- Swap tray icon to dot variant (add `tray-update.png` asset alongside the
+  existing tray icon). One dot covers both update types — no need to
+  distinguish at the icon level.
+- Update the tray menu:
+  - CLI newer → menu item `Check for updates…` → `Update CLI to X.Y.Z`.
+  - Desktop newer → add `Download desktop X.Y.Z` item below it.
+  - Both newer → show both items.
+  - Clicking either navigates the webview to dashboard Settings → About so
+    the user picks which update to run there.
+- Reset on each update's success (CLI install completes → reset CLI label;
+  desktop version equals latest after relaunch → reset desktop label).
 
 ## Settings
 
@@ -210,6 +284,10 @@ Migration: if key missing, defaults applied on first read.
 | `bun i -g` exits non-zero      | Modal shows stderr; server NOT restarted; retry button enabled.                                              |
 | Same version                   | `updateAvailable: false`; UI shows "Up to date".                                                             |
 | Update succeeds, respawn fails | Tauri shows existing error screen ("Server did not start"); user can click Start Server.                     |
+| GitHub API offline / 5xx       | `GET /api/desktop-version` returns `latest: null`; UI: "Couldn't reach GitHub". No tray badge.               |
+| GitHub rate limit (403)        | Same as offline. Unauthenticated GitHub requests are 60/h per IP — 6h poll is well under.                    |
+| No `.dmg` asset on release     | `downloadUrl: null`; UI swaps `Download` button for `Open release page` linking to `htmlUrl`.                |
+| .dmg download fails mid-stream | Modal shows error + `Retry`. Partial file is deleted.                                                        |
 
 ## Testing
 
@@ -225,14 +303,27 @@ Migration: if key missing, defaults applied on first read.
 - `dashboard/routes/update.test.ts`
   - `GET /api/version` returns expected shape; `?refresh=1` bypasses cache.
   - `POST /api/update` creates job; SSE stream emits log + terminal event.
-- Manual smoke: Tauri build, trigger update against a test npm tag, confirm
-  server respawns on new binary.
+- `dashboard/routes/desktop-version.test.ts`
+  - `GET /api/desktop-version` resolves `downloadUrl` from the first `.dmg`
+    asset; falls back to `htmlUrl` when no asset matches.
+  - 6h cache served on repeated calls; differing `currentDesktopVersion`
+    query still recomputes `updateAvailable`.
+  - GitHub 5xx → `latest: null`.
+- Manual smoke:
+  - Tauri build, trigger CLI update against a test npm tag, confirm server
+    respawns on new binary.
+  - Bump `desktop/src-tauri/tauri.conf.json` version locally below the
+    latest GitHub release, confirm desktop card shows update + download
+    reveals .dmg in Finder.
 
 ## Scope summary
 
-In: shared updater lib, dashboard route + UI, CLI subcommand, Tauri command,
-monitor periodic checker, OS notification, tray indicator, settings toggles,
-SQLite cache table.
+In: shared updater lib, dashboard route + UI, CLI subcommand, Tauri update
+command, monitor periodic checker, OS notification, tray indicator (covering
+both update types), settings toggles, SQLite cache table, desktop-version
+route + Tauri download command + About row.
 
-Out (deferred): auto-install, rollback, changelog, bun self-update, email,
-in-app modal popups beyond the update dialog itself.
+Out (deferred): auto-install of CLI, rollback, changelog rendering, bun
+self-update, email, in-app modal popups beyond the update dialogs themselves,
+tauri-plugin-updater integration (drag-to-Applications stays manual), Windows
+/ Linux desktop installers (only macOS `.dmg` is built today).

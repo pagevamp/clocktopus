@@ -34,4 +34,39 @@ app.route('/api', desktopVersionRoutes);
 export function startDashboard() {
   console.log(`Clocktopus dashboard running at http://localhost:${DASHBOARD_PORT}`);
   serve({ fetch: app.fetch, port: DASHBOARD_PORT });
+
+  // Periodic update check (6h). Mirrors monitor:run's checker so users running
+  // just the dashboard (no monitor) still get a populated update_check cache.
+  (async () => {
+    const { getCurrentVersion, fetchLatestVersion, isUpdateAvailable } = await import('../lib/updater.js');
+    const { getUpdateSettings } = await import('../lib/settings.js');
+    const { setUpdateCache, getUpdateCache, markNotifiedVersion } = await import('../lib/update-cache.js');
+    async function run() {
+      const settings = getUpdateSettings();
+      if (!settings.autoCheck) return;
+      const latest = await fetchLatestVersion({ force: true });
+      if (!latest) return;
+      setUpdateCache({
+        latestVersion: latest.version,
+        publishedAt: latest.publishedAt,
+        checkedAt: new Date().toISOString(),
+      });
+      const current = getCurrentVersion();
+      if (!isUpdateAvailable(current, latest.version)) return;
+      if (!settings.notify) return;
+      const cache = getUpdateCache();
+      if (cache?.notifiedVersion === latest.version) return;
+      const { notify } = await import('../lib/notifier.js');
+      notify({
+        subtitle: 'Update available',
+        message: `Clocktopus ${latest.version} available — open dashboard to update`,
+        sound: false,
+        wait: false,
+        timeout: 8,
+      });
+      markNotifiedVersion(latest.version);
+    }
+    run().catch((err) => console.error('Update check failed:', err));
+    setInterval(() => run().catch((err) => console.error('Update check failed:', err)), 6 * 60 * 60 * 1000);
+  })();
 }

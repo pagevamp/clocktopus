@@ -447,12 +447,14 @@ pub fn run() {
             let show = MenuItem::with_id(app, "show", "Open Dashboard", true, None::<&str>)?;
             let stop_timer = MenuItem::with_id(app, "stop-timer", "Stop Timer", false, None::<&str>)?;
             let stop_server_item = MenuItem::with_id(app, "stop-server", "Stop Server", false, None::<&str>)?;
+            let update_cli = MenuItem::with_id(app, "update-cli", "Update CLI", false, None::<&str>)?;
+            let update_desktop = MenuItem::with_id(app, "update-desktop", "Update desktop", false, None::<&str>)?;
             let sep1 = PredefinedMenuItem::separator(app)?;
             let sep2 = PredefinedMenuItem::separator(app)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = Menu::with_items(
                 app,
-                &[&show, &stop_timer, &sep1, &stop_server_item, &sep2, &quit],
+                &[&show, &stop_timer, &sep1, &stop_server_item, &update_cli, &update_desktop, &sep2, &quit],
             )?;
 
             // Idle icon: black template — macOS auto-adapts white/black
@@ -503,6 +505,21 @@ pub fn run() {
                         kill_server_child(&state);
                         kill_server_by_port();
                         navigate_to_error(app);
+                    }
+                    "update-cli" | "update-desktop" => {
+                        if let Some(win) = app.get_webview_window("main") {
+                            if let Ok(url) = dashboard_url().parse() {
+                                let _ = win.navigate(url);
+                            }
+                        }
+                        #[cfg(target_os = "macos")]
+                        if let Ok(panel) = app.get_webview_panel("main") {
+                            panel.show();
+                        }
+                        #[cfg(not(target_os = "macos"))]
+                        if let Some(win) = app.get_webview_window("main") {
+                            let _ = win.show();
+                        }
                     }
                     "quit" => {
                         kill_server_child(&app.state::<ServerChild>());
@@ -689,6 +706,78 @@ pub fn run() {
 
                     tick = tick.wrapping_add(1);
                     std::thread::sleep(Duration::from_secs(1));
+                }
+            });
+
+            // Background poller: check for CLI / desktop updates every 6 hours.
+            // Updates the corresponding tray menu item text + enabled state.
+            let update_cli_handle = update_cli.clone();
+            let update_desktop_handle = update_desktop.clone();
+            let update_dash_url = dashboard_url();
+            let desktop_current = app.package_info().version.to_string();
+            std::thread::spawn(move || {
+                let client = reqwest::blocking::Client::new();
+                let cli_url = format!("{}/api/version", update_dash_url);
+                let desktop_url = format!(
+                    "{}/api/desktop-version?currentDesktopVersion={}",
+                    update_dash_url, desktop_current
+                );
+                loop {
+                    // CLI version
+                    let cli_body: Option<serde_json::Value> = client
+                        .get(&cli_url)
+                        .timeout(Duration::from_secs(5))
+                        .send()
+                        .ok()
+                        .and_then(|r| r.text().ok())
+                        .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok());
+                    if let Some(body) = cli_body {
+                        let avail = body
+                            .get("updateAvailable")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false);
+                        let latest = body
+                            .get("latest")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        if avail && !latest.is_empty() {
+                            let _ = update_cli_handle
+                                .set_text(format!("Update CLI to v{latest}"));
+                            let _ = update_cli_handle.set_enabled(true);
+                        } else {
+                            let _ = update_cli_handle.set_text("Update CLI");
+                            let _ = update_cli_handle.set_enabled(false);
+                        }
+                    }
+                    // Desktop version
+                    let desktop_body: Option<serde_json::Value> = client
+                        .get(&desktop_url)
+                        .timeout(Duration::from_secs(5))
+                        .send()
+                        .ok()
+                        .and_then(|r| r.text().ok())
+                        .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok());
+                    if let Some(body) = desktop_body {
+                        let avail = body
+                            .get("updateAvailable")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false);
+                        let latest = body
+                            .get("latest")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        if avail && !latest.is_empty() {
+                            let _ = update_desktop_handle
+                                .set_text(format!("Update desktop to v{latest}"));
+                            let _ = update_desktop_handle.set_enabled(true);
+                        } else {
+                            let _ = update_desktop_handle.set_text("Update desktop");
+                            let _ = update_desktop_handle.set_enabled(false);
+                        }
+                    }
+                    std::thread::sleep(Duration::from_secs(6 * 60 * 60));
                 }
             });
 

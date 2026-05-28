@@ -612,11 +612,14 @@ pub fn run() {
             let stop_timer_for_thread = stop_timer.clone();
             let stop_server_for_thread = stop_server_item.clone();
             let active_url = format!("{}/api/timer/active", dashboard_url());
+            let monitor_status_url = format!("{}/api/monitor/status", dashboard_url());
             let dash_url_for_thread = dashboard_url();
             let window_for_thread = window.clone();
             std::thread::spawn(move || {
                 let client = reqwest::blocking::Client::new();
                 let mut is_active: bool = false;
+                let mut monitor_on: bool = false;
+                let mut icon_active: bool = false;
                 let mut start_ms: Option<i64> = None;
                 let mut description: Option<String> = None;
                 let mut tick: u32 = 0;
@@ -660,18 +663,6 @@ pub fn run() {
 
                             if new_active != is_active {
                                 is_active = new_active;
-
-                                let rgba = if new_active { &active_rgba } else { &idle_rgba };
-                                let img = Image::new_owned(rgba.clone(), w, h);
-                                let _ = tray.set_icon(Some(img));
-                                let _ = tray.set_icon_as_template(true);
-
-                                let _ = tray.set_tooltip(Some(if new_active {
-                                    product_name_active.as_str()
-                                } else {
-                                    product_name.as_str()
-                                }));
-
                                 let _ = stop_timer_for_thread.set_enabled(new_active);
                             }
 
@@ -683,6 +674,33 @@ pub fn run() {
                             }
                         }
                         // On request/parse failure: leave is_active and start_ms unchanged
+
+                        // Poll monitor status — when the idle monitor daemon is on,
+                        // surface the active icon even without an explicit timer so
+                        // the user has a visual cue that auto-tracking is armed.
+                        monitor_on = client
+                            .get(&monitor_status_url)
+                            .timeout(Duration::from_secs(3))
+                            .send()
+                            .and_then(|r| r.text())
+                            .ok()
+                            .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+                            .and_then(|json| json.get("running").and_then(|v| v.as_bool()))
+                            .unwrap_or(monitor_on);
+
+                        let desired_icon_active = is_active || monitor_on;
+                        if desired_icon_active != icon_active {
+                            icon_active = desired_icon_active;
+                            let rgba = if icon_active { &active_rgba } else { &idle_rgba };
+                            let img = Image::new_owned(rgba.clone(), w, h);
+                            let _ = tray.set_icon(Some(img));
+                            let _ = tray.set_icon_as_template(true);
+                            let _ = tray.set_tooltip(Some(if icon_active {
+                                product_name_active.as_str()
+                            } else {
+                                product_name.as_str()
+                            }));
+                        }
                     }
 
                     // Drive the title every tick

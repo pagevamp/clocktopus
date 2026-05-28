@@ -61,8 +61,11 @@ updateRoutes.post('/update', async (c) => {
       pushLog(done, '__DONE__');
       // Self-exit so a supervisor (Tauri, PM2) respawns dashboard on the new
       // binary. Skipped in tests where the harness runs everything in-process.
+      // Delay long enough for SSE subscribers to receive the `done` event
+      // before the connection drops — otherwise the UI sees a native error
+      // and reports the update as failed even though it succeeded.
       if (process.env.NODE_ENV !== 'test') {
-        setTimeout(() => process.exit(0), 500);
+        setTimeout(() => process.exit(0), 1500);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

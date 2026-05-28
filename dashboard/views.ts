@@ -2314,15 +2314,35 @@ export function indexPage() {
         const resp = await fetch('/api/update', { method: 'POST' });
         const { jobId } = await resp.json();
         const evt = new EventSource('/api/update/' + jobId + '/stream');
+        let doneReceived = false;
         evt.addEventListener('log', (e) => appendUpdateLog(e.data));
         evt.addEventListener('done', () => {
+          doneReceived = true;
           evt.close();
           finishUpdateModal({ ok: true, message: 'Updated. Reloading…' });
           setTimeout(() => location.reload(), 1500);
         });
+        // Custom 'error' SSE event (job-level failure) carries data.
+        // Native onerror fires on connection drop too — including the
+        // expected drop when the server self-exits after a successful
+        // update. Treat connection drops post-done as success.
         evt.addEventListener('error', (e) => {
+          if (doneReceived) return;
+          // EventSource native error event has no data field; the
+          // server-emitted 'error' SSE event does. Distinguish by data.
+          const data = e && typeof e.data === 'string' ? e.data : '';
+          if (!data && evt.readyState === EventSource.CONNECTING) {
+            // Browser is auto-reconnecting after server self-exit — wait
+            // briefly; if no done arrives, treat as failure.
+            setTimeout(() => {
+              if (doneReceived) return;
+              evt.close();
+              finishUpdateModal({ ok: false, message: 'Update failed (lost connection)' });
+            }, 3000);
+            return;
+          }
           evt.close();
-          finishUpdateModal({ ok: false, message: e.data || 'Update failed' });
+          finishUpdateModal({ ok: false, message: data || 'Update failed' });
         });
       } catch (err) {
         finishUpdateModal({ ok: false, message: String(err) });
@@ -2342,7 +2362,9 @@ export function indexPage() {
         const updateBtn = document.getElementById('about-desktop-update');
         const notes = document.getElementById('about-desktop-notes');
         if (v.updateAvailable) {
-          badge.textContent = v.latest + ' available';
+          badge.textContent = v.assetPending
+            ? v.latest + ' building…'
+            : v.latest + ' available';
           badge.style.display = 'inline-block';
           if (v.downloadUrl) {
             updateBtn.style.display = 'inline-block';
@@ -2352,6 +2374,7 @@ export function indexPage() {
           }
           if (v.htmlUrl) {
             notes.href = v.htmlUrl;
+            notes.textContent = v.assetPending ? 'View build' : 'Release notes';
             notes.style.display = 'inline';
           }
         } else if (v.latest) {

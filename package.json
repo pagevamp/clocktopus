@@ -1,6 +1,6 @@
 {
   "name": "clocktopus",
-  "version": "1.13.1",
+  "version": "1.13.2",
   "description": "Time-tracking automation for Clockify with idle monitoring, Jira integration, Google Calendar sync, CLI, web dashboard, and desktop app.",
   "type": "module",
   "main": "dist/index.js",
@@ -31,7 +31,8 @@
     "dashboard": "bun -e \"import('./dist/dashboard/server.js').then(m => m.startDashboard())\"",
     "db:cleanup": "bun dist/scripts/db-cleanup.js",
     "google-auth": "bunx tsc && bun dist/scripts/google-auth.js",
-    "log-calendar": "bunx tsc && bun -r dotenv/config dist/scripts/log-calendar-events.js"
+    "log-calendar": "bunx tsc && bun -r dotenv/config dist/scripts/log-calendar-events.js",
+    "desktop:version": "bun scripts/desktop-version.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.9",

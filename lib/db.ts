@@ -136,6 +136,16 @@ function getDb(): Database {
         updatedAt TEXT NOT NULL
       )
     `);
+    dbInstance.exec(`
+      CREATE TABLE IF NOT EXISTS update_check (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        latest_version TEXT,
+        published_at TEXT,
+        checked_at TEXT,
+        notified_version TEXT
+      )
+    `);
+    dbInstance.exec(`INSERT OR IGNORE INTO update_check (id) VALUES (1)`);
   }
 
   return dbInstance;
@@ -420,3 +430,7 @@ export function toggleProjectActive(id: string, active: boolean) {
   const db = getDb();
   db.prepare('UPDATE projects SET active = ? WHERE id = ?').run(active ? 1 : 0, id);
 }
+
+// Internal: exposed so sibling modules in lib/ can share the singleton without
+// each opening their own connection.
+export const __dbInternal = getDb;

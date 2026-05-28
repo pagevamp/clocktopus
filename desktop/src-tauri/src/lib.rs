@@ -470,6 +470,7 @@ pub fn run() {
                 .clone()
                 .unwrap_or_else(|| "Clocktopus".to_string());
             let product_name_active = format!("{} - Timer running", product_name);
+            let product_name_monitor = format!("{} - Idle monitor running", product_name);
 
             let tray = TrayIconBuilder::with_id(TrayIconId::new("main-tray"))
                 .icon(icon)
@@ -620,6 +621,7 @@ pub fn run() {
                 let mut is_active: bool = false;
                 let mut monitor_on: bool = false;
                 let mut icon_active: bool = false;
+                let mut last_tooltip: String = product_name.clone();
                 let mut start_ms: Option<i64> = None;
                 let mut description: Option<String> = None;
                 let mut tick: u32 = 0;
@@ -695,11 +697,17 @@ pub fn run() {
                             let img = Image::new_owned(rgba.clone(), w, h);
                             let _ = tray.set_icon(Some(img));
                             let _ = tray.set_icon_as_template(true);
-                            let _ = tray.set_tooltip(Some(if icon_active {
-                                product_name_active.as_str()
-                            } else {
-                                product_name.as_str()
-                            }));
+                        }
+                        let desired_tooltip = if is_active {
+                            product_name_active.as_str()
+                        } else if monitor_on {
+                            product_name_monitor.as_str()
+                        } else {
+                            product_name.as_str()
+                        };
+                        if desired_tooltip != last_tooltip.as_str() {
+                            let _ = tray.set_tooltip(Some(desired_tooltip));
+                            last_tooltip = desired_tooltip.to_string();
                         }
                     }
 

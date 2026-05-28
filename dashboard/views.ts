@@ -189,7 +189,7 @@ export function indexPage() {
     .timeline-track.dragging { cursor:crosshair; }
 
     /* About section */
-    .about-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 0.75rem; padding: 0.6rem 0; border-bottom: 1px solid rgba(128, 128, 128, 0.15); }
+    .about-row { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; padding: 0.6rem 0; border-bottom: 1px solid rgba(128, 128, 128, 0.15); }
     .about-row:last-child { border-bottom: none; }
     .about-row-info { min-width: 0; flex: 1 1 auto; }
     .about-row-info strong { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; color: #e1e4e8; }
@@ -354,6 +354,7 @@ export function indexPage() {
           <h2>Idle Monitor</h2>
         </div>
         <p id="monitor-desc" style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem;">Auto-stops timers when idle, resumes when active.</p>
+        <p id="monitor-hint" style="display:none;font-size:0.8rem;color:#d29922;margin-bottom:0.5rem;line-height:1.4;"></p>
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
           <button id="monitor-start-btn" onclick="monitorAction('start')" style="margin-top:0;">Start</button>
           <button id="monitor-stop-btn" onclick="monitorAction('stop')" class="stop-btn" style="margin-top:0;" disabled>Stop</button>
@@ -1450,9 +1451,17 @@ export function indexPage() {
         const data = await res.json();
         const dot = document.getElementById('monitor-dot');
         const desc = document.getElementById('monitor-desc');
+        const hintEl = document.getElementById('monitor-hint');
         const startBtn = document.getElementById('monitor-start-btn');
         const stopBtn = document.getElementById('monitor-stop-btn');
         const restartBtn = document.getElementById('monitor-restart-btn');
+
+        if (data.hint) {
+          hintEl.textContent = data.hint;
+          hintEl.style.display = 'block';
+        } else {
+          hintEl.style.display = 'none';
+        }
 
         if (data.running) {
           dot.className = 'dot green';

@@ -19,22 +19,39 @@ const bunBin = (() => {
 })();
 const pm2Cmd = `${bunBin} ${pm2Bin}`;
 
+const PM2_STALE_HINT =
+  'PM2 daemon is out-of-date with installed pm2 binary. Fix: `bun install -g pm2@latest` then `pm2 update`. ' +
+  'After that, reload this page.';
+
+function detectPm2Hint(text: string): string | undefined {
+  if (/In-memory PM2 is out-of-date/i.test(text)) return PM2_STALE_HINT;
+  return undefined;
+}
+
 const monitorRoutes = new Hono();
 
-function pm2Exec(command: string): { ok: boolean; output: string } {
+function pm2Exec(command: string): { ok: boolean; output: string; hint?: string } {
   try {
     const output = execSync(command, { encoding: 'utf-8', timeout: 10000 });
-    return { ok: true, output: output.trim() };
+    const trimmed = output.trim();
+    const hint = detectPm2Hint(trimmed);
+    return hint ? { ok: true, output: trimmed, hint } : { ok: true, output: trimmed };
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
-    return { ok: false, output: msg };
+    const hint = detectPm2Hint(msg);
+    return hint ? { ok: false, output: msg, hint } : { ok: false, output: msg };
   }
 }
 
 monitorRoutes.get('/monitor/status', (c) => {
   try {
     const output = execSync(`${pm2Cmd} jlist`, { encoding: 'utf-8', timeout: 10000 });
-    const processes = JSON.parse(output);
+    // PM2 prepends "In-memory PM2 is out-of-date" warning when daemon
+    // version drifts from the installed binary. Strip everything before
+    // the JSON array so parse doesn't choke.
+    const jsonStart = output.indexOf('[');
+    if (jsonStart < 0) throw new Error('pm2 jlist returned no JSON');
+    const processes = JSON.parse(output.slice(jsonStart));
     const proc = processes.find((p: { name: string }) => p.name === PM2_NAME);
 
     if (!proc) {
@@ -47,8 +64,10 @@ monitorRoutes.get('/monitor/status', (c) => {
       uptime: proc.pm2_env.pm_uptime,
       restarts: proc.pm2_env.restart_time,
     });
-  } catch {
-    return c.json({ running: false, status: 'pm2 not available' });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const hint = detectPm2Hint(msg) ?? PM2_STALE_HINT;
+    return c.json({ running: false, status: 'pm2 error', error: msg, hint });
   }
 });
 

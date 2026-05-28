@@ -26,3 +26,6 @@ node-compile-cache/
 
 # npm lockfile — this project uses bun (bun.lock)
 package-lock.json
+
+# Test temp directories (bun:test isolated data dirs)
+lib/__tmp_*/

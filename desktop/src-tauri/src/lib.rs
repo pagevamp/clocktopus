@@ -2,7 +2,7 @@ use tauri::{
     image::Image,
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{TrayIconBuilder, TrayIconId},
-    Manager,
+    Emitter, Manager,
 };
 use std::sync::Mutex;
 use std::time::Duration;
@@ -201,31 +201,64 @@ fn install_bun() -> Result<(), String> {
     }
 }
 
-#[tauri::command]
-fn install_clocktopus() -> Result<(), String> {
+fn run_bun_install_clocktopus(app: Option<&tauri::AppHandle>) -> Result<(), String> {
+    use std::io::{BufRead, BufReader};
+    use std::process::Stdio;
+
     let home = std::env::var("HOME").unwrap_or_default();
     let bun = first_matching(&bun_candidates(&home), |p| std::path::Path::new(p).exists())
         .ok_or_else(|| "bun not found".to_string())?;
-    // `--trust` runs lifecycle scripts (clocktopus postinstall, native rebuilds) that
-    // shell out to bun/bunx. GUI apps don't inherit the shell PATH, so inject
-    // ~/.bun/bin like spawn_server does — without it the first install can fail.
+    // `--trust` runs lifecycle scripts (clocktopus postinstall, native rebuilds)
+    // that shell out to bun/bunx. GUI apps don't inherit the shell PATH, so
+    // inject ~/.bun/bin like spawn_server does — without it the first install
+    // can fail.
     let bun_bin = format!("{home}/.bun/bin");
     let current_path = std::env::var("PATH").unwrap_or_default();
     let new_path = format!("{bun_bin}:{current_path}");
-    // Capture output so a failure surfaces in the Setup UI instead of vanishing.
-    let output = std::process::Command::new(&bun)
+
+    let mut child = std::process::Command::new(&bun)
         .args(["i", "-g", "clocktopus", "--trust"])
         .env("PATH", new_path)
-        .output()
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .map_err(|e| format!("failed to launch bun: {e}"))?;
-    if output.status.success() {
+
+    // Stream stdout on a background thread so we don't block on it before
+    // joining stderr below.
+    if let Some(stdout) = child.stdout.take() {
+        let app_clone = app.cloned();
+        std::thread::spawn(move || {
+            for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+                if let Some(a) = &app_clone {
+                    let _ = a.emit("update://log", line);
+                }
+            }
+        });
+    }
+
+    let mut stderr_buf = String::new();
+    if let Some(stderr) = child.stderr.take() {
+        for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+            stderr_buf.push_str(&line);
+            stderr_buf.push('\n');
+            if let Some(a) = app {
+                let _ = a.emit("update://log", line);
+            }
+        }
+    }
+
+    let status = child.wait().map_err(|e| format!("wait failed: {e}"))?;
+    if status.success() {
         Ok(())
     } else {
-        Err(format!(
-            "clocktopus install failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ))
+        Err(format!("clocktopus install failed: {}", stderr_buf.trim()))
     }
+}
+
+#[tauri::command]
+fn install_clocktopus() -> Result<(), String> {
+    run_bun_install_clocktopus(None)
 }
 
 fn spawn_server(state: &ServerChild) {

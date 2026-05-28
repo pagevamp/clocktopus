@@ -160,6 +160,33 @@ export function indexPage() {
     #ctx-menu button { display: block; width: 100%; margin: 0; text-align: left; background: transparent; border: none; color: #e1e4e8; padding: 0.4rem 0.7rem; border-radius: 4px; font-size: 0.85rem; cursor: pointer; }
     #ctx-menu button:hover { background: #21262d; }
 
+    /* Timeline view */
+    .timeline-date-row { display:flex; align-items:center; gap:0.5rem; margin-bottom:0.75rem; flex-wrap:wrap; }
+    .timeline-date-row button { background:#30363d; color:#c9d1d9; border:1px solid #30363d; border-radius:6px; padding:0.3rem 0.6rem; cursor:pointer; margin:0; }
+    .timeline-date-row button:hover { background:#3a414b; }
+    .timeline-date-label { font-weight:600; min-width:11ch; text-align:center; }
+    .timeline-summary { margin-left:auto; color:#8b949e; font-size:0.85rem; }
+    .timeline-canvas-wrap { max-height:60vh; overflow-y:auto; border:1px solid #21262d; border-radius:8px; background:#0d1117; }
+    .timeline-canvas { position:relative; height:720px; }
+    .timeline-gutter { position:absolute; top:0; left:0; width:56px; height:100%; border-right:1px solid #21262d; }
+    .timeline-gutter span { position:absolute; left:0; right:0; padding:0 0.5rem; font-size:0.7rem; color:#8b949e; transform:translateY(-50%); }
+    .timeline-grid { position:absolute; top:0; left:56px; right:0; height:100%; pointer-events:none; }
+    .timeline-grid div { position:absolute; left:0; right:0; height:1px; background:#161b22; }
+    .timeline-track { position:absolute; top:0; left:56px; right:8px; height:100%; }
+    .timeline-bar { position:absolute; left:0; right:0; margin:0; background:#1f6feb; border:1px solid #388bfd; border-radius:4px; color:#fff; font-size:0.75rem; padding:2px 6px; text-align:left; cursor:pointer; overflow:hidden; display:flex; align-items:center; gap:0.4rem; line-height:1.1; }
+    .timeline-bar .dot { display:inline-block; width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+    .timeline-bar .desc { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .timeline-bar .jira { font-size:0.7rem; background:rgba(0,0,0,0.25); padding:1px 4px; border-radius:3px; flex-shrink:0; }
+    .timeline-bar.in-progress { border-style:dashed; }
+    .timeline-bar.overlap { left:50%; }
+    .timeline-bar { z-index:2; }
+    .timeline-gap { position:absolute; left:0; right:0; background:repeating-linear-gradient(45deg, rgba(248,81,73,0.10) 0 8px, rgba(248,81,73,0.18) 8px 16px); color:#f85149; font-size:0.7rem; padding:2px 6px; cursor:pointer; display:flex; align-items:center; border-radius:3px; box-shadow:inset 0 0 0 1px rgba(248,81,73,0.35); z-index:1; }
+    .timeline-gap:hover { background:repeating-linear-gradient(45deg, rgba(248,81,73,0.18) 0 8px, rgba(248,81,73,0.28) 8px 16px); }
+    .timeline-now { position:absolute; left:0; right:0; height:2px; background:#f0883e; box-shadow:0 0 6px rgba(240,136,62,0.6); pointer-events:none; }
+    .timeline-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#8b949e; }
+    .timeline-drag-ghost { position:absolute; left:0; right:0; background:rgba(31,111,235,0.22); border:1px dashed #58a6ff; color:#58a6ff; font-size:0.7rem; padding:2px 6px; display:flex; align-items:center; pointer-events:none; z-index:3; border-radius:4px; box-sizing:border-box; }
+    .timeline-track.dragging { cursor:crosshair; }
+
   </style>
 </head>
 <body>
@@ -198,6 +225,7 @@ export function indexPage() {
         <div class="track-tabs" id="track-tabs">
           <button class="track-tab-btn active" data-mode="auto" onclick="switchTrackMode('auto')">Auto Track</button>
           <button class="track-tab-btn" data-mode="manual" onclick="switchTrackMode('manual')">Manual Log</button>
+          <button class="track-tab-btn" data-mode="calendar" onclick="switchTrackMode('calendar')">Calendar</button>
         </div>
 
         <div id="track-auto">
@@ -276,11 +304,26 @@ export function indexPage() {
           <button id="manual-log-btn" onclick="logManualTime()">Log Time</button>
           <div class="msg" id="manual-msg"></div>
         </div>
+
+        <div id="track-calendar" style="display:none;">
+          <div class="timeline-date-row">
+            <button type="button" id="timeline-prev" aria-label="Previous day">&lsaquo;</button>
+            <span id="timeline-date-label" class="timeline-date-label">--</span>
+            <button type="button" id="timeline-next" aria-label="Next day">&rsaquo;</button>
+            <button type="button" id="timeline-today">Today</button>
+            <span class="timeline-summary" id="timeline-summary"></span>
+          </div>
+          <div class="timeline-canvas-wrap">
+            <div id="timeline-canvas" class="timeline-canvas">
+              <div class="timeline-empty" id="timeline-empty">Loading...</div>
+            </div>
+          </div>
+        </div>
       </div>
 
 
       <!-- Monitor Control -->
-      <div class="card">
+      <div class="card" id="monitor-card">
         <div class="card-header">
           <div class="dot gray" id="monitor-dot"></div>
           <h2>Idle Monitor</h2>
@@ -596,12 +639,241 @@ export function indexPage() {
       if (tab === 'jira') loadJira();
     }
 
+    // === Timeline ===
+    var timelineDate = startOfTodayLocal();
+
+    function startOfTodayLocal() {
+      var d = new Date();
+      d.setHours(0, 0, 0, 0);
+      return d;
+    }
+
+    function timelineDayBounds(dayStart) {
+      var fromMs = dayStart.getTime();
+      var toMs = fromMs + 24 * 3600 * 1000;
+      return {
+        from: new Date(fromMs).toISOString(),
+        to: new Date(toMs).toISOString(),
+        fromMs: fromMs,
+        toMs: toMs,
+      };
+    }
+
+    function formatDateLabel(d) {
+      var y = d.getFullYear();
+      var m = String(d.getMonth() + 1).padStart(2, '0');
+      var dd = String(d.getDate()).padStart(2, '0');
+      return y + '-' + m + '-' + dd;
+    }
+
+    function projectColor(projectId) {
+      if (!projectId) return '#6e7681';
+      var h = 0;
+      for (var i = 0; i < projectId.length; i++) {
+        h = ((h << 5) - h + projectId.charCodeAt(i)) | 0;
+      }
+      var hue = Math.abs(h) % 360;
+      return 'hsl(' + hue + ', 55%, 50%)';
+    }
+
+    function fmtHm(totalMin) {
+      var h = Math.floor(totalMin / 60);
+      var m = totalMin % 60;
+      if (h <= 0) return m + 'm';
+      if (m === 0) return h + 'h';
+      return h + 'h ' + m + 'm';
+    }
+
+    function fmtTimeLocal(ms) {
+      var d = new Date(ms);
+      var hh = String(d.getHours()).padStart(2, '0');
+      var mm = String(d.getMinutes()).padStart(2, '0');
+      return hh + ':' + mm;
+    }
+
+    async function loadTimeline() {
+      var label = document.getElementById('timeline-date-label');
+      var summary = document.getElementById('timeline-summary');
+      var canvas = document.getElementById('timeline-canvas');
+      label.textContent = formatDateLabel(timelineDate);
+      summary.textContent = '';
+      canvas.innerHTML = '<div class="timeline-empty">Loading...</div>';
+
+      var bounds = timelineDayBounds(timelineDate);
+      try {
+        var res = await fetch('/api/sessions?from=' + encodeURIComponent(bounds.from) + '&to=' + encodeURIComponent(bounds.to));
+        var result = await res.json();
+        if (!result || !result.data) throw new Error('bad response');
+        renderTimeline(result.data, bounds);
+      } catch (err) {
+        canvas.innerHTML = '<div class="timeline-empty">Failed to load timeline.</div>';
+      }
+    }
+
+    function renderTimeline(sessions, bounds) {
+      var canvas = document.getElementById('timeline-canvas');
+      canvas.innerHTML = '';
+      document.getElementById('timeline-summary').textContent = '0m logged · 0 gaps';
+
+      var gutter = document.createElement('div');
+      gutter.className = 'timeline-gutter';
+      for (var h = 0; h < 24; h++) {
+        var s = document.createElement('span');
+        s.style.top = (h * 30) + 'px';
+        s.textContent = (h < 10 ? '0' : '') + h + ':00';
+        gutter.appendChild(s);
+      }
+      canvas.appendChild(gutter);
+
+      var grid = document.createElement('div');
+      grid.className = 'timeline-grid';
+      for (var g = 1; g < 24; g++) {
+        var line = document.createElement('div');
+        line.style.top = (g * 30) + 'px';
+        grid.appendChild(line);
+      }
+      canvas.appendChild(grid);
+
+      var track = document.createElement('div');
+      track.className = 'timeline-track';
+
+      if (!sessions || sessions.length === 0) {
+        var empty = document.createElement('div');
+        empty.className = 'timeline-empty';
+        empty.textContent = 'No sessions on this date.';
+        canvas.appendChild(track);
+        canvas.appendChild(empty);
+        return;
+      }
+
+      var nowMs = Date.now();
+      var clipped = [];
+      for (var i = 0; i < sessions.length; i++) {
+        var sess = sessions[i];
+        var startMs = new Date(sess.startedAt).getTime();
+        var endMs;
+        if (sess.completedAt) {
+          endMs = new Date(sess.completedAt).getTime();
+        } else {
+          if (startMs > nowMs) {
+            console.warn('skipping in-progress session with future startedAt', sess.id);
+            continue;
+          }
+          endMs = nowMs;
+        }
+        if (!isFinite(startMs) || !isFinite(endMs) || endMs <= startMs) continue;
+        var clipStart = Math.max(startMs, bounds.fromMs);
+        var clipEnd = Math.min(endMs, bounds.toMs);
+        if (clipEnd <= clipStart) continue;
+        clipped.push({
+          raw: sess,
+          startMs: startMs,
+          endMs: endMs,
+          clipStart: clipStart,
+          clipEnd: clipEnd,
+          isOpen: !sess.completedAt,
+        });
+      }
+
+      clipped.sort(function(a, b) { return a.clipStart - b.clipStart; });
+
+      var loggedMs = 0;
+      for (var k = 0; k < clipped.length; k++) {
+        loggedMs += clipped[k].clipEnd - clipped[k].clipStart;
+      }
+      var gapCount = 0;
+      var gapMs = 0;
+
+      var GAP_MIN = 30;
+      var prevEnd = null;
+      var prevVisualBottomPct = -1;
+      for (var j = 0; j < clipped.length; j++) {
+        var c = clipped[j];
+        var curTopPct = ((c.clipStart - bounds.fromMs) / (bounds.toMs - bounds.fromMs)) * 100;
+
+        if (prevEnd !== null && c.clipStart > prevEnd) {
+          var gapMin = Math.round((c.clipStart - prevEnd) / 60000);
+          if (gapMin >= GAP_MIN) {
+            var gapTopPct = prevVisualBottomPct >= 0 ? prevVisualBottomPct : ((prevEnd - bounds.fromMs) / (bounds.toMs - bounds.fromMs)) * 100;
+            var gapHeightPct = Math.max(0, curTopPct - gapTopPct);
+            if (gapHeightPct > 0.1) {
+              var gap = document.createElement('div');
+              gap.className = 'timeline-gap';
+              gap.style.top = gapTopPct + '%';
+              gap.style.height = gapHeightPct + '%';
+              gap.setAttribute('data-from', new Date(prevEnd).toISOString());
+              gap.setAttribute('data-to', new Date(c.clipStart).toISOString());
+              gap.textContent = 'Gap · ' + fmtHm(gapMin) + ' — click to log';
+              track.appendChild(gap);
+            }
+            gapCount++;
+            gapMs += c.clipStart - prevEnd;
+          }
+        }
+
+        var topPct = curTopPct;
+        var heightPct = ((c.clipEnd - c.clipStart) / (bounds.toMs - bounds.fromMs)) * 100;
+        var bar = document.createElement('button');
+        bar.type = 'button';
+        bar.className = 'timeline-bar' + (c.isOpen ? ' in-progress' : '');
+        if (prevEnd !== null && c.clipStart < prevEnd) bar.classList.add('overlap');
+        bar.style.top = topPct + '%';
+        bar.style.height = Math.max(heightPct, 1.2) + '%';
+        bar.setAttribute('data-session-id', c.raw.id);
+        var dur = Math.round((c.endMs - c.startMs) / 60000);
+        bar.title =
+          (c.raw.description || '(no description)') +
+          '\\n' + (c.raw.projectName || 'No project') +
+          (c.raw.jiraTicket ? '\\n' + c.raw.jiraTicket : '') +
+          '\\n' + fmtTimeLocal(c.startMs) + ' - ' + (c.isOpen ? 'in progress' : fmtTimeLocal(c.endMs)) +
+          '\\n' + fmtHm(dur);
+        var dot = document.createElement('span');
+        dot.className = 'dot';
+        dot.style.background = projectColor(c.raw.projectId);
+        var desc = document.createElement('span');
+        desc.className = 'desc';
+        desc.textContent = (c.raw.description || '(no description)') + (c.isOpen ? ' · in progress' : '');
+        bar.appendChild(dot);
+        bar.appendChild(desc);
+        if (c.raw.jiraTicket) {
+          var jira = document.createElement('span');
+          jira.className = 'jira';
+          jira.textContent = c.raw.jiraTicket;
+          bar.appendChild(jira);
+        }
+        track.appendChild(bar);
+        prevEnd = Math.max(prevEnd || 0, c.clipEnd);
+        prevVisualBottomPct = Math.max(prevVisualBottomPct, topPct + Math.max(heightPct, 1.2));
+      }
+
+      var nowMsForLine = Date.now();
+      if (nowMsForLine >= bounds.fromMs && nowMsForLine < bounds.toMs) {
+        var nowLine = document.createElement('div');
+        nowLine.className = 'timeline-now';
+        nowLine.style.top = (((nowMsForLine - bounds.fromMs) / (bounds.toMs - bounds.fromMs)) * 100) + '%';
+        track.appendChild(nowLine);
+      }
+
+      var summary = document.getElementById('timeline-summary');
+      var loggedLabel = fmtHm(Math.round(loggedMs / 60000));
+      if (gapCount === 0) {
+        summary.textContent = loggedLabel + ' logged · 0 gaps';
+      } else {
+        summary.textContent = loggedLabel + ' logged · ' + gapCount + ' gap' + (gapCount === 1 ? '' : 's') + ' (' + fmtHm(Math.round(gapMs / 60000)) + ')';
+      }
+
+      canvas.appendChild(track);
+    }
+
     function switchTrackMode(mode) {
       document.querySelectorAll('.track-tab-btn').forEach(function(b) {
         b.classList.toggle('active', b.dataset.mode === mode);
       });
       document.getElementById('track-auto').style.display = mode === 'auto' ? 'block' : 'none';
       document.getElementById('track-manual').style.display = mode === 'manual' ? 'block' : 'none';
+      var calEl = document.getElementById('track-calendar');
+      if (calEl) calEl.style.display = mode === 'calendar' ? 'block' : 'none';
+      if (mode === 'calendar' && typeof loadTimeline === 'function') loadTimeline();
     }
 
     function switchSettingsSection(section) {
@@ -1392,10 +1664,77 @@ export function indexPage() {
       }
     }
 
+    async function deleteSessionFromTimeline(id) {
+      var ok = await showConfirm('Delete this entry from Clockify and Jira?');
+      if (!ok) return;
+      try {
+        var res = await fetch('/api/timer/' + encodeURIComponent(id), { method: 'DELETE' });
+        var result = await res.json();
+        if (!result.ok) { alert(result.error || 'Failed to delete entry.'); return; }
+        loadTimeline();
+        loadSessions();
+      } catch (err) {
+        alert('Failed to delete entry.');
+      }
+    }
+
+    function prefillManualLogFromGap(fromIso, toIso) {
+      if (!fromIso || !toIso) return;
+      var fromDate = new Date(fromIso);
+      var toDate = new Date(toIso);
+      if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) return;
+
+      switchTab('home');
+      switchTrackMode('manual');
+
+      var rangeWrap = document.getElementById('manual-range-wrap');
+      var durationWrap = document.getElementById('manual-duration-wrap');
+      if (rangeWrap) rangeWrap.style.display = '';
+      if (durationWrap) durationWrap.style.display = 'none';
+
+      function toDateInput(d) {
+        var y = d.getFullYear();
+        var m = String(d.getMonth() + 1).padStart(2, '0');
+        var dd = String(d.getDate()).padStart(2, '0');
+        return y + '-' + m + '-' + dd;
+      }
+      function toTimeInput(d) {
+        var hh = String(d.getHours()).padStart(2, '0');
+        var mm = String(d.getMinutes()).padStart(2, '0');
+        return hh + ':' + mm;
+      }
+
+      var sd = document.getElementById('manual-start-date');
+      var st = document.getElementById('manual-start-time');
+      var ed = document.getElementById('manual-end-date');
+      var et = document.getElementById('manual-end-time');
+      if (sd) sd.value = toDateInput(fromDate);
+      if (st) st.value = toTimeInput(fromDate);
+      if (ed) ed.value = toDateInput(toDate);
+      if (et) et.value = toTimeInput(toDate);
+
+      var desc = document.getElementById('manual-description');
+      if (desc) desc.focus();
+    }
+
     document.addEventListener('click', function(e) {
-      const btn = e.target.closest && e.target.closest('[data-delete-id]');
-      if (!btn || btn.disabled) return;
-      deleteSession(btn.getAttribute('data-delete-id'));
+      if (!e.target.closest) return;
+      var delBtn = e.target.closest('[data-delete-id]');
+      if (delBtn && !delBtn.disabled) {
+        deleteSession(delBtn.getAttribute('data-delete-id'));
+        return;
+      }
+      if (typeof __tlDragEnded !== 'undefined' && __tlDragEnded) return;
+      var bar = e.target.closest('.timeline-bar[data-session-id]');
+      if (bar) {
+        deleteSessionFromTimeline(bar.getAttribute('data-session-id'));
+        return;
+      }
+      var gap = e.target.closest('.timeline-gap');
+      if (gap) {
+        prefillManualLogFromGap(gap.getAttribute('data-from'), gap.getAttribute('data-to'));
+        return;
+      }
     });
 
     function escapeHtml(str) {
@@ -2018,6 +2357,128 @@ export function indexPage() {
       const today = new Date().toISOString().split('T')[0];
       document.getElementById('cal-from').value = today;
       document.getElementById('cal-to').value = today;
+    })();
+
+    (function wireTimelineControls() {
+      var prev = document.getElementById('timeline-prev');
+      var next = document.getElementById('timeline-next');
+      var today = document.getElementById('timeline-today');
+      if (!prev || !next || !today) return;
+      prev.addEventListener('click', function() {
+        timelineDate = new Date(timelineDate.getTime() - 24 * 3600 * 1000);
+        timelineDate.setHours(0, 0, 0, 0);
+        loadTimeline();
+      });
+      next.addEventListener('click', function() {
+        timelineDate = new Date(timelineDate.getTime() + 24 * 3600 * 1000);
+        timelineDate.setHours(0, 0, 0, 0);
+        loadTimeline();
+      });
+      today.addEventListener('click', function() {
+        timelineDate = startOfTodayLocal();
+        loadTimeline();
+      });
+    })();
+
+    var __tlDragEnded = false;
+    (function wireTimelineDrag() {
+      var canvas = document.getElementById('timeline-canvas');
+      if (!canvas) return;
+      var SNAP_MS = 5 * 60 * 1000;
+      var DRAG_THRESHOLD_PX = 5;
+      var dragState = null;
+
+      function snapMs(ms) { return Math.round(ms / SNAP_MS) * SNAP_MS; }
+
+      function onMouseDown(e) {
+        if (e.button !== 0) return;
+        if (!e.target || !e.target.closest) return;
+        if (e.target.closest('.timeline-bar') || e.target.closest('.timeline-gap')) return;
+        var trackEl = canvas.querySelector('.timeline-track');
+        if (!trackEl) return;
+        var rect = trackEl.getBoundingClientRect();
+        if (e.clientX < rect.left || e.clientX > rect.right) return;
+        var y = e.clientY - rect.top;
+        if (y < 0 || y > rect.height) return;
+        var bounds = timelineDayBounds(timelineDate);
+        dragState = {
+          trackEl: trackEl,
+          trackTop: rect.top,
+          trackHeight: rect.height,
+          dayStartMs: bounds.fromMs,
+          startY: y,
+          startClientY: e.clientY,
+          active: false,
+          ghost: null,
+        };
+        e.preventDefault();
+      }
+
+      function ensureGhost(d) {
+        if (d.ghost) return;
+        d.ghost = document.createElement('div');
+        d.ghost.className = 'timeline-drag-ghost';
+        d.trackEl.appendChild(d.ghost);
+        d.trackEl.classList.add('dragging');
+      }
+
+      function tearDown(d, cancel) {
+        if (d.ghost) d.ghost.remove();
+        if (d.trackEl) d.trackEl.classList.remove('dragging');
+        document.body.style.userSelect = '';
+        if (d.active && !cancel) {
+          __tlDragEnded = true;
+          setTimeout(function() { __tlDragEnded = false; }, 50);
+        }
+      }
+
+      function onMouseMove(e) {
+        if (!dragState) return;
+        var d = dragState;
+        if (!d.active) {
+          if (Math.abs(e.clientY - d.startClientY) < DRAG_THRESHOLD_PX) return;
+          d.active = true;
+          ensureGhost(d);
+          document.body.style.userSelect = 'none';
+        }
+        var curY = Math.max(0, Math.min(d.trackHeight, e.clientY - d.trackTop));
+        var top = Math.min(d.startY, curY);
+        var height = Math.abs(curY - d.startY);
+        d.ghost.style.top = (top / d.trackHeight * 100) + '%';
+        d.ghost.style.height = (height / d.trackHeight * 100) + '%';
+        var startMs = snapMs(d.dayStartMs + (top / d.trackHeight) * 24 * 3600 * 1000);
+        var endMs = snapMs(d.dayStartMs + ((top + height) / d.trackHeight) * 24 * 3600 * 1000);
+        var dur = Math.max(0, Math.round((endMs - startMs) / 60000));
+        d.ghost.textContent = dur + 'm — release to log';
+      }
+
+      function onMouseUp(e) {
+        if (!dragState) return;
+        var d = dragState;
+        dragState = null;
+        if (!d.active) { tearDown(d, true); return; }
+        var curY = Math.max(0, Math.min(d.trackHeight, e.clientY - d.trackTop));
+        var top = Math.min(d.startY, curY);
+        var bottom = Math.max(d.startY, curY);
+        var startMs = snapMs(d.dayStartMs + (top / d.trackHeight) * 24 * 3600 * 1000);
+        var endMs = snapMs(d.dayStartMs + (bottom / d.trackHeight) * 24 * 3600 * 1000);
+        tearDown(d, false);
+        if (endMs - startMs < SNAP_MS) return;
+        prefillManualLogFromGap(new Date(startMs).toISOString(), new Date(endMs).toISOString());
+      }
+
+      function onKeyDown(e) {
+        if (e.key === 'Escape' && dragState) {
+          var d = dragState;
+          dragState = null;
+          tearDown(d, true);
+        }
+      }
+
+      canvas.addEventListener('mousedown', onMouseDown);
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+      document.addEventListener('keydown', onKeyDown);
     })();
 
     // --- Init ---

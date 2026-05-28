@@ -195,7 +195,7 @@ export function indexPage() {
     .about-row .muted { font-size: 0.8rem; color: #8b949e; margin-top: 0.15rem; }
     .about-row-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
     .about-row-actions button { white-space: nowrap; padding: 0.4rem 0.75rem; font-size: 0.85rem; }
-    .about-row-actions a { display: inline-flex; align-items: center; color: #58a6ff; font-size: 0.8rem; text-decoration: none; padding: 0 0.5rem; white-space: nowrap; align-self: stretch; }
+    .about-row-actions a { color: #58a6ff; font-size: 0.8rem; text-decoration: none; padding: 0.25rem 0; white-space: nowrap; flex-basis: 100%; text-align: right; }
     .about-row-actions a:hover { text-decoration: underline; }
     .badge { display: inline-flex; align-items: center; background: rgba(210, 153, 34, 0.2); color: #d29922; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.7rem; line-height: 1.4; white-space: nowrap; }
     .toggle-row { display: flex; align-items: center; gap: 0.5rem; margin: 0.3rem 0; font-size: 0.85rem; color: #c9d1d9; }

@@ -114,7 +114,9 @@ run(`git add ${PKG} ${CARGO} ${TAURI_CONF} ${path.join(ROOT, 'desktop/src-tauri/
 run(`git commit -m "chore(desktop): bump version to ${next}"`);
 
 if (wantTag) {
-  run(`git tag v${next}`);
+  // Annotated tag so `git push --follow-tags` picks it up; lightweight
+  // tags are skipped by that flag.
+  run(`git tag -a v${next} -m "desktop v${next}"`);
   console.log(`Created tag v${next}. Push with: git push origin HEAD --follow-tags`);
 } else {
   console.log(`Committed. No tag (--no-tag).`);

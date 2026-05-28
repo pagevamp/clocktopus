@@ -188,14 +188,21 @@ export function indexPage() {
     .timeline-track.dragging { cursor:crosshair; }
 
     /* About section */
-    .about-row { display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0; border-bottom: 1px solid rgba(128, 128, 128, 0.15); }
+    .about-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 0.75rem; padding: 0.6rem 0; border-bottom: 1px solid rgba(128, 128, 128, 0.15); }
     .about-row:last-child { border-bottom: none; }
+    .about-row-info { min-width: 0; flex: 1 1 auto; }
+    .about-row-info strong { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; color: #e1e4e8; }
     .about-row .muted { font-size: 0.8rem; color: #8b949e; margin-top: 0.15rem; }
-    .badge { display: inline-block; background: rgba(210, 153, 34, 0.2); color: #d29922; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.75rem; margin-right: 0.5rem; }
+    .about-row-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+    .about-row-actions button { white-space: nowrap; padding: 0.4rem 0.75rem; font-size: 0.85rem; }
+    .about-row-actions a { color: #58a6ff; font-size: 0.8rem; text-decoration: none; margin-left: 0.2rem; }
+    .about-row-actions a:hover { text-decoration: underline; }
+    .badge { display: inline-flex; align-items: center; background: rgba(210, 153, 34, 0.2); color: #d29922; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.7rem; line-height: 1.4; white-space: nowrap; }
     .toggle-row { display: flex; align-items: center; gap: 0.5rem; margin: 0.3rem 0; font-size: 0.85rem; color: #c9d1d9; }
     .toggle-row input[type="checkbox"] { width: auto; margin: 0; }
     .modal { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-    .modal-body { background: #1c1f26; color: #e1e4e8; padding: 1.5rem; border: 1px solid #2d3139; border-radius: 12px; min-width: 420px; max-width: 600px; }
+    .modal { padding: 1rem; }
+    .modal-body { background: #1c1f26; color: #e1e4e8; padding: 1.25rem; border: 1px solid #2d3139; border-radius: 12px; width: 100%; max-width: 600px; box-sizing: border-box; }
     .modal-body h3 { margin-bottom: 0.75rem; color: #fff; }
     .modal-body pre { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 0.6rem 0.75rem; color: #c9d1d9; margin-bottom: 0.5rem; white-space: pre-wrap; }
     .modal-body progress { width: 100%; margin-right: 0.5rem; }
@@ -559,27 +566,25 @@ export function indexPage() {
           </div>
 
           <div class="about-row" id="about-cli-row">
-            <div>
-              <strong>Clocktopus CLI</strong>
+            <div class="about-row-info">
+              <strong>Clocktopus CLI <span id="about-cli-badge" class="badge" style="display:none;"></span></strong>
               <div class="muted"><span id="about-cli-current">…</span></div>
             </div>
-            <div>
-              <span id="about-cli-badge" style="display:none;" class="badge"></span>
+            <div class="about-row-actions">
               <button id="about-cli-check" onclick="checkCliUpdate()">Check for updates</button>
               <button id="about-cli-update" onclick="startCliUpdate()" style="display:none;">Update</button>
             </div>
           </div>
 
           <div class="about-row" id="about-desktop-row" style="display:none;">
-            <div>
-              <strong>Desktop app</strong>
+            <div class="about-row-info">
+              <strong>Desktop app <span id="about-desktop-badge" class="badge" style="display:none;"></span></strong>
               <div class="muted"><span id="about-desktop-current">…</span></div>
             </div>
-            <div>
-              <span id="about-desktop-badge" style="display:none;" class="badge"></span>
+            <div class="about-row-actions">
               <button id="about-desktop-check" onclick="checkDesktopUpdate()">Check for updates</button>
               <button id="about-desktop-update" onclick="startDesktopDownload()" style="display:none;">Download</button>
-              <a id="about-desktop-notes" href="#" target="_blank" style="display:none;margin-left:0.5rem;">Release notes</a>
+              <a id="about-desktop-notes" href="#" target="_blank" style="display:none;">Release notes</a>
             </div>
           </div>
 

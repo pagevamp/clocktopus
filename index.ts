@@ -570,6 +570,55 @@ const bunBin = (() => {
 const pm2Cmd = `${bunBin} ${pm2Bin}`;
 
 program
+  .command('update')
+  .description('Check for and install a newer clocktopus npm release.')
+  .option('--yes', 'Install without prompting.', false)
+  .option('--check', 'Only print current + latest, do not install.', false)
+  .action(async (opts: { yes: boolean; check: boolean }) => {
+    const { getCurrentVersion, fetchLatestVersion, isUpdateAvailable, runUpdate, stopMonitorIfRunning } = await import(
+      './lib/updater.js'
+    );
+    const current = getCurrentVersion();
+    process.stdout.write(`Current: ${current}\n`);
+    const latest = await fetchLatestVersion({ force: true });
+    if (!latest) {
+      console.error(chalk.red('Could not reach the npm registry.'));
+      process.exit(1);
+    }
+    process.stdout.write(`Latest:  ${latest.version}\n`);
+    if (!isUpdateAvailable(current, latest.version)) {
+      console.log(chalk.green('Already up to date.'));
+      return;
+    }
+    if (opts.check) return;
+    if (!opts.yes) {
+      const { simplePrompt } = await import('./lib/simple-prompt.js');
+      const answers = await simplePrompt([
+        {
+          type: 'confirm',
+          name: 'install',
+          message: `Install clocktopus ${latest.version}?`,
+          default: false,
+        },
+      ]);
+      if (!answers.install) {
+        console.log('Cancelled.');
+        return;
+      }
+    }
+    console.log(chalk.blue('Stopping monitor (if running)…'));
+    await stopMonitorIfRunning();
+    console.log(chalk.blue('Installing…'));
+    try {
+      await runUpdate({ onLog: (line) => process.stdout.write(line + '\n') });
+    } catch (err) {
+      console.error(chalk.red(`Update failed: ${err instanceof Error ? err.message : String(err)}`));
+      process.exit(1);
+    }
+    console.log(chalk.green(`Updated to ${latest.version}. Restart monitor with: mrestart`));
+  });
+
+program
   .command('monitor')
   .description('Start idle monitor as a background daemon.')
   .action(async () => {

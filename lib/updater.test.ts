@@ -79,3 +79,52 @@ describe('fetchLatestVersion', () => {
     expect(await fetchLatestVersion()).toBeNull();
   });
 });
+
+describe('runUpdate', () => {
+  it('spawns bun with the expected args and resolves on exit 0', async () => {
+    const calls: { cmd: string; args: string[]; env: Record<string, string> }[] = [];
+    const fakeSpawn = (cmd: string, args: string[], opts: { env: Record<string, string> }) => {
+      calls.push({ cmd, args, env: opts.env });
+      const listeners: Record<string, ((...a: unknown[]) => void)[]> = {};
+      const emitter = {
+        stdout: { on: (e: string, cb: (b: Buffer) => void) => (listeners['out-' + e] = [cb]) },
+        stderr: { on: (e: string, cb: (b: Buffer) => void) => (listeners['err-' + e] = [cb]) },
+        on: (e: string, cb: (code: number) => void) => {
+          if (e === 'close') setTimeout(() => cb(0), 5);
+          return emitter;
+        },
+      };
+      setTimeout(() => listeners['out-data']?.[0](Buffer.from('installing\n')), 1);
+      return emitter as unknown;
+    };
+    const { runUpdate, __setSpawnerForTests } = await import('./updater.js');
+    __setSpawnerForTests(fakeSpawn as Parameters<typeof __setSpawnerForTests>[0]);
+    const logs: string[] = [];
+    await runUpdate({ onLog: (l) => logs.push(l) });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].args).toEqual(['i', '-g', 'clocktopus', '--trust']);
+    expect(calls[0].env.PATH.startsWith(`${process.env.HOME}/.bun/bin:`)).toBe(true);
+    expect(logs).toContain('installing');
+    __setSpawnerForTests(null);
+  });
+
+  it('rejects with combined stderr on non-zero exit', async () => {
+    const fakeSpawn = () => {
+      const listeners: Record<string, ((...a: unknown[]) => void)[]> = {};
+      const emitter = {
+        stdout: { on: () => {} },
+        stderr: { on: (e: string, cb: (b: Buffer) => void) => (listeners['err-' + e] = [cb]) },
+        on: (e: string, cb: (code: number) => void) => {
+          if (e === 'close') setTimeout(() => cb(1), 5);
+          return emitter;
+        },
+      };
+      setTimeout(() => listeners['err-data']?.[0](Buffer.from('permission denied\n')), 1);
+      return emitter as unknown;
+    };
+    const { runUpdate, __setSpawnerForTests } = await import('./updater.js');
+    __setSpawnerForTests(fakeSpawn as Parameters<typeof __setSpawnerForTests>[0]);
+    await expect(runUpdate({ onLog: () => {} })).rejects.toThrow(/permission denied/);
+    __setSpawnerForTests(null);
+  });
+});

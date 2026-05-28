@@ -261,6 +261,18 @@ fn install_clocktopus() -> Result<(), String> {
     run_bun_install_clocktopus(None)
 }
 
+#[tauri::command]
+fn update_clocktopus(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, ServerChild>,
+) -> Result<(), String> {
+    kill_server_child(&state);
+    kill_server_by_port();
+    run_bun_install_clocktopus(Some(&app))?;
+    spawn_server(&state);
+    Ok(())
+}
+
 fn spawn_server(state: &ServerChild) {
     // Resolve clocktopus binary directly — GUI apps lack shell PATH.
     let home = std::env::var("HOME").unwrap_or_default();
@@ -320,7 +332,7 @@ pub fn run() {
     }
 
     builder
-        .invoke_handler(tauri::generate_handler![start_server, stop_server, check_server, check_bun_installed, install_bun, check_clocktopus_installed, install_clocktopus])
+        .invoke_handler(tauri::generate_handler![start_server, stop_server, check_server, check_bun_installed, install_bun, check_clocktopus_installed, install_clocktopus, update_clocktopus])
         .register_uri_scheme_protocol("clocktopus", move |_app, request| {
             let body = if request.uri().path() == "/loading" {
                 loading_html.as_bytes().to_vec()
